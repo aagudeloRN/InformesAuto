@@ -1,6 +1,6 @@
 # Sistema de Informes de Inteligencia Competitiva — Contexto del Proyecto
 
-**Estado:** En planeación → preparado para Fase 0 (andamiaje)  
+**Estado:** Fase 0 completa → preparado para Fase 2 (Retrieval)  
 **Piloto:** Descripción Empresa → Sector GICS → Benchmarking (Cap 2) → ensamblado  
 **Estimación:** ~8-11 días de desarrollo (1 persona con Claude Code)
 
@@ -19,6 +19,15 @@
 - Hook de modelos hardcodeados (pre-commit, bloqueante)
 - Hook de formateo Python (post-edit, no bloqueante)
 
+✅ **Fase 0: Andamiaje (2026-06-22)**
+- `docker-compose.yml` (pgvector:pg16, port 5434)
+- `shared/config.py` pydantic-settings singleton
+- `data/database.py` engine + SessionLocal schema-aware
+- 4 modelos ORM en schema `informes_ic` (empresas, historial_informes, documentos_locales, embeddings_vectoriales VECTOR(768))
+- `scripts/create_schema.py` + 4 smoke tests ✓
+- ADR-004: LangChain como framework de orquestación
+- Hallazgo: instancia compartida `repositorio_postgres` ya corre en 5434 (ver `docs/decisions/FASE0_HALLAZGOS.md`)
+
 ✅ **Grafo de dependencias (DAG) del informe**
 - Nivel 0: Descripción Empresa, Sector GICS, Ecuaciones búsqueda (fundacionales)
 - Nivel 1: Cap2 Benchmarking, Cap3 Tendencial, Cap4 Ecosistema, Cap5 Convergencia (paralelos)
@@ -31,23 +40,30 @@
 
 ## Lo que falta
 
-**Fase 1 (próxima) — Revisar prompts del piloto e identificar refinamientos**
+**Fase 2 (próxima) — Retrieval**
+- Conectores de fuentes automáticas: OpenAlex, arXiv, Crossref, web (Tavily/DuckDuckGo)
+- Conector RUES (datos empresa desde Colombia)
+- Pipeline de ingesta de PDFs manuales (EMIS, informes sectoriales)
+- Chunking + embeddings con `nomic-embed-text` vía Ollama
+- PGVector store (wrapper en `infrastructure/retrieval/`)
+- Tests de retrieval con datos del caso NOEL
 
-Entrada: ~18 archivos `.docx` con prompts originales (diseñados para NotebookLM manual)  
-Salida: 3 plantillas `.md` parametrizadas (Descripción Empresa, Sector GICS, Benchmarking) + decisión clara de cuál refinamiento iterativo heredado de NotebookLM se conserva en el sistema automatizado
+**Fase 3 — Orquestación LLM**
+- Wrapper LLM único (`infrastructure/llm/`): circuit breaker, budget tracker, fallback local→API
+- Cadenas LCEL para los 3 capítulos del piloto (Prompt-01, Prompt-02, Prompt-03)
+- Política de datos ausentes (umbral de relevancia → párrafo de ausencia)
 
-Esto requiere leer y analizar:
-1. `1__Prompt_Descripción_Empresa.docx` — insumo: RUES, entrada usuario. Output: descripción empresa.
-2. `2__Prompt_Sector_GIS_de_la_empresa.docx` — insumo: descripción empresa + 25 grupos GICS. Output: clasificación GICS.
-3. `3__Prompt_-_Capítulo_2_-_Benchmarking.docx` — insumo: descripción + (retrieval de 14 competidores). Output: análisis competitivo con citas.
+**Fase 4 — Ensamblado**
+- Ensamblado en plantilla membrete (`011 Hoja membreteESP.dotx`) con python-docx
+- Citación APA 7 desde metadatos del retrieval
 
-**Fases 2-6 (después de Fase 1)**
-- Fase 0: Andamiaje (estructura de carpetas, Docker, esquema PostgreSQL)
-- Fase 2: Retrieval (conectores web + RUES + chunking + pgvector)
-- Fase 3: Orquestación LLM (cadenas, circuit breaker, faithful/gate)
-- Fase 4: Ensamblado en membrete (python-docx, citación APA)
-- Fase 5: Tests e integración del piloto
-- Fase 6: Medición costo/tiempo
+**Fase 5 — Tests e integración del piloto**
+- Tests de integración end-to-end (empresa NOEL → informe completo)
+- Cobertura ≥80% en `domain/`
+
+**Fase 6 — Medición**
+- Costo total por informe (objetivo ≤1 USD)
+- Tiempo de generación
 
 ---
 
@@ -120,20 +136,11 @@ Estructura observada tras leer los encabezados de los 18 prompts:
 
 ## Siguientes pasos en orden acordado
 
-1. **Revisar prompts del piloto** (Descripción Empresa, Sector GICS, Benchmarking)
-   - Leer cada uno, identificar pasos de refinamiento
-   - Decidir cuál se colapsa al system prompt, cuál es paso real
-   - Generar plantillas `.md` parametrizadas (con variables como `{nombre_empresa}`, `{sector_ciuu}`, etc.)
-   
-2. **Escribir CLAUDE.md y Prime Directive en el repo** (ya lo tienes, copia a `/docs/architecture/`)
-
-3. **Fase 0: Andamiaje**
-   - Estructura de carpetas (presentation/, domain/, data/, infrastructure/, shared/)
-   - Docker compose, PostgreSQL + pgvector
-   - `.env.example`
-   - Esquema de BD inicial (tablas: Empresas, HistorialInformes, DocumentosLocales, EmbeddingsVectoriales)
-
-4. **Fase 1-6 del piloto** (ya con especificación clara de prompts)
+1. **Fase 2: Retrieval** — conectores de fuentes + chunking + pgvector store
+2. **Fase 3: Orquestación LLM** — wrapper + cadenas LCEL + política datos ausentes
+3. **Fase 4: Ensamblado** — python-docx + citación APA
+4. **Fase 5: Tests e integración** — piloto NOEL end-to-end
+5. **Fase 6: Medición** — costo/tiempo
 
 ---
 
