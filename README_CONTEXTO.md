@@ -1,7 +1,7 @@
 # Sistema de Informes de Inteligencia Competitiva — Contexto del Proyecto
 
-**Estado:** Fase 0 completa → preparado para Fase 2 (Retrieval)  
-**Piloto:** Descripción Empresa → Sector GICS → Benchmarking (Cap 2) → ensamblado  
+**Estado:** Fase 2 completa → preparado para Fase 3 (Orquestación LLM)
+**Piloto:** Descripción Empresa → Sector GICS → Benchmarking (Cap 2) → ensamblado
 **Estimación:** ~8-11 días de desarrollo (1 persona con Claude Code)
 
 ---
@@ -28,6 +28,18 @@
 - ADR-004: LangChain como framework de orquestación
 - Hallazgo: instancia compartida `repositorio_postgres` ya corre en 5434 (ver `docs/decisions/FASE0_HALLAZGOS.md`)
 
+✅ **Fase 2: Retrieval Layer (2026-06-22)**
+- `shared/types.py`: DTOs `WebResult`, `ChunkResult`
+- `shared/constants/gics_groups.py`: 25 grupos GICS + `build_gics_prompt_block()`
+- `infrastructure/sources/web_connector.py`: `WebConnector` Tavily + DDG fallback + `extract_ciiu()`
+- `infrastructure/retrieval/chunker.py`: wrapper `RecursiveCharacterTextSplitter`
+- `infrastructure/retrieval/embedder.py`: httpx directo a Ollama `/api/embeddings` (sin langchain)
+- `data/repositories/embedding_repo.py`: `EmbeddingRepository` con cosine pgvector
+- `infrastructure/retrieval/pgvector_store.py`: `PGVectorStore` orquesta ingest + search
+- 9 tests nuevos, 13/13 pasando ✓
+- ADR-005: Diseño de la capa de retrieval
+- Hallazgos: `ddgs` reemplaza `duckduckgo-search`; raw SQL necesita schema calificado (ver `docs/decisions/FASE2_HALLAZGOS.md`)
+
 ✅ **Grafo de dependencias (DAG) del informe**
 - Nivel 0: Descripción Empresa, Sector GICS, Ecuaciones búsqueda (fundacionales)
 - Nivel 1: Cap2 Benchmarking, Cap3 Tendencial, Cap4 Ecosistema, Cap5 Convergencia (paralelos)
@@ -40,15 +52,7 @@
 
 ## Lo que falta
 
-**Fase 2 (próxima) — Retrieval**
-- Conectores de fuentes automáticas: OpenAlex, arXiv, Crossref, web (Tavily/DuckDuckGo)
-- Conector RUES (datos empresa desde Colombia)
-- Pipeline de ingesta de PDFs manuales (EMIS, informes sectoriales)
-- Chunking + embeddings con `nomic-embed-text` vía Ollama
-- PGVector store (wrapper en `infrastructure/retrieval/`)
-- Tests de retrieval con datos del caso NOEL
-
-**Fase 3 — Orquestación LLM**
+**Fase 3 — Orquestación LLM** ← próxima
 - Wrapper LLM único (`infrastructure/llm/`): circuit breaker, budget tracker, fallback local→API
 - Cadenas LCEL para los 3 capítulos del piloto (Prompt-01, Prompt-02, Prompt-03)
 - Política de datos ausentes (umbral de relevancia → párrafo de ausencia)
@@ -136,7 +140,7 @@ Estructura observada tras leer los encabezados de los 18 prompts:
 
 ## Siguientes pasos en orden acordado
 
-1. **Fase 2: Retrieval** — conectores de fuentes + chunking + pgvector store
+1. ~~**Fase 2: Retrieval**~~ ✅ completada 2026-06-22
 2. **Fase 3: Orquestación LLM** — wrapper + cadenas LCEL + política datos ausentes
 3. **Fase 4: Ensamblado** — python-docx + citación APA
 4. **Fase 5: Tests e integración** — piloto NOEL end-to-end
