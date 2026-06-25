@@ -3,7 +3,7 @@
 Genera informes de vigilancia competitiva estructurados y citados a partir del nombre de una empresa,
 usando RAG propio sobre pgvector, modelos locales vía Ollama y cadenas LCEL.
 
-**Estado actual:** Fase 3 completa — LLM Gateway + Cadenas LCEL + Use Cases del piloto  
+**Estado actual:** Fase 4 completa — Ensamblado .docx + Citación APA 7 + Ingesta PDF  
 **Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)
 
 ---
@@ -34,7 +34,7 @@ curl http://127.0.0.1:11434/api/tags      # Ollama OK?
 docker ps | grep repositorio_postgres     # BD OK?
 
 # 5. Correr tests
-uv run pytest tests/ -v                   # debe mostrar 19/19 passed
+uv run pytest tests/ -v                   # debe mostrar 27/27 passed
 ```
 
 ## Variables de entorno requeridas
@@ -65,6 +65,10 @@ LLM_CIRCUIT_BREAKER_MAX_RETRIES=3
 
 # Fuentes web (vacío = fallback a DDG gratuito)
 TAVILY_API_KEY=
+
+# Ensamblado .docx (Fase 4)
+DOCX_TEMPLATE_PATH=assets/plantilla_membrete.dotx   # vacío = documento limpio
+DOCX_OUTPUT_DIR=./output
 ```
 
 ## Arquitectura de alto nivel
@@ -87,9 +91,9 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | 0 | ✅ | Andamiaje: Docker + PostgreSQL + modelos ORM |
 | 2 | ✅ | Retrieval: WebConnector + Embedder + PGVectorStore |
 | 3 | ✅ | LLM Gateway + Cadenas LCEL + Use Cases del piloto |
-| 4 | ⏳ | Ensamblado: python-docx + citación APA 7 |
-| 5 | ⏳ | DAG completo + tests E2E piloto NOEL |
-| 6 | ⏳ | Medición de costo/tiempo; verificar ≤1 USD/informe |
+| 4 | ✅ | Ensamblado .docx + Citación APA 7 + Ingesta PDF |
+| 5 | ⏳ | Capítulos restantes (Cap 3–6) + Resumen Ejecutivo + Prompt-00 |
+| 6 | ⏳ | UI Streamlit + medición costo/tiempo + hardening + fallback API |
 
 ## Documentación
 
@@ -100,6 +104,7 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | [`docs/decisions/FASE0_HALLAZGOS.md`](docs/decisions/FASE0_HALLAZGOS.md) | Hallazgos operativos Fase 0 |
 | [`docs/decisions/FASE2_HALLAZGOS.md`](docs/decisions/FASE2_HALLAZGOS.md) | Hallazgos operativos Fase 2 |
 | [`docs/decisions/FASE3_HALLAZGOS.md`](docs/decisions/FASE3_HALLAZGOS.md) | Hallazgos operativos Fase 3 |
+| [`docs/decisions/FASE4_HALLAZGOS.md`](docs/decisions/FASE4_HALLAZGOS.md) | Hallazgos operativos Fase 4 |
 | [`docs/prompts/`](docs/prompts/) | Especificación de los 3 prompts del piloto |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historial semántico de cambios |
 | [`CLAUDE.md`](CLAUDE.md) | Reglas operativas para agentes IA |

@@ -1,6 +1,6 @@
 # Arquitectura del Sistema — Informes de Inteligencia Competitiva
 
-**Versión:** 3 (post Fase 3)
+**Versión:** 4 (post Fase 4)
 **Última actualización:** 2026-06-25
 **Propósito:** documento vivo de referencia arquitectónica. Las decisiones cerradas
 viven en los ADRs; este documento describe el sistema como está construido y hacia
@@ -72,7 +72,7 @@ El informe incluye:
 │  · Settings (pydantic-settings, lru_cache)        │
 │  · DTOs: WebResult, ChunkResult,                  │
 │          DescripcionEmpresa, ClasificacionGICS,   │
-│          CapBenchmarking                          │
+│          CapBenchmarking, Referencia, InformePiloto│
 │  · Constantes: GICS_GROUPS (25 grupos)            │
 └───────────────────────────────────────────────────┘
 ```
@@ -171,18 +171,31 @@ Input usuario: {nombre_empresa}
 | ClassifyGICS | `domain/use_cases/classify_gics.py` | Prompt-02: clasificación + parsing output |
 | GenerateBenchmarking | `domain/use_cases/generate_benchmarking.py` | Prompt-03: ingesta on-demand + LLM + datos ausentes |
 
+### Fase 4 ✅
+
+| Componente | Archivo | Responsabilidad |
+|-----------|---------|-----------------|
+| DTOs ensamblado | `shared/types.py` | `Referencia`, `InformePiloto`; `chunks_usados` en `CapBenchmarking` |
+| APA formatter | `infrastructure/citation/apa_formatter.py` | Extrae, formatea y deduplica citas desde JSONB |
+| DocxBuilder | `infrastructure/docx_builder.py` | Wrapper python-docx; convierte Markdown básico a estilos Word |
+| PilotAssembler | `domain/assembler.py` | Orquesta el .docx del piloto (N0+N1 parcial) |
+| InformeRepository | `data/repositories/informe_repo.py` | CRUD de `HistorialInforme` |
+| ingest_pdf.py | `scripts/ingest_pdf.py` | CLI ingesta PDF manual con SHA-256 anti-duplicados |
+
 ### Pendiente
 
 | Fase | Componente | Descripción |
 |------|-----------|-------------|
-| 4 | Ensamblador | `domain/assembler.py` + `infrastructure/docx_builder.py` via python-docx |
-| 4 | Citación APA | Generador de citas APA 7 desde metadatos del chunk |
-| 4 | PDF Ingestor | `scripts/ingest_pdf.py` para PDFs manuales (EMIS, informes sectoriales) |
-| 4 | Prompt-00 | Generación de ecuaciones de búsqueda por canal (OpenAlex, arXiv, web) |
-| 5 | DAG completo | Orquestador de los niveles N0→N1→N2→N3→ensamblado |
-| 5 | Tests E2E | Piloto NOEL completo (empresa → informe .docx) |
-| 5 | Fallback API | Escalado de OllamaGatewayLLM a proveedor externo (ADR-002) |
-| 6 | Medición | Dashboard de costo/tiempo por informe; verificar ≤1 USD/informe |
+| 5 | Prompt-00 | Generación de ecuaciones de búsqueda por canal (OpenAlex, arXiv, web) |
+| 5 | Cap 3 — Tendencias | chain_04 + use_case + retrieval OpenAlex/arXiv |
+| 5 | Cap 4 — Ecosistema | chain_05 + use_case + retrieval web local/global |
+| 5 | Cap 5 — Convergencias | chain_06 + use_case + retrieval cruzado |
+| 5 | Cap 6 — Accionables | chain_07 + use_case (barrera N2: consume N1) |
+| 5 | Resumen Ejecutivo | chain_08 + use_case (barrera N3: consume informe completo) |
+| 5 | DAG orquestador | `domain/orchestrator.py` — N0→N1→N2→N3→ensamblado con barreras |
+| 6 | UI Streamlit | `presentation/app.py` — formulario empresa → progreso → descarga .docx |
+| 6 | Fallback API | Escalado de `OllamaGatewayLLM` a proveedor externo (ADR-002) |
+| 6 | Medición | `CostTracker` persistido en `HistorialInforme`; dashboard costo/tiempo |
 
 ---
 
@@ -299,7 +312,32 @@ if web_results:
         texts=[r.content for r in web_results],
         fuente_tipo="web",
         urls=[r.url for r in web_results],
+        metadatos_extra=[r.metadatos for r in web_results],  # APA: título, año, dominio
     )
+```
+
+### Patrón de ensamblado (Fase 4+)
+
+```python
+# domain/assembler.py — el dominio no importa python-docx directamente
+from ic.infrastructure.docx_builder import DocxBuilder
+from ic.infrastructure.citation.apa_formatter import build_references_section
+
+refs = build_references_section(cap.chunks_usados)     # deduplica por URL
+informe = InformePiloto(empresa=..., gics=..., cap_benchmarking=cap, referencias=refs)
+assembler = PilotAssembler(DocxBuilder(settings.docx_template_path or None))
+ruta = assembler.assemble(informe, output_path)
+```
+
+### Patrón de citación APA desde chunks
+
+```python
+# infrastructure/citation/apa_formatter.py
+# Los chunks llevan metadatos JSONB con {titulo, fuente_nombre, año, autor, fecha_acceso}
+# Si un campo falta → usar código APA de ausencia (nunca inventar)
+meta = extract_citation_metadata(chunk)   # lee chunk.metadatos
+inline = format_inline(meta)              # "(fortune.com, 2024)"
+ref = format_reference(meta)             # Referencia completa APA 7
 ```
 
 ---
@@ -313,7 +351,7 @@ curl http://127.0.0.1:11434/api/tags       # Ollama responde?
 
 # Desarrollo
 uv sync                                    # sincronizar deps
-uv run pytest tests/ -v                    # suite completa (19 tests)
+uv run pytest tests/ -v                    # suite completa (27 tests)
 uv run python scripts/create_schema.py    # re-crear schema si hay cambios ORM
 
 # Smoke test gateway LLM
