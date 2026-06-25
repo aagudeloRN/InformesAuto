@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     openalex_email: str = ""
     tavily_api_key: str = ""
 
+    # Ensamblado de documentos (Fase 4)
+    docx_template_path: str = ""
+    docx_output_dir: str = "./output"
+
     # Aplicación
     app_env: str = "development"
     log_level: str = "INFO"

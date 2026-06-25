@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ic.data.models.base import Base
@@ -32,4 +32,5 @@ class DocumentoLocal(Base):
     estado_ingesta: Mapped[str] = mapped_column(
         Text, nullable=False, default=EstadoIngesta.PENDIENTE
     )
+    metadatos: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

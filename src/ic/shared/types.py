@@ -7,6 +7,7 @@ class WebResult:
     title: str
     content: str
     snippet: str = ""
+    metadatos: dict | None = field(default=None)
 
 
 @dataclass
@@ -37,3 +38,24 @@ class CapBenchmarking:
     texto: str
     n_chunks_usados: int
     retrieval_suficiente: bool
+    chunks_usados: list["ChunkResult"] = field(default_factory=list)
+
+
+@dataclass
+class Referencia:
+    clave: str
+    autor: str
+    año: str
+    titulo: str
+    fuente: str
+    url: str | None
+    apa_string: str
+
+
+@dataclass
+class InformePiloto:
+    empresa: DescripcionEmpresa
+    gics: ClasificacionGICS
+    cap_benchmarking: CapBenchmarking
+    referencias: list[Referencia]
+    ruta_docx: str | None = None

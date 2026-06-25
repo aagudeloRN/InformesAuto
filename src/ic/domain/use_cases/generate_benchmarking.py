@@ -49,6 +49,7 @@ class GenerateBenchmarking:
                 texto=build_absent_paragraph("Cap 2 — Análisis Competitivo"),
                 n_chunks_usados=0,
                 retrieval_suficiente=False,
+                chunks_usados=[],
             )
 
         context = format_chunks_as_context(chunks)
@@ -61,4 +62,5 @@ class GenerateBenchmarking:
             texto=texto,
             n_chunks_usados=len(chunks),
             retrieval_suficiente=True,
+            chunks_usados=chunks,
         )

@@ -1,4 +1,6 @@
 import re
+from datetime import date
+from urllib.parse import urlparse
 
 import httpx
 from ddgs import DDGS
@@ -7,6 +9,29 @@ from ic.shared.config import Settings
 from ic.shared.types import WebResult
 
 _CIIU_RE = re.compile(r"CIIU[:\s]*(\d{4,6})", re.IGNORECASE)
+_YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
+
+
+def _extract_domain(url: str) -> str:
+    try:
+        return urlparse(url).netloc.removeprefix("www.")
+    except Exception:
+        return url
+
+
+def _extract_year(text: str) -> str | None:
+    m = _YEAR_RE.search(text)
+    return m.group(0) if m else None
+
+
+def _build_metadatos(url: str, title: str, content: str) -> dict:
+    return {
+        "titulo": title or "Sin título",
+        "fuente_nombre": _extract_domain(url),
+        "año": _extract_year(content) or "s.f.",
+        "fecha_acceso": date.today().isoformat(),
+        "autor": None,
+    }
 
 
 class WebConnector:
@@ -31,12 +56,16 @@ class WebConnector:
         data = resp.json()
         results = []
         for item in data.get("results", []):
+            url = item.get("url", "")
+            title = item.get("title", "")
+            content = item.get("content", "")
             results.append(
                 WebResult(
-                    url=item.get("url", ""),
-                    title=item.get("title", ""),
-                    content=item.get("content", ""),
-                    snippet=item.get("content", "")[:300],
+                    url=url,
+                    title=title,
+                    content=content,
+                    snippet=content[:300],
+                    metadatos=_build_metadatos(url, title, content),
                 )
             )
         return results
@@ -44,12 +73,16 @@ class WebConnector:
     def _search_ddg(self, query: str, max_results: int) -> list[WebResult]:
         results = []
         for item in DDGS().text(query, max_results=max_results):
+            url = item.get("href", "")
+            title = item.get("title", "")
+            content = item.get("body", "")
             results.append(
                 WebResult(
-                    url=item.get("href", ""),
-                    title=item.get("title", ""),
-                    content=item.get("body", ""),
-                    snippet=item.get("body", "")[:300],
+                    url=url,
+                    title=title,
+                    content=content,
+                    snippet=content[:300],
+                    metadatos=_build_metadatos(url, title, content),
                 )
             )
         return results
