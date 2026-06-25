@@ -1,6 +1,6 @@
 # Sistema de Informes de Inteligencia Competitiva — Contexto del Proyecto
 
-**Estado:** Fase 2 completa → preparado para Fase 3 (Orquestación LLM)
+**Estado:** Fase 3 completa → preparado para Fase 4 (Ensamblado)
 **Piloto:** Descripción Empresa → Sector GICS → Benchmarking (Cap 2) → ensamblado
 **Estimación:** ~8-11 días de desarrollo (1 persona con Claude Code)
 
@@ -52,12 +52,17 @@
 
 ## Lo que falta
 
-**Fase 3 — Orquestación LLM** ← próxima
-- Wrapper LLM único (`infrastructure/llm/`): circuit breaker, budget tracker, fallback local→API
-- Cadenas LCEL para los 3 capítulos del piloto (Prompt-01, Prompt-02, Prompt-03)
-- Política de datos ausentes (umbral de relevancia → párrafo de ausencia)
+✅ **Fase 3 — Orquestación LLM (2026-06-25)**
+- `OllamaGatewayLLM(BaseChatModel)`: httpx directo a Ollama + tenacity circuit breaker
+- `CostTracker`: acumulador de tokens/costo por sesión
+- Cadenas LCEL para los 3 prompts del piloto (`chain_01`, `chain_02`, `chain_03`)
+- Política de datos ausentes: `check_retrieval_sufficient()` + `build_absent_paragraph()`
+- Use cases: `GenerateEmpresaDescription`, `ClassifyGICS`, `GenerateBenchmarking`
+- DTOs nuevos: `DescripcionEmpresa`, `ClasificacionGICS`, `CapBenchmarking`
+- 6 tests nuevos, 19/19 pasando ✓
+- Hallazgos: import path `langchain_core`, retry en closure HTTP, variable names del doc de prompt (ver `docs/decisions/FASE3_HALLAZGOS.md`)
 
-**Fase 4 — Ensamblado**
+**Fase 4 — Ensamblado** ← próxima
 - Ensamblado en plantilla membrete (`011 Hoja membreteESP.dotx`) con python-docx
 - Citación APA 7 desde metadatos del retrieval
 
@@ -141,8 +146,8 @@ Estructura observada tras leer los encabezados de los 18 prompts:
 ## Siguientes pasos en orden acordado
 
 1. ~~**Fase 2: Retrieval**~~ ✅ completada 2026-06-22
-2. **Fase 3: Orquestación LLM** — wrapper + cadenas LCEL + política datos ausentes
-3. **Fase 4: Ensamblado** — python-docx + citación APA
+2. ~~**Fase 3: Orquestación LLM**~~ ✅ completada 2026-06-25
+3. **Fase 4: Ensamblado** — python-docx + citación APA ← próxima
 4. **Fase 5: Tests e integración** — piloto NOEL end-to-end
 5. **Fase 6: Medición** — costo/tiempo
 

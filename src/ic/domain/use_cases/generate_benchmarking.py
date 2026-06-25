@@ -34,7 +34,11 @@ class GenerateBenchmarking:
         for query in queries:
             web_results = self._web_connector.search(query)
             if web_results:
-                self._store.ingest(web_results, fuente_tipo="web")
+                self._store.ingest(
+                    texts=[r.content for r in web_results],
+                    fuente_tipo="web",
+                    urls=[r.url for r in web_results],
+                )
 
         chunks = self._store.search(
             f"{sector_gics} competitors benchmarking {nombre_empresa}"

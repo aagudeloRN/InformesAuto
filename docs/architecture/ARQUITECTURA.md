@@ -1,7 +1,7 @@
 # Arquitectura del Sistema — Informes de Inteligencia Competitiva
 
-**Versión:** 2 (post Fase 2)
-**Última actualización:** 2026-06-22
+**Versión:** 3 (post Fase 3)
+**Última actualización:** 2026-06-25
 **Propósito:** documento vivo de referencia arquitectónica. Las decisiones cerradas
 viven en los ADRs; este documento describe el sistema como está construido y hacia
 dónde va.
@@ -51,8 +51,10 @@ El informe incluye:
                             │
 ┌───────────────────────────▼─────────────────────────┐
 │  domain/               Orquestación del DAG          │
-│    · casos de uso (generar capítulo, ensamblar)      │
-│    · política de datos ausentes                      │
+│    · use cases: GenerateEmpresaDescription,          │
+│                ClassifyGICS, GenerateBenchmarking    │
+│    · chains LCEL: chain_01, chain_02, chain_03       │
+│    · política de datos ausentes (absent_data.py)     │
 │    · DAG de capítulos (N0→N1→N2→N3→ensamblado)      │
 └───────┬───────────────────────────────┬──────────────┘
         │                               │
@@ -68,8 +70,9 @@ El informe incluye:
 ┌───────▼───────────────────────────────────────────┐
 │  shared/              tipos, constantes, config   │
 │  · Settings (pydantic-settings, lru_cache)        │
-│  · DTOs: WebResult, ChunkResult                   │
-│  · Enums: FuenteTipo, EstadoInforme, etc.         │
+│  · DTOs: WebResult, ChunkResult,                  │
+│          DescripcionEmpresa, ClasificacionGICS,   │
+│          CapBenchmarking                          │
 │  · Constantes: GICS_GROUPS (25 grupos)            │
 └───────────────────────────────────────────────────┘
 ```
@@ -79,16 +82,16 @@ El informe incluye:
 ## 4. Flujo de generación de un informe
 
 ```
-Input usuario: {nombre_empresa}, {descripcion_preliminar}
+Input usuario: {nombre_empresa}
                          │
                          ▼
           ┌──────────────────────────┐
           │  N0: Fundacionales       │
-          │  · Prompt-01: Descripción│ ← búsqueda web RUES + CIIU (WebConnector)
+          │  · Prompt-01: Descripción│ ← web RUES+CIIU (WebConnector) → OllamaGatewayLLM
           │  · Prompt-02: GICS       │ ← 25 grupos en system prompt (sin retrieval)
           │  · Prompt-00: Ecuaciones │ ← genera queries de búsqueda por canal
           └──────────────┬───────────┘
-                         │
+                         │  (barrera: Prompt-01 debe completar antes de N1)
           ┌──────────────▼───────────────────────────────────┐
           │  N1: Analíticos (paralelizables)                 │
           │  · Cap 2 Benchmarking  ← web on-demand + pgvector│
@@ -138,14 +141,13 @@ Input usuario: {nombre_empresa}, {descripcion_preliminar}
 | ORM: HistorialInforme | `data/models/historial_informe.py` | Registro de cada informe generado |
 | ORM: DocumentoLocal | `data/models/documento_local.py` | PDFs manuales (EMIS, sectoriales) |
 | ORM: EmbeddingVectorial | `data/models/embedding_vectorial.py` | Chunks embeds (`VECTOR(768)`) + metadata |
-| Enums | `shared/constants/__init__.py` | EstadoInforme, TipoDocumento, FuenteTipo, EstadoIngesta |
 | Scripts | `scripts/create_schema.py` | Crea el schema `informes_ic` y las tablas |
 
 ### Fase 2 ✅
 
 | Componente | Archivo | Responsabilidad |
 |-----------|---------|-----------------|
-| DTOs | `shared/types.py` | WebResult, ChunkResult |
+| DTOs retrieval | `shared/types.py` | `WebResult`, `ChunkResult` |
 | Constantes GICS | `shared/constants/gics_groups.py` | 25 grupos + `build_gics_prompt_block()` |
 | WebConnector | `infrastructure/sources/web_connector.py` | Búsqueda Tavily/DDG; extracción CIIU |
 | Chunker | `infrastructure/retrieval/chunker.py` | `chunk_text()` sobre `RecursiveCharacterTextSplitter` |
@@ -153,19 +155,34 @@ Input usuario: {nombre_empresa}, {descripcion_preliminar}
 | EmbeddingRepository | `data/repositories/embedding_repo.py` | `insert_many()` + `search_similar()` (cosine pgvector) |
 | PGVectorStore | `infrastructure/retrieval/pgvector_store.py` | Orquesta chunker + embedder + repo; `ingest()` + `search()` |
 
+### Fase 3 ✅
+
+| Componente | Archivo | Responsabilidad |
+|-----------|---------|-----------------|
+| DTOs generación | `shared/types.py` | `DescripcionEmpresa`, `ClasificacionGICS`, `CapBenchmarking` |
+| OllamaGatewayLLM | `infrastructure/llm/gateway.py` | `BaseChatModel` httpx directo + tenacity circuit breaker |
+| CostTracker | `infrastructure/llm/gateway.py` | Acumula tokens/costo por sesión |
+| build_llm() | `infrastructure/llm/gateway.py` | Factory sin hardcodear modelo (ADR-002) |
+| absent_data | `domain/absent_data.py` | Umbral de chunks + párrafo de ausencia estándar |
+| chain_01 | `domain/chains/chain_01_descripcion.py` | Cadena LCEL Prompt-01 (descripción empresa) |
+| chain_02 | `domain/chains/chain_02_gics.py` | Cadena LCEL Prompt-02 (clasificación GICS) |
+| chain_03 | `domain/chains/chain_03_benchmarking.py` | Cadena LCEL Prompt-03 (Cap 2 Benchmarking) |
+| GenerateEmpresaDescription | `domain/use_cases/generate_empresa_description.py` | Prompt-01: búsqueda web + LLM |
+| ClassifyGICS | `domain/use_cases/classify_gics.py` | Prompt-02: clasificación + parsing output |
+| GenerateBenchmarking | `domain/use_cases/generate_benchmarking.py` | Prompt-03: ingesta on-demand + LLM + datos ausentes |
+
 ### Pendiente
 
 | Fase | Componente | Descripción |
 |------|-----------|-------------|
-| 3 | LLM Gateway | Wrapper único: circuit breaker, budget tracker, fallback local→API, logging de costo |
-| 3 | Cadenas LCEL | Chains para Prompt-01, 02, 03; política de datos ausentes |
-| 3 | Prompt-00 | Generación de ecuaciones de búsqueda por canal (OpenAlex, arXiv, web) |
 | 4 | Ensamblador | `domain/assembler.py` + `infrastructure/docx_builder.py` via python-docx |
 | 4 | Citación APA | Generador de citas APA 7 desde metadatos del chunk |
 | 4 | PDF Ingestor | `scripts/ingest_pdf.py` para PDFs manuales (EMIS, informes sectoriales) |
+| 4 | Prompt-00 | Generación de ecuaciones de búsqueda por canal (OpenAlex, arXiv, web) |
 | 5 | DAG completo | Orquestador de los niveles N0→N1→N2→N3→ensamblado |
 | 5 | Tests E2E | Piloto NOEL completo (empresa → informe .docx) |
-| 6 | Medición | Dashboard de costo/tiempo por informe |
+| 5 | Fallback API | Escalado de OllamaGatewayLLM a proveedor externo (ADR-002) |
+| 6 | Medición | Dashboard de costo/tiempo por informe; verificar ≤1 USD/informe |
 
 ---
 
@@ -192,6 +209,10 @@ OLLAMA_BASE_URL=http://127.0.0.1:11434
 RAG_SIMILARITY_THRESHOLD=0.7
 RAG_TOP_K=10
 TAVILY_API_KEY=                          # vacío = fallback a DDG
+LLM_MAX_TOKENS_INPUT=8000
+LLM_MAX_TOKENS_OUTPUT=4000
+LLM_BUDGET_LIMIT_USD=1.0
+LLM_CIRCUIT_BREAKER_MAX_RETRIES=3
 ```
 
 ---
@@ -208,12 +229,12 @@ TAVILY_API_KEY=                          # vacío = fallback a DDG
 
 ---
 
-## 8. Patrones establecidos (copiar en Fase 3+)
+## 8. Patrones establecidos (copiar en Fase 4+)
 
 ### Patrón de acceso a Ollama (httpx directo)
 
 ```python
-# infrastructure/retrieval/embedder.py — referencia
+# infrastructure/retrieval/embedder.py — referencia para embeddings
 resp = httpx.post(
     f"{settings.ollama_base_url}/api/embeddings",
     json={"model": settings.llm_local_embed_model, "prompt": text},
@@ -221,6 +242,15 @@ resp = httpx.post(
 )
 resp.raise_for_status()
 return resp.json()["embedding"]
+
+# infrastructure/llm/gateway.py — referencia para chat
+resp = httpx.post(
+    f"{self.base_url}/api/chat",
+    json={"model": self.model, "messages": ollama_msgs, "stream": False},
+    timeout=self.timeout,
+)
+resp.raise_for_status()
+return resp.json()["message"]["content"]
 ```
 
 ### Patrón de raw SQL con schema calificado
@@ -231,14 +261,45 @@ table = EmbeddingVectorial.__table__.fullname  # "informes_ic.embeddings_vectori
 sql = text(f"SELECT ... FROM {table} ...")
 ```
 
+### Patrón de cadena LCEL (chain → use case)
+
+```python
+# domain/chains/chain_0N_*.py — definir la cadena
+def build_chain_0N(llm: OllamaGatewayLLM) -> Runnable:
+    prompt = ChatPromptTemplate.from_messages([...])
+    return prompt | llm | StrOutputParser()
+
+# domain/use_cases/use_case_0N.py — inyectar, no instanciar
+class UseCase0N:
+    def __init__(self, chain: Runnable, ...) -> None:  # inyección de dependencias
+        self._chain = chain
+
+    def execute(self, ...) -> DTO:
+        resultado = self._chain.invoke({...})
+        return DTO(...)
+```
+
 ### Patrón de lectura de config (sin hardcodear modelos)
 
 ```python
 # Correcto — el nombre del modelo viene del .env
-model = settings.llm_local_embed_model
+model = settings.llm_local_analytic_model
 
 # Incorrecto — viola CLAUDE.md Tier 1
-model = "nomic-embed-text"
+model = "qwen2.5"
+```
+
+### Patrón de conversión WebResult → ingest
+
+```python
+# domain/use_cases/ — conversión antes de llamar al store
+web_results = self._web_connector.search(query)
+if web_results:
+    self._store.ingest(
+        texts=[r.content for r in web_results],
+        fuente_tipo="web",
+        urls=[r.url for r in web_results],
+    )
 ```
 
 ---
@@ -247,13 +308,27 @@ model = "nomic-embed-text"
 
 ```bash
 # Verificar servicios
-docker ps | grep repositorio_postgres    # BD corriendo?
-curl http://127.0.0.1:11434/api/tags     # Ollama responde?
+docker ps | grep repositorio_postgres      # BD corriendo?
+curl http://127.0.0.1:11434/api/tags       # Ollama responde?
 
 # Desarrollo
-uv sync                                  # sincronizar deps
-uv run pytest tests/ -v                  # suite completa (13 tests)
-uv run python scripts/create_schema.py   # re-crear schema si hay cambios ORM
+uv sync                                    # sincronizar deps
+uv run pytest tests/ -v                    # suite completa (19 tests)
+uv run python scripts/create_schema.py    # re-crear schema si hay cambios ORM
+
+# Smoke test gateway LLM
+uv run python -c "
+from ic.shared.config import get_settings
+from ic.infrastructure.llm.gateway import build_llm
+from ic.domain.chains.chain_02_gics import build_chain_02
+from ic.domain.use_cases.classify_gics import ClassifyGICS
+s = get_settings()
+llm = build_llm(s)
+chain = build_chain_02(llm)
+uc = ClassifyGICS(chain)
+result = uc.execute('Grupo Nutresa', 'Empresa colombiana de alimentos procesados...')
+print(result.grupo_gics)
+"
 
 # Verificación rápida de embeddings
 uv run python -c "
