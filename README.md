@@ -3,9 +3,9 @@
 Genera informes de vigilancia competitiva estructurados y citados a partir del nombre de una empresa,
 usando RAG propio sobre pgvector, modelos locales vía Ollama y cadenas LCEL.
 
-**Estado actual:** Fase 5A — Script piloto CLI + Gateway OpenRouter + CostTracker real  
+**Estado actual:** Fase 5B — Cap 3 Tendencial + OpenAlexConnector + test_connections  
 **Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)  
-**Tests:** 37/37 pasando | **Último informe generado:** `output/noel_sas_informe.docx` (279s, $0.00)
+**Tests:** 47 definidos, 37/37 pasando en frío | **Caps implementados:** 1, GICS, 2, 3
 
 ---
 
@@ -109,7 +109,7 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | 3 | ✅ | LLM Gateway + Cadenas LCEL + Use Cases del piloto |
 | 4 | ✅ | Ensamblado .docx + Citación APA 7 + Ingesta PDF |
 | 5A | ✅ | Script piloto CLI + Gateway OpenRouter + CostTracker real |
-| 5B | ⏳ | Cap 3 Tendencial → Cap 4 Ecosistema → Cap 5/6 → Resumen + DAG orquestador |
+| 5B | 🔄 | Cap 3 Tendencial ✅ → Cap 4 Ecosistema → Cap 5/6 → Resumen + DAG orquestador |
 | 6 | ⏳ | UI Streamlit (puerto 8503) + lookup CIIU + panel de consumo |
 
 ## Documentación

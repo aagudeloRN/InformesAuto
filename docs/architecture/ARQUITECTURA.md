@@ -1,6 +1,6 @@
 # Arquitectura del Sistema — Informes de Inteligencia Competitiva
 
-**Versión:** 5A (post Fase 5A)
+**Versión:** 5B (post Fase 5B — Cap 3 implementado)
 **Última actualización:** 2026-07-02
 **Propósito:** documento vivo de referencia arquitectónica. Las decisiones cerradas
 viven en los ADRs; este documento describe el sistema como está construido y hacia
@@ -52,19 +52,21 @@ El informe incluye:
 ┌───────────────────────────▼─────────────────────────┐
 │  domain/               Orquestación del DAG          │
 │    · use cases: GenerateEmpresaDescription,          │
-│                ClassifyGICS, GenerateBenchmarking    │
-│    · chains LCEL: chain_01, chain_02, chain_03       │
+│                ClassifyGICS, GenerateBenchmarking,   │
+│                GenerateTendencias                    │
+│    · chains LCEL: chain_01…chain_04                  │
 │    · política de datos ausentes (absent_data.py)     │
 │    · DAG de capítulos (N0→N1→N2→N3→ensamblado) [⏳ orquestador pendiente]│
 └───────┬───────────────────────────────┬──────────────┘
         │                               │
 ┌───────▼───────────┐       ┌───────────▼──────────────┐
 │  infrastructure/  │       │  data/                   │
-│  · LLM gateway    │       │  · repositories           │
-│  · WebConnector   │       │  · models (ORM)           │
-│  · Embedder       │       │  · database (engine)      │
-│  · Chunker        │       └──────────────────────────┘
-│  · PGVectorStore  │
+│  · LLM gateway         │  │  · repositories           │
+│  · WebConnector        │  │  · models (ORM)           │
+│  · OpenAlexConnector   │  │  · database (engine)      │
+│  · Embedder            │  └──────────────────────────┘
+│  · Chunker             │
+│  · PGVectorStore       │
 └───────────────────┘
         │
 ┌───────▼───────────────────────────────────────────┐
@@ -194,21 +196,34 @@ Input usuario: {nombre_empresa}
 | CostReport | `shared/types.py` | DTO de costo por llamada LLM (modelo, tokens, USD, capítulo) |
 | InformePiloto (actualizado) | `shared/types.py` | Agrega `cost_reports` y `costo_total_usd` |
 
+### Fase 5B ✅ (parcial) — 2026-07-02
+
+| Componente | Archivo | Responsabilidad |
+|-----------|---------|-----------------|
+| OpenAlexConnector | `infrastructure/sources/openalex_connector.py` | Wrapper REST api.openalex.org; polite pool via mailto; reconstruye abstract; silencioso en 503 |
+| WebConnector (actualizado) | `infrastructure/sources/web_connector.py` | Nuevo param `force_ddg=True` para tests sin gastar créditos Tavily |
+| chain_04_tendencias | `domain/chains/chain_04_tendencias.py` | LCEL para Cap 3 (3.1 TES, 3.2 MECE, 3.3 Casos); tono ejecutivo; nivel de confianza |
+| GenerateTendencias | `domain/use_cases/generate_tendencias.py` | 2 búsquedas web + OpenAlex + RAG; tier free OpenRouter; degradación silenciosa sin OpenAlex |
+| CapTendencias | `shared/types.py` | DTO Cap 3 con texto, chunks usados, flag retrieval_suficiente |
+| InformePiloto (actualizado) | `shared/types.py` | Campo `cap_tendencias: CapTendencias | None = None` |
+| PilotAssembler (actualizado) | `domain/assembler.py` | Sección Cap 3 condicional en el .docx |
+| run_pilot.py (actualizado) | `scripts/run_pilot.py` | Paso 4/6 Cap 3 via OpenRouter; referencias combinadas Cap 2+3 |
+| test_connections.py | `scripts/test_connections.py` | Diagnóstico de 6 servicios; 1 crédito Tavily por ejecución |
+
 ### Pendiente
 
 | Fase | Componente | Descripción |
 |------|-----------|-------------|
-| 5B | Cap 3 — Tendencias | `chain_04` + use case + retrieval OpenAlex/arXiv + tier free OpenRouter |
+| 5B | **E2E Cap 3** | Validar con `run_pilot.py` que el .docx incluye ≥200 palabras reales en Cap 3 |
 | 5B | Cap 4 — Ecosistema | `chain_05` + use case + retrieval web local/global |
 | 5B | Cap 5 — Convergencias | `chain_06` + use case + retrieval cruzado (consume N1) |
 | 5B | Cap 6 — Accionables | `chain_07` + use case (barrera N2) + tier synth OpenRouter |
 | 5B | Párrafos Intro | `chain_08` + use case (barrera N3) |
 | 5B | Resumen Ejecutivo | `chain_09` + use case (barrera N3) + tier synth OpenRouter |
-| 5B | Prompt-00 | Generación de ecuaciones de búsqueda por canal |
 | 5B | DAG orquestador | `domain/orchestrator.py` — N0→N1→N2→N3 con barreras + `asyncio.gather()` para N1 |
 | 6 | UI Streamlit | `presentation/app.py` puerto 8503 — entrada empresa/CIIU → progreso → descarga |
-| 6 | Lookup CIIU | CSV DANE local + `lookup_empresa_rues()` en `WebConnector` → validación antes de generar |
-| 6 | Panel de consumo | Tab en UI con tabla de llamadas LLM, costo total, histórico de informes |
+| 6 | Lookup CIIU | CSV DANE local + validación RUES antes de generar |
+| 6 | Panel de consumo | Tab en UI con tabla de llamadas LLM, costo total, histórico |
 
 ---
 

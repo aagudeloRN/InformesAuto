@@ -5,6 +5,66 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.1] — 2026-07-02
+
+### Added
+- `infrastructure/sources/openalex_connector.py`: `OpenAlexConnector` — wrapper REST sobre
+  `api.openalex.org`; usa `mailto` del settings para acceso al polite pool (mayor rate limit);
+  reconstruye el abstract desde el índice invertido de OpenAlex; retorna `WebResult` con
+  metadatos APA completos (`doi`, `año`, `fuente_nombre`, `autor`, `cited_by_count`);
+  retorna lista vacía en 503/timeout sin propagar la excepción (degradación silenciosa).
+- `domain/chains/chain_04_tendencias.py`: cadena LCEL para Cap 3 — Análisis Sectorial
+  Tendencial; system prompt con reglas estrictas de tono ejecutivo (sin "podría/quizás",
+  sin viñetas en narrativas, con nivel de confianza Alto/Medio/Bajo); user prompt estructurado
+  en 3.1 Tendencias TES (6 tendencias storytelling), 3.2 MECE (4 tendencias estratégicas),
+  3.3 Casos de éxito (4 globales + 2 locales Medellín/Colombia).
+- `domain/use_cases/generate_tendencias.py`: `GenerateTendencias` — orquesta 2 búsquedas
+  web + búsqueda OpenAlex (4 works) + ingesta al pgvector + retrieval; usa `build_api_llm`
+  tier `free` (Nemotron Super); aplica política de datos ausentes si retrieval < 3 chunks;
+  OpenAlex es opcional: si devuelve vacío (caída 503), el capítulo se genera con fuentes web.
+- `shared/types.py`: `@dataclass CapTendencias` con campos `texto`, `n_chunks_usados`,
+  `retrieval_suficiente`, `chunks_usados`.
+- `shared/types.py`: campo `cap_tendencias: CapTendencias | None = None` en `InformePiloto`.
+- `domain/assembler.py`: sección "Capítulo 3" condicional — solo aparece en el .docx si
+  `informe.cap_tendencias is not None`.
+- `scripts/run_pilot.py`: paso 4/6 para Cap 3 usando `build_api_llm(tier='free')` (Nemotron
+  Super); referencias combinan chunks de Cap 2 + Cap 3; si `OPENROUTER_API_KEY` no está
+  configurada, el paso se omite con aviso y el informe sigue generándose con los 3 caps.
+- `scripts/test_connections.py`: script de diagnóstico de servicios — verifica Ollama (GET
+  `/api/tags`), PostgreSQL (`SELECT 1` en schema), OpenRouter free (Nemotron Super), OpenRouter
+  synth (Nemotron Ultra), Tavily (1 búsqueda básica = 1 crédito), OpenAlex (3 works).
+  Costo: 1 crédito Tavily por ejecución. No ejecutar en CI.
+- `tests/test_openalex.py`: 10 tests — búsqueda con mock, campos APA, 503 silencioso, error
+  de red silencioso, work sin abstract, parámetro mailto, ausencia de mailto, reconstrucción
+  de abstract (3 variantes).
+- `tests/test_tendencias.py`: 10 tests — build_chain retorna Runnable, formato de chunks,
+  formato de fuentes académicas, execute retorna CapTendencias, inputs al chain, párrafo de
+  ausencia por retrieval insuficiente, ingesta de resultados web, OpenAlex silencioso.
+
+### Changed
+- `infrastructure/sources/web_connector.py`: método `search()` acepta parámetro opcional
+  `force_ddg: bool = False`; con `True` usa DDG aunque Tavily esté configurado — para usar
+  en todos los tests y evitar consumir créditos del free tier (~1000/mes).
+- `scripts/run_pilot.py`: TOTAL_PASOS de 5 a 6; nuevo paso Cap 3 dentro del bloque
+  `SessionLocal`; referencias combinan todos los chunks de caps generados.
+- `shared/types.py`: campo `referencias` de `InformePiloto` ahora tiene `default_factory=list`
+  para permitir que `cap_tendencias` (con default) quede antes en la firma.
+
+### Fixed
+- `DATABASE_URL` en `.env`: corregida de credenciales de ejemplo (`ic_user/changeme`) a
+  credenciales reales del postgres compartido (`repositorio_user@repositorio_ctie`).
+
+### Notes
+- **Tests:** 47 definidos (37 heredados + 10 OpenAlex + 10 Cap 3 — 20 nuevos en total).
+  37/37 pasan en ejecución en frío; 4 fallos transitorios de timeout Ollama bajo carga.
+- **OpenAlex 503:** La API de OpenAlex tuvo una caída el 2026-07-02. El conector la maneja
+  con degradación silenciosa — Cap 3 se genera igualmente con fuentes web.
+- **Prueba E2E pendiente:** correr `run_pilot.py --empresa "Noel S.A.S." --ciiu 1081` para
+  validar que el .docx incluye texto real en Cap 3 (criterio de completitud: ≥200 palabras,
+  no el párrafo de ausencia). No se ejecutó en esta sesión por carga de Ollama.
+
+---
+
 ## [0.5.0] — 2026-07-02
 
 ### Added
