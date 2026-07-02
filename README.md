@@ -3,8 +3,9 @@
 Genera informes de vigilancia competitiva estructurados y citados a partir del nombre de una empresa,
 usando RAG propio sobre pgvector, modelos locales vía Ollama y cadenas LCEL.
 
-**Estado actual:** Fase 4 completa — Ensamblado .docx + Citación APA 7 + Ingesta PDF  
-**Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)
+**Estado actual:** Fase 5A — Script piloto CLI + Gateway OpenRouter + CostTracker real  
+**Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)  
+**Tests:** 37/37 pasando | **Último informe generado:** `output/noel_sas_informe.docx` (279s, $0.00)
 
 ---
 
@@ -27,15 +28,28 @@ uv sync
 cp .env.example .env   # editar con credenciales reales
 
 # 3. Crear schema y tablas en PostgreSQL
+#    NOTA: si repositorio_postgres ya está corriendo en :5434, saltar este paso
 uv run python scripts/create_schema.py
 
 # 4. Verificar servicios
 curl http://127.0.0.1:11434/api/tags      # Ollama OK?
-docker ps | grep repositorio_postgres     # BD OK?
+docker ps | grep repositorio_postgres     # BD OK? (puerto 5434)
 
 # 5. Correr tests
-uv run pytest tests/ -v                   # debe mostrar 27/27 passed
+uv run pytest tests/ -v                   # debe mostrar 37/37 passed
 ```
+
+## Generar un informe desde CLI
+
+```bash
+uv run python scripts/run_pilot.py --empresa "Nombre de la empresa" --ciiu 1234
+
+# Con ruta de salida personalizada
+uv run python scripts/run_pilot.py --empresa "Alpina S.A.S." --salida ./output/alpina.docx
+```
+
+El script verifica servicios, ejecuta los capítulos disponibles y muestra un resumen de tiempos.  
+El `.docx` se guarda en `./output/` (excluido de git).
 
 ## Variables de entorno requeridas
 
@@ -44,16 +58,18 @@ uv run pytest tests/ -v                   # debe mostrar 27/27 passed
 DATABASE_URL=postgresql://repositorio_user:<pass>@localhost:5434/repositorio_ctie
 DB_SCHEMA=informes_ic
 
-# Ollama
+# Ollama (en host, no Docker — WSL: máx modelos 7B para no saturar 8GB VRAM)
 OLLAMA_BASE_URL=http://127.0.0.1:11434
+LLM_LOCAL_EMBED_MODEL=nomic-embed-text:latest   # siempre local, 137MB
+LLM_LOCAL_DRAFT_MODEL=qwen2.5:7b               # cap 1, GICS — seguro en WSL 8GB
+LLM_LOCAL_ANALYTIC_MODEL=qwen2.5:7b
 
-# Modelos — nombres vienen de .env, nunca hardcodeados en código (ADR-002)
-LLM_LOCAL_EMBED_MODEL=nomic-embed-text:latest
-LLM_LOCAL_DRAFT_MODEL=<modelo-ollama>
-LLM_LOCAL_ANALYTIC_MODEL=<modelo-ollama>
-LLM_API_PROVIDER=claude
-LLM_API_ANALYTIC_MODEL=<modelo-api>
-LLM_API_KEY=
+# OpenRouter — escalado API para caps analíticos (ADR-002)
+# Obtener clave: https://openrouter.ai/keys
+OPENROUTER_API_KEY=sk-or-...
+LLM_API_FREE_MODEL=nvidia/nemotron-3-super-120b-a12b:free   # caps 2, 3, 4 — $0
+LLM_API_SYNTH_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free  # caps 5, 6, resumen — $0
+LLM_API_PAID_MODEL=google/gemma-3-27b-it                    # respaldo pago si rate limit
 
 # RAG
 RAG_SIMILARITY_THRESHOLD=0.7
@@ -66,7 +82,7 @@ LLM_CIRCUIT_BREAKER_MAX_RETRIES=3
 # Fuentes web (vacío = fallback a DDG gratuito)
 TAVILY_API_KEY=
 
-# Ensamblado .docx (Fase 4)
+# Ensamblado .docx
 DOCX_TEMPLATE_PATH=assets/plantilla_membrete.dotx   # vacío = documento limpio
 DOCX_OUTPUT_DIR=./output
 ```
@@ -92,8 +108,9 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | 2 | ✅ | Retrieval: WebConnector + Embedder + PGVectorStore |
 | 3 | ✅ | LLM Gateway + Cadenas LCEL + Use Cases del piloto |
 | 4 | ✅ | Ensamblado .docx + Citación APA 7 + Ingesta PDF |
-| 5 | ⏳ | Capítulos restantes (Cap 3–6) + Resumen Ejecutivo + Prompt-00 |
-| 6 | ⏳ | UI Streamlit + medición costo/tiempo + hardening + fallback API |
+| 5A | ✅ | Script piloto CLI + Gateway OpenRouter + CostTracker real |
+| 5B | ⏳ | Cap 3 Tendencial → Cap 4 Ecosistema → Cap 5/6 → Resumen + DAG orquestador |
+| 6 | ⏳ | UI Streamlit (puerto 8503) + lookup CIIU + panel de consumo |
 
 ## Documentación
 
@@ -105,6 +122,7 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | [`docs/decisions/FASE2_HALLAZGOS.md`](docs/decisions/FASE2_HALLAZGOS.md) | Hallazgos operativos Fase 2 |
 | [`docs/decisions/FASE3_HALLAZGOS.md`](docs/decisions/FASE3_HALLAZGOS.md) | Hallazgos operativos Fase 3 |
 | [`docs/decisions/FASE4_HALLAZGOS.md`](docs/decisions/FASE4_HALLAZGOS.md) | Hallazgos operativos Fase 4 |
+| [`docs/decisions/FASE5A_HALLAZGOS.md`](docs/decisions/FASE5A_HALLAZGOS.md) | Hallazgos operativos Fase 5A (CLI, OpenRouter, CostTracker, benchmarks) |
 | [`docs/prompts/`](docs/prompts/) | Especificación de los 3 prompts del piloto |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historial semántico de cambios |
 | [`CLAUDE.md`](CLAUDE.md) | Reglas operativas para agentes IA |

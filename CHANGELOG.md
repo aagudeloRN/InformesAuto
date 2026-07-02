@@ -5,6 +5,64 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.0] — 2026-07-02
+
+### Added
+- `scripts/run_pilot.py`: CLI completo para generar el informe piloto sin UI.
+  Acepta `--empresa` (requerido), `--ciiu` (opcional, se extrae auto) y `--salida`
+  (opcional). Verifica Ollama y PostgreSQL al arrancar, muestra progreso por paso
+  con tiempos individuales, imprime resumen de ejecución con barra gráfica y costo.
+  Suprime logs verbosos de SQLAlchemy para mantener la salida legible.
+- `infrastructure/llm/gateway.py`: nueva clase `OpenRouterGatewayLLM(BaseChatModel)` —
+  wrapper httpx para la API OpenAI-compatible de OpenRouter; extrae `usage.prompt_tokens`
+  y `usage.completion_tokens` de cada respuesta; aplica enforcement de presupuesto
+  (`within_budget()`) antes de cada llamada; manejo de SSE para streaming; tenacity
+  circuit breaker con backoff más amplio (max 30s) para respetar rate limits de free tier.
+- `infrastructure/llm/gateway.py`: tabla de precios `_PRICING` como constante de módulo
+  (USD por token in/out): `nemotron-super:free` $0, `nemotron-ultra:free` $0,
+  `google/gemma-3-27b-it` $0.10/$0.20 MTok. Extensible sin tocar código de aplicación.
+- `infrastructure/llm/gateway.py`: `build_api_llm(settings, tier, cost_tracker)` —
+  factory para 3 tiers: `free` → Nemotron Super (caps analíticos), `synth` → Nemotron
+  Ultra (síntesis), `paid` → Gemma 3 27B (respaldo con rate limit).
+- `infrastructure/llm/gateway.py`: `CostTracker.add_call(model, tokens_in, tokens_out)`
+  calcula costo real desde `_PRICING`; `records()` devuelve historial completo por
+  llamada; `add_local_call()` mantiene compatibilidad con código existente.
+- `shared/types.py`: `@dataclass CostReport` con campos `modelo`, `tokens_in`,
+  `tokens_out`, `costo_usd`, `capitulo`.
+- `shared/types.py`: `InformePiloto` agrega `cost_reports: list[CostReport]` y
+  `costo_total_usd: float` para transportar el desglose económico hasta el assembler.
+- `shared/config.py`: nuevos campos `openrouter_base_url`, `openrouter_api_key`,
+  `llm_api_free_model`, `llm_api_synth_model`, `llm_api_paid_model`; campos legados
+  marcados como opcionales con defaults vacíos para no romper `.env` existentes.
+- `.env.example`: bloque OpenRouter documentado con los 3 tiers y comentarios de
+  cuándo usar cada uno; variables legadas marcadas como compatibilidad.
+- `docker-compose.yml`: nota de conflicto de puerto: el container `repositorio_postgres`
+  ya ocupa `5434`; instrucciones para evitar el conflicto en el entorno compartido.
+- `.gitignore`: excluir `output/` (informes generados, no deben ir al repo).
+- `tests/test_cost_tracker.py`: 10 tests — costo $0 en local y free, cálculo correcto
+  en modelos pago, enforcement de presupuesto, acumulación de llamadas, campos de
+  registros, tabla de precios, factory `build_api_llm`.
+
+### Changed
+- `data/repositories/informe_repo.py`: `update_completado()` acepta parámetro
+  opcional `tiempo_s: float | None` para persistir la duración real de la generación
+  en `HistorialInforme.tiempo_generacion_s`.
+
+### Fixed
+- Logs de SQLAlchemy e httpx suprimidos en `run_pilot.py` (nivel WARNING) para
+  mantener la salida del CLI legible; los logs de BD solo aparecen en pytest.
+
+### Notes
+- **Prueba E2E validada:** `run_pilot.py` generó exitosamente `output/noel_sas_informe.docx`
+  con Cap 1 + GICS + Cap 2 en 279s usando `qwen2.5:7b` local.
+- **Benchmark de tiempo local:** Cap 1 ~32s, GICS ~4s, Cap 2 ~243s. La duración de
+  Cap 2 con modelo local es la motivación principal para escalar analíticos a OpenRouter.
+- **Suite de tests:** 37/37 pasando (27 heredados + 10 nuevos).
+- **OpenRouter pendiente de activar:** el gateway está construido pero requiere
+  `OPENROUTER_API_KEY` + las 3 variables de modelo en `.env` para funcionar.
+
+---
+
 ## [0.4.0] — 2026-06-25
 
 ### Added

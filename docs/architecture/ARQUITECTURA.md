@@ -1,7 +1,7 @@
 # Arquitectura del Sistema — Informes de Inteligencia Competitiva
 
-**Versión:** 4 (post Fase 4)
-**Última actualización:** 2026-06-25
+**Versión:** 5A (post Fase 5A)
+**Última actualización:** 2026-07-02
 **Propósito:** documento vivo de referencia arquitectónica. Las decisiones cerradas
 viven en los ADRs; este documento describe el sistema como está construido y hacia
 dónde va.
@@ -55,7 +55,7 @@ El informe incluye:
 │                ClassifyGICS, GenerateBenchmarking    │
 │    · chains LCEL: chain_01, chain_02, chain_03       │
 │    · política de datos ausentes (absent_data.py)     │
-│    · DAG de capítulos (N0→N1→N2→N3→ensamblado)      │
+│    · DAG de capítulos (N0→N1→N2→N3→ensamblado) [⏳ orquestador pendiente]│
 └───────┬───────────────────────────────┬──────────────┘
         │                               │
 ┌───────▼───────────┐       ┌───────────▼──────────────┐
@@ -161,7 +161,7 @@ Input usuario: {nombre_empresa}
 |-----------|---------|-----------------|
 | DTOs generación | `shared/types.py` | `DescripcionEmpresa`, `ClasificacionGICS`, `CapBenchmarking` |
 | OllamaGatewayLLM | `infrastructure/llm/gateway.py` | `BaseChatModel` httpx directo + tenacity circuit breaker |
-| CostTracker | `infrastructure/llm/gateway.py` | Acumula tokens/costo por sesión |
+| CostTracker (esqueleto) | `infrastructure/llm/gateway.py` | Acumulador de tokens (completado en Fase 5A) |
 | build_llm() | `infrastructure/llm/gateway.py` | Factory sin hardcodear modelo (ADR-002) |
 | absent_data | `domain/absent_data.py` | Umbral de chunks + párrafo de ausencia estándar |
 | chain_01 | `domain/chains/chain_01_descripcion.py` | Cadena LCEL Prompt-01 (descripción empresa) |
@@ -179,23 +179,36 @@ Input usuario: {nombre_empresa}
 | APA formatter | `infrastructure/citation/apa_formatter.py` | Extrae, formatea y deduplica citas desde JSONB |
 | DocxBuilder | `infrastructure/docx_builder.py` | Wrapper python-docx; convierte Markdown básico a estilos Word |
 | PilotAssembler | `domain/assembler.py` | Orquesta el .docx del piloto (N0+N1 parcial) |
-| InformeRepository | `data/repositories/informe_repo.py` | CRUD de `HistorialInforme` |
+| InformeRepository | `data/repositories/informe_repo.py` | CRUD de `HistorialInforme` + persistencia costo/tiempo |
 | ingest_pdf.py | `scripts/ingest_pdf.py` | CLI ingesta PDF manual con SHA-256 anti-duplicados |
+
+### Fase 5A ✅ — 2026-07-02
+
+| Componente | Archivo | Responsabilidad |
+|-----------|---------|-----------------|
+| run_pilot.py | `scripts/run_pilot.py` | CLI completo: verifica servicios → ejecuta caps → guarda .docx → resumen |
+| OpenRouterGatewayLLM | `infrastructure/llm/gateway.py` | Wrapper httpx para OpenRouter (OpenAI-compatible); extrae tokens de uso |
+| `_PRICING` | `infrastructure/llm/gateway.py` | Tabla de precios USD/token para modelos OpenRouter (free y pago) |
+| build_api_llm() | `infrastructure/llm/gateway.py` | Factory para 3 tiers: free/synth/paid → OpenRouterGatewayLLM configurado |
+| CostTracker (completo) | `infrastructure/llm/gateway.py` | `add_call()` calcula costo real; `records()` historial; enforcement `within_budget()` |
+| CostReport | `shared/types.py` | DTO de costo por llamada LLM (modelo, tokens, USD, capítulo) |
+| InformePiloto (actualizado) | `shared/types.py` | Agrega `cost_reports` y `costo_total_usd` |
 
 ### Pendiente
 
 | Fase | Componente | Descripción |
 |------|-----------|-------------|
-| 5 | Prompt-00 | Generación de ecuaciones de búsqueda por canal (OpenAlex, arXiv, web) |
-| 5 | Cap 3 — Tendencias | chain_04 + use_case + retrieval OpenAlex/arXiv |
-| 5 | Cap 4 — Ecosistema | chain_05 + use_case + retrieval web local/global |
-| 5 | Cap 5 — Convergencias | chain_06 + use_case + retrieval cruzado |
-| 5 | Cap 6 — Accionables | chain_07 + use_case (barrera N2: consume N1) |
-| 5 | Resumen Ejecutivo | chain_08 + use_case (barrera N3: consume informe completo) |
-| 5 | DAG orquestador | `domain/orchestrator.py` — N0→N1→N2→N3→ensamblado con barreras |
-| 6 | UI Streamlit | `presentation/app.py` — formulario empresa → progreso → descarga .docx |
-| 6 | Fallback API | Escalado de `OllamaGatewayLLM` a proveedor externo (ADR-002) |
-| 6 | Medición | `CostTracker` persistido en `HistorialInforme`; dashboard costo/tiempo |
+| 5B | Cap 3 — Tendencias | `chain_04` + use case + retrieval OpenAlex/arXiv + tier free OpenRouter |
+| 5B | Cap 4 — Ecosistema | `chain_05` + use case + retrieval web local/global |
+| 5B | Cap 5 — Convergencias | `chain_06` + use case + retrieval cruzado (consume N1) |
+| 5B | Cap 6 — Accionables | `chain_07` + use case (barrera N2) + tier synth OpenRouter |
+| 5B | Párrafos Intro | `chain_08` + use case (barrera N3) |
+| 5B | Resumen Ejecutivo | `chain_09` + use case (barrera N3) + tier synth OpenRouter |
+| 5B | Prompt-00 | Generación de ecuaciones de búsqueda por canal |
+| 5B | DAG orquestador | `domain/orchestrator.py` — N0→N1→N2→N3 con barreras + `asyncio.gather()` para N1 |
+| 6 | UI Streamlit | `presentation/app.py` puerto 8503 — entrada empresa/CIIU → progreso → descarga |
+| 6 | Lookup CIIU | CSV DANE local + `lookup_empresa_rues()` en `WebConnector` → validación antes de generar |
+| 6 | Panel de consumo | Tab en UI con tabla de llamadas LLM, costo total, histórico de informes |
 
 ---
 
@@ -205,7 +218,8 @@ Input usuario: {nombre_empresa}
 |----------|-----------|--------|
 | PostgreSQL + pgvector | `repositorio_postgres` Docker, `localhost:5434` | DB: `repositorio_ctie`, schema: `informes_ic` |
 | Ollama | Host (no Docker) | `http://127.0.0.1:11434` |
-| Modelos disponibles | Ollama host | `qwen2.5:7b` (draft/analítico), `nomic-embed-text:latest` (embeddings 768d) |
+| Modelos Ollama | Ollama host | `nomic-embed-text:latest` (embeddings 768d, 137MB), `qwen2.5:7b` (analítico, 4.7GB) |
+| Modelos API | OpenRouter | Tier free: `nemotron-super/ultra`; pago: `gemma-3-27b-it` |
 | Python runtime | `.venv` gestionado por `uv` | Python 3.12 |
 
 **Variables de entorno críticas** (en `.env`, nunca en código):
@@ -214,9 +228,12 @@ Input usuario: {nombre_empresa}
 DATABASE_URL=postgresql://...             # conexión a repositorio_ctie
 LLM_LOCAL_EMBED_MODEL=nomic-embed-text:latest
 LLM_LOCAL_DRAFT_MODEL=qwen2.5:7b
-LLM_LOCAL_ANALYTIC_MODEL=qwen2.5:7b
-LLM_API_PROVIDER=claude                  # o gemini
-LLM_API_ANALYTIC_MODEL=...               # modelo API sin hardcodear
+LLM_LOCAL_ANALYTIC_MODEL=qwen2.5:7b      # máx 7B en WSL 8GB VRAM
+# OpenRouter (Fase 5A+)
+OPENROUTER_API_KEY=sk-or-...
+LLM_API_FREE_MODEL=nvidia/nemotron-3-super-120b-a12b:free
+LLM_API_SYNTH_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+LLM_API_PAID_MODEL=google/gemma-3-27b-it
 LLM_API_KEY=...
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 RAG_SIMILARITY_THRESHOLD=0.7
@@ -329,6 +346,25 @@ assembler = PilotAssembler(DocxBuilder(settings.docx_template_path or None))
 ruta = assembler.assemble(informe, output_path)
 ```
 
+### Patrón de escalado a OpenRouter (Fase 5A+)
+
+```python
+# infrastructure/llm/gateway.py — usar build_api_llm() con el tier correcto
+from ic.infrastructure.llm.gateway import build_api_llm, CostTracker
+
+tracker = CostTracker(budget_limit=settings.llm_budget_limit_usd)
+
+# Caps analíticos (N1): tier free — Nemotron Super
+llm_free = build_api_llm(settings, tier="free", cost_tracker=tracker)
+
+# Caps síntesis (N2, N3): tier synth — Nemotron Ultra
+llm_synth = build_api_llm(settings, tier="synth", cost_tracker=tracker)
+
+# El tracker lleva el acumulado entre todas las llamadas
+print(f"Costo total: ${tracker.total_cost():.4f} USD")
+print(f"Tokens: {tracker.total_tokens()}")
+```
+
 ### Patrón de citación APA desde chunks
 
 ```python
@@ -346,13 +382,18 @@ ref = format_reference(meta)             # Referencia completa APA 7
 
 ```bash
 # Verificar servicios
-docker ps | grep repositorio_postgres      # BD corriendo?
+docker ps | grep repositorio_postgres      # BD corriendo en :5434?
 curl http://127.0.0.1:11434/api/tags       # Ollama responde?
+curl http://127.0.0.1:11434/api/tags | python3 -c \  # modelos disponibles con tamaño
+  "import json,sys; [print(m['name'], m['size']//1e9,'GB') for m in json.load(sys.stdin)['models']]"
 
 # Desarrollo
 uv sync                                    # sincronizar deps
-uv run pytest tests/ -v                    # suite completa (27 tests)
+uv run pytest tests/ -v                    # suite completa (37 tests)
 uv run python scripts/create_schema.py    # re-crear schema si hay cambios ORM
+
+# Generar informe desde CLI (Fase 5A)
+uv run python scripts/run_pilot.py --empresa "Noel S.A.S." --ciiu 1081
 
 # Smoke test gateway LLM
 uv run python -c "
