@@ -17,8 +17,17 @@ class Settings(BaseSettings):
     llm_local_embed_model: str
     llm_local_draft_model: str
     llm_local_analytic_model: str
-    llm_api_provider: str
-    llm_api_analytic_model: str
+
+    # OpenRouter (escalado API)
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_api_key: str = ""
+    llm_api_free_model: str = ""    # tier free (Nemotron Super)
+    llm_api_synth_model: str = ""   # tier síntesis free (Nemotron Ultra)
+    llm_api_paid_model: str = ""    # respaldo pago (Gemma 3)
+
+    # Compatibilidad legada — mantener para no romper .env existentes
+    llm_api_provider: str = "openrouter"
+    llm_api_analytic_model: str = ""
     llm_api_key: str = ""
 
     # Control de presupuesto

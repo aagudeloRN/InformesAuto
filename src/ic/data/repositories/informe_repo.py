@@ -30,7 +30,11 @@ class InformeRepository:
         self._db.commit()
 
     def update_completado(
-        self, informe_id: uuid.UUID, ruta_docx: str, costo: float
+        self,
+        informe_id: uuid.UUID,
+        ruta_docx: str,
+        costo: float,
+        tiempo_s: float | None = None,
     ) -> None:
         informe = self._db.get(HistorialInforme, informe_id)
         if informe is None:
@@ -38,6 +42,8 @@ class InformeRepository:
         informe.estado = EstadoInforme.COMPLETADO
         informe.ruta_documento_final = ruta_docx
         informe.costo_usd = costo
+        if tiempo_s is not None:
+            informe.tiempo_generacion_s = tiempo_s
         informe.completed_at = datetime.now(timezone.utc)
         self._db.commit()
 

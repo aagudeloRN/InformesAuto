@@ -1,3 +1,7 @@
+# NOTA: En el entorno compartido el contenedor 'repositorio_postgres' ya ocupa el puerto
+# 5434 y es la instancia que este proyecto usa (DATABASE_URL en .env apunta a él).
+# Solo ejecutar 'docker compose up -d' si esa instancia NO está corriendo.
+# Verificar con: docker ps | grep 5434
 services:
   postgres:
     image: pgvector/pgvector:pg16

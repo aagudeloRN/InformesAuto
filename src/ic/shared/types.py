@@ -53,9 +53,21 @@ class Referencia:
 
 
 @dataclass
+class CostReport:
+    """Registro de costo de una llamada LLM individual."""
+    modelo: str
+    tokens_in: int
+    tokens_out: int
+    costo_usd: float
+    capitulo: str = ""
+
+
+@dataclass
 class InformePiloto:
     empresa: DescripcionEmpresa
     gics: ClasificacionGICS
     cap_benchmarking: CapBenchmarking
     referencias: list[Referencia]
     ruta_docx: str | None = None
+    cost_reports: list[CostReport] = field(default_factory=list)
+    costo_total_usd: float = 0.0
