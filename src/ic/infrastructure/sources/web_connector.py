@@ -39,8 +39,12 @@ class WebConnector:
         self._tavily_key = settings.tavily_api_key
         self._use_tavily = bool(self._tavily_key)
 
-    def search(self, query: str, max_results: int = 5) -> list[WebResult]:
-        if self._use_tavily:
+    def search(
+        self, query: str, max_results: int = 5, force_ddg: bool = False
+    ) -> list[WebResult]:
+        """Busca en la web. force_ddg=True omite Tavily aunque esté configurado
+        (útil en tests para no gastar créditos del free tier)."""
+        if self._use_tavily and not force_ddg:
             return self._search_tavily(query, max_results)
         return self._search_ddg(query, max_results)
 

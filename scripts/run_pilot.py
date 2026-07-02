@@ -1,4 +1,4 @@
-"""Script CLI para generar un informe de IC piloto (Caps 1, GICS, Cap 2).
+"""Script CLI para generar un informe de IC piloto (Caps 1, GICS, Cap 2, Cap 3).
 
 Uso:
     uv run python scripts/run_pilot.py --empresa "Noel S.A.S."
@@ -97,19 +97,22 @@ def main() -> None:
     # ── Wiring de dependencias ─────────────────────────────────────────
     from ic.data.database import SessionLocal
     from ic.data.repositories.embedding_repo import EmbeddingRepository
+    from ic.domain.assembler import PilotAssembler
     from ic.domain.chains.chain_01_descripcion import build_chain_01
     from ic.domain.chains.chain_02_gics import build_chain_02
     from ic.domain.chains.chain_03_benchmarking import build_chain_03
+    from ic.domain.chains.chain_04_tendencias import build_chain_04
     from ic.domain.use_cases.classify_gics import ClassifyGICS
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
     from ic.domain.use_cases.generate_empresa_description import GenerateEmpresaDescription
+    from ic.domain.use_cases.generate_tendencias import GenerateTendencias
     from ic.infrastructure.citation.apa_formatter import build_references_section
     from ic.infrastructure.docx_builder import DocxBuilder
-    from ic.infrastructure.llm.gateway import build_llm
+    from ic.infrastructure.llm.gateway import build_api_llm, build_llm
     from ic.infrastructure.retrieval.embedder import Embedder
     from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
+    from ic.infrastructure.sources.openalex_connector import OpenAlexConnector
     from ic.infrastructure.sources.web_connector import WebConnector
-    from ic.domain.assembler import PilotAssembler
     from ic.shared.types import InformePiloto
 
     llm = build_llm(settings)
@@ -125,12 +128,15 @@ def main() -> None:
 
     _banner(f"Generando informe: {args.empresa}")
 
+    # Construir LLM API para capítulos analíticos (OpenRouter free tier)
+    api_llm = build_api_llm(settings, tier="free") if settings.openrouter_api_key else None
+
     with SessionLocal() as db:
         repo = EmbeddingRepository(db)
         store = PGVectorStore(embedder, repo, settings)
 
         # ── Cap 1: Descripción empresa ─────────────────────────────────
-        TOTAL_PASOS = 5
+        TOTAL_PASOS = 6
         _step(1, TOTAL_PASOS, "Cap 1 — Descripción de la empresa")
         t0 = time.time()
         uc_desc = GenerateEmpresaDescription(chain=build_chain_01(llm), web_connector=web)
@@ -177,21 +183,53 @@ def main() -> None:
         )
         print(f"       Retrieval: {retrieval_estado}")
 
+        # ── Cap 3: Análisis Tendencial ─────────────────────────────────
+        _step(4, TOTAL_PASOS, "Cap 3 — Análisis Tendencial (OpenAlex + web + LLM)")
+        t0 = time.time()
+        cap_tend = None
+        if api_llm is not None:
+            uc_tend = GenerateTendencias(
+                chain=build_chain_04(api_llm),
+                store=store,
+                web_connector=web,
+                openalex_connector=OpenAlexConnector(settings),
+            )
+            cap_tend = uc_tend.execute(
+                nombre_empresa=args.empresa,
+                descripcion_empresa=empresa.texto,
+                sector_gics=gics.grupo_gics,
+            )
+            tiempos["Cap 3"] = time.time() - t0
+            _ok(tiempos["Cap 3"])
+            retrieval_tend = (
+                f"{cap_tend.n_chunks_usados} chunks usados"
+                if cap_tend and cap_tend.retrieval_suficiente
+                else "⚠️  retrieval insuficiente — párrafo de ausencia insertado"
+            )
+            print(f"       Retrieval: {retrieval_tend}")
+        else:
+            tiempos["Cap 3"] = 0.0
+            print(f"⚠️  OPENROUTER_API_KEY no configurada — Cap 3 omitido")
+
     # ── Referencias APA ───────────────────────────────────────────────
-    _step(4, TOTAL_PASOS, "Referencias — Formateo APA 7")
+    _step(5, TOTAL_PASOS, "Referencias — Formateo APA 7")
     t0 = time.time()
-    refs = build_references_section(cap.chunks_usados)
+    todos_chunks = list(cap.chunks_usados)
+    if cap_tend and cap_tend.chunks_usados:
+        todos_chunks += cap_tend.chunks_usados
+    refs = build_references_section(todos_chunks)
     tiempos["Referencias"] = time.time() - t0
     _ok(tiempos["Referencias"])
     print(f"       {len(refs)} referencias únicas")
 
     # ── Ensamblado .docx ──────────────────────────────────────────────
-    _step(5, TOTAL_PASOS, f"Ensamblado → {output_path}")
+    _step(6, TOTAL_PASOS, f"Ensamblado → {output_path}")
     t0 = time.time()
     informe = InformePiloto(
         empresa=empresa,
         gics=gics,
         cap_benchmarking=cap,
+        cap_tendencias=cap_tend,
         referencias=refs,
     )
     assembler = PilotAssembler(DocxBuilder(settings.docx_template_path or None))
