@@ -18,8 +18,10 @@ class PilotAssembler:
         b.add_paragraph(f"Fecha de generación: {fecha}")
         b.add_paragraph("")
 
-        b.add_heading("[Resumen ejecutivo — pendiente Fase 5]", level=2)
-        b.add_paragraph("")
+        if informe.resumen_ejecutivo is not None:
+            b.add_heading("Resumen Ejecutivo", level=2)
+            b.add_markdown_section(informe.resumen_ejecutivo.texto)
+            b.add_paragraph("")
 
         b.add_heading("Capítulo 1. Descripción de la Empresa", level=2)
         b.add_markdown_section(informe.empresa.texto)
@@ -42,6 +44,16 @@ class PilotAssembler:
         if informe.cap_ecosistema is not None:
             b.add_heading("Capítulo 4. Ecosistema Empresarial", level=2)
             b.add_markdown_section(informe.cap_ecosistema.texto)
+            b.add_paragraph("")
+
+        if informe.cap_convergencia is not None:
+            b.add_heading("Capítulo 5. Convergencia Empresarial", level=2)
+            b.add_markdown_section(informe.cap_convergencia.texto)
+            b.add_paragraph("")
+
+        if informe.cap_accionables is not None:
+            b.add_heading("Capítulo 6. Accionables Estratégicos", level=2)
+            b.add_markdown_section(informe.cap_accionables.texto)
             b.add_paragraph("")
 
         b.add_heading("Referencias", level=2)

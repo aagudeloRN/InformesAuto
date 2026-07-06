@@ -1,4 +1,4 @@
-"""Script CLI para generar un informe de IC piloto (Caps 1, GICS, Cap 2, Cap 3, Cap 4).
+"""Script CLI para generar un informe de IC piloto (Caps 1–6 + Resumen Ejecutivo).
 
 Uso:
     uv run python scripts/run_pilot.py --empresa "Noel S.A.S."
@@ -103,10 +103,16 @@ def main() -> None:
     from ic.domain.chains.chain_03_benchmarking import build_chain_03
     from ic.domain.chains.chain_04_tendencias import build_chain_04
     from ic.domain.chains.chain_05_ecosistema import build_chain_05
+    from ic.domain.chains.chain_06_convergencia import build_chain_06
+    from ic.domain.chains.chain_07_accionables import build_chain_07
+    from ic.domain.chains.chain_08_resumen_ejecutivo import build_chain_08
     from ic.domain.use_cases.classify_gics import ClassifyGICS
+    from ic.domain.use_cases.generate_accionables import GenerateAccionables
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
+    from ic.domain.use_cases.generate_convergencia import GenerateConvergencia
     from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
     from ic.domain.use_cases.generate_empresa_description import GenerateEmpresaDescription
+    from ic.domain.use_cases.generate_resumen_ejecutivo import GenerateResumenEjecutivo
     from ic.domain.use_cases.generate_tendencias import GenerateTendencias
     from ic.infrastructure.citation.apa_formatter import build_references_section
     from ic.infrastructure.docx_builder import DocxBuilder
@@ -137,17 +143,23 @@ def main() -> None:
         if settings.openrouter_api_key and settings.llm_api_free_alt_model
         else None
     )
+    api_llm_synth = (
+        build_api_llm(settings, tier="synth")
+        if settings.openrouter_api_key
+        else None
+    )
 
     # Cadena de fallback para Cap 1: free API → free_alt API → local Ollama
     # Si no hay API key configurada, usa directamente el modelo local.
     cap1_llms = [m for m in [api_llm, api_llm_alt, llm] if m is not None]
+
+    TOTAL_PASOS = 10
 
     with SessionLocal() as db:
         repo = EmbeddingRepository(db)
         store = PGVectorStore(embedder, repo, settings)
 
         # ── Cap 1: Descripción empresa ─────────────────────────────────
-        TOTAL_PASOS = 7
         _step(1, TOTAL_PASOS, "Cap 1 — Descripción de la empresa")
         t0 = time.time()
         uc_desc = GenerateEmpresaDescription(chain=build_chain_01(cap1_llms), web_connector=web)
@@ -249,34 +261,145 @@ def main() -> None:
             tiempos["Cap 4"] = 0.0
             print(f"⚠️  OPENROUTER_API_KEY no configurada — Cap 4 omitido")
 
+        # ── PDF Convergencia (ingesta automática condicional) ──────────
+        PDF_CONVERGENCIA = Path(__file__).parent.parent / "InformeConvergenciaLocal2026V3RvADAA.pdf"
+        if PDF_CONVERGENCIA.exists():
+            _step(6, TOTAL_PASOS, "PDF Convergencia — ingesta automática")
+            t0 = time.time()
+            sys.path.insert(0, str(Path(__file__).parent))
+            from ingest_pdf import _ensure_metadatos_column, ingest_pdf as _ingest_pdf
+            _ensure_metadatos_column()
+            n_pdf = _ingest_pdf(
+                pdf_path=str(PDF_CONVERGENCIA),
+                empresa_id=None,
+                titulo="Informe de Convergencia Local Medellín 2026",
+                autor="Alcaldía de Medellín",
+                año=2026,
+            )
+            tiempos["PDF Convergencia"] = time.time() - t0
+            _ok(tiempos["PDF Convergencia"])
+            print(f"       {n_pdf} chunks ingestados (0 = ya ingestado previamente)")
+        else:
+            tiempos["PDF Convergencia"] = 0.0
+            print(
+                f"[6/{TOTAL_PASOS}] PDF Convergencia — archivo no encontrado, "
+                "Cap 5 usará solo RAG de capítulos anteriores"
+            )
+
+        # ── Cap 5: Convergencia Empresarial ───────────────────────────
+        _step(7, TOTAL_PASOS, "Cap 5 — Convergencia Empresarial (synth + RAG cruzado)")
+        t0 = time.time()
+        cap_conv = None
+        if api_llm_synth is not None:
+            uc_conv = GenerateConvergencia(
+                chain=build_chain_06(api_llm_synth),
+                store=store,
+                web_connector=web,
+            )
+            cap_conv = uc_conv.execute(
+                nombre_empresa=args.empresa,
+                descripcion_empresa=empresa.texto,
+                sector_gics=gics.grupo_gics,
+            )
+            tiempos["Cap 5"] = time.time() - t0
+            _ok(tiempos["Cap 5"])
+            retrieval_conv = (
+                f"{cap_conv.n_chunks_usados} chunks usados"
+                if cap_conv and cap_conv.retrieval_suficiente
+                else "⚠️  retrieval insuficiente — párrafo de ausencia insertado"
+            )
+            print(f"       Retrieval: {retrieval_conv}")
+        else:
+            tiempos["Cap 5"] = 0.0
+            print(f"⚠️  OPENROUTER_API_KEY no configurada — Cap 5 omitido")
+
+        # ── Cap 6: Accionables Estratégicos ───────────────────────────
+        _step(8, TOTAL_PASOS, "Cap 6 — Accionables Estratégicos (free + RAG cruzado)")
+        t0 = time.time()
+        cap_acc = None
+        if api_llm is not None:
+            uc_acc = GenerateAccionables(
+                chain=build_chain_07(api_llm),
+                store=store,
+            )
+            cap_acc = uc_acc.execute(
+                nombre_empresa=args.empresa,
+                descripcion_empresa=empresa.texto,
+                sector_gics=gics.grupo_gics,
+            )
+            tiempos["Cap 6"] = time.time() - t0
+            _ok(tiempos["Cap 6"])
+            retrieval_acc = (
+                f"{cap_acc.n_chunks_usados} chunks usados"
+                if cap_acc and cap_acc.retrieval_suficiente
+                else "⚠️  retrieval insuficiente — párrafo de ausencia insertado"
+            )
+            print(f"       Retrieval: {retrieval_acc}")
+        else:
+            tiempos["Cap 6"] = 0.0
+            print(f"⚠️  OPENROUTER_API_KEY no configurada — Cap 6 omitido")
+
+    # ── Resumen Ejecutivo (N3 — sin retrieval) ────────────────────────
+    _step(9, TOTAL_PASOS, "Resumen Ejecutivo (synth — síntesis del informe completo)")
+    t0 = time.time()
+    resumen = None
+    if api_llm_synth is not None:
+        cap_textos: dict[str, str] = {
+            "Cap 1: Descripción": empresa.texto,
+            "Cap 2: Benchmarking": cap.texto,
+        }
+        if cap_tend:
+            cap_textos["Cap 3: Tendencias"] = cap_tend.texto
+        if cap_eco:
+            cap_textos["Cap 4: Ecosistema"] = cap_eco.texto
+        if cap_conv:
+            cap_textos["Cap 5: Convergencia"] = cap_conv.texto
+        if cap_acc:
+            cap_textos["Cap 6: Accionables"] = cap_acc.texto
+
+        uc_re = GenerateResumenEjecutivo(chain=build_chain_08(api_llm_synth))
+        resumen = uc_re.execute(
+            nombre_empresa=args.empresa,
+            descripcion_empresa=empresa.texto,
+            sector_gics=gics.grupo_gics,
+            cap_textos=cap_textos,
+        )
+        tiempos["Resumen Ejecutivo"] = time.time() - t0
+        _ok(tiempos["Resumen Ejecutivo"])
+    else:
+        tiempos["Resumen Ejecutivo"] = 0.0
+        print(f"⚠️  OPENROUTER_API_KEY no configurada — Resumen Ejecutivo omitido")
+
     # ── Referencias APA ───────────────────────────────────────────────
-    _step(6, TOTAL_PASOS, "Referencias — Formateo APA 7")
+    _step(10, TOTAL_PASOS, "Referencias + Ensamblado .docx")
     t0 = time.time()
     todos_chunks = list(cap.chunks_usados)
     if cap_tend and cap_tend.chunks_usados:
         todos_chunks += cap_tend.chunks_usados
     if cap_eco and cap_eco.chunks_usados:
         todos_chunks += cap_eco.chunks_usados
+    if cap_conv and cap_conv.chunks_usados:
+        todos_chunks += cap_conv.chunks_usados
+    if cap_acc and cap_acc.chunks_usados:
+        todos_chunks += cap_acc.chunks_usados
     refs = build_references_section(todos_chunks)
-    tiempos["Referencias"] = time.time() - t0
-    _ok(tiempos["Referencias"])
-    print(f"       {len(refs)} referencias únicas")
 
-    # ── Ensamblado .docx ──────────────────────────────────────────────
-    _step(7, TOTAL_PASOS, f"Ensamblado → {output_path}")
-    t0 = time.time()
     informe = InformePiloto(
         empresa=empresa,
         gics=gics,
         cap_benchmarking=cap,
         cap_tendencias=cap_tend,
         cap_ecosistema=cap_eco,
+        cap_convergencia=cap_conv,
+        cap_accionables=cap_acc,
+        resumen_ejecutivo=resumen,
         referencias=refs,
     )
     assembler = PilotAssembler(DocxBuilder(settings.docx_template_path or None))
     assembler.assemble(informe, output_path)
     tiempos["Ensamblado"] = time.time() - t0
     _ok(tiempos["Ensamblado"])
+    print(f"       {len(refs)} referencias únicas")
 
     # ── Resumen de ejecución ───────────────────────────────────────────
     total_s = time.time() - total_start

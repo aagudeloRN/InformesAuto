@@ -5,6 +5,38 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.4] — 2026-07-06
+
+### Added
+- `domain/chains/chain_06_convergencia.py`: cadena LCEL para Cap 5 "Convergencia Empresarial
+  en las Áreas Estratégicas del Distrito". 4 secciones (Sostenibilidad Ambiental, Transformación
+  Digital, Desarrollo Social-Humano, Desarrollo Económico). Tier synth (Nemotron Ultra free).
+  Párrafo intro fijo del spec de negocio. Reutiliza helpers de chain_04.
+- `domain/use_cases/generate_convergencia.py`: `GenerateConvergencia` — use case N2. Dos queries
+  RAG diferenciadas (caps anteriores vs. convergencia territorial), 2 búsquedas web, deduplicación
+  de chunks por `fuente_url`. `_MIN_CHUNKS = 5`. Tier synth.
+- `domain/chains/chain_07_accionables.py`: cadena LCEL para Cap 6 "Accionables Estratégicos".
+  Genera exactamente 6 accionables cruzando todos los capítulos. Tier free.
+- `domain/use_cases/generate_accionables.py`: `GenerateAccionables` — use case N2. RAG sobre
+  contenido ya indexado (Caps 2-5 + PDF). Sin web_connector. `_MIN_CHUNKS = 6`.
+- `domain/chains/chain_08_resumen_ejecutivo.py`: cadena LCEL para Resumen Ejecutivo (N3).
+  Tono C-Level, estructura: gancho → propósito → problema → solución → hallazgos → llamado a
+  la acción. 400-600 palabras. Tier synth.
+- `domain/use_cases/generate_resumen_ejecutivo.py`: `GenerateResumenEjecutivo` — use case N3.
+  Sin retrieval; recibe `cap_textos: dict[str, str]` directamente. Omite caps con texto vacío.
+  Siempre `retrieval_suficiente = True`.
+- `shared/types.py`: DTOs `CapConvergencia`, `CapAccionables`, `ResumenEjecutivo`. Campos
+  opcionales `cap_convergencia`, `cap_accionables`, `resumen_ejecutivo` en `InformePiloto`.
+- `domain/assembler.py`: secciones para Cap 5 (Convergencia), Cap 6 (Accionables) y Resumen
+  Ejecutivo. Eliminado placeholder "pendiente Fase 5".
+- `scripts/run_pilot.py`: TOTAL_PASOS 7 → 10. Paso 6 = ingesta automática del PDF de
+  convergencia territorial si `InformeConvergenciaLocal2026V3RvADAA.pdf` existe en la raíz.
+  Pasos 7-8 = Cap 5/6. Paso 9 = Resumen Ejecutivo. `api_llm_synth` (tier synth).
+- Tests: `test_convergencia.py` (9 tests), `test_accionables.py` (7 tests),
+  `test_resumen_ejecutivo.py` (6 tests). Total: +22 tests (64 → 86 passed).
+
+---
+
 ## [0.5.3] — 2026-07-06
 
 ### Added

@@ -229,6 +229,7 @@ def test_assembler_with_mock_informe(tmp_path):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 @requires_ollama
 @requires_network
 def test_pilot_end_to_end_noel(tmp_path):

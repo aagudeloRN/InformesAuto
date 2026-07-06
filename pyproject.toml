@@ -30,6 +30,7 @@ dev = [
   "pytest-asyncio>=0.23",
   "ruff>=0.4",
   "black>=24",
+  "pytest-env>=1.6.0",
 ]
 
 [build-system]
@@ -49,6 +50,10 @@ select = ["E", "F", "I", "UP"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+env = [
+    "OPENBLAS_NUM_THREADS=1",
+    "OMP_NUM_THREADS=1",
+]
 markers = [
     "slow: tests que invocan Ollama real o red externa (excluir con -m 'not slow')",
 ]

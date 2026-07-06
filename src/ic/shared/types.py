@@ -79,12 +79,39 @@ class CapEcosistema:
 
 
 @dataclass
+class CapConvergencia:
+    texto: str
+    n_chunks_usados: int
+    retrieval_suficiente: bool
+    chunks_usados: list["ChunkResult"] = field(default_factory=list)
+
+
+@dataclass
+class CapAccionables:
+    texto: str
+    n_chunks_usados: int
+    retrieval_suficiente: bool
+    chunks_usados: list["ChunkResult"] = field(default_factory=list)
+
+
+@dataclass
+class ResumenEjecutivo:
+    texto: str
+    n_chunks_usados: int = 0
+    retrieval_suficiente: bool = True
+    chunks_usados: list["ChunkResult"] = field(default_factory=list)
+
+
+@dataclass
 class InformePiloto:
     empresa: DescripcionEmpresa
     gics: ClasificacionGICS
     cap_benchmarking: CapBenchmarking
     cap_tendencias: "CapTendencias | None" = None
     cap_ecosistema: "CapEcosistema | None" = None
+    cap_convergencia: "CapConvergencia | None" = None
+    cap_accionables: "CapAccionables | None" = None
+    resumen_ejecutivo: "ResumenEjecutivo | None" = None
     referencias: list[Referencia] = field(default_factory=list)
     ruta_docx: str | None = None
     cost_reports: list[CostReport] = field(default_factory=list)
