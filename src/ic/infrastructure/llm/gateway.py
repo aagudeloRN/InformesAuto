@@ -96,7 +96,7 @@ class OllamaGatewayLLM(BaseChatModel):
         def _call() -> str:
             resp = httpx.post(
                 f"{self.base_url}/api/chat",
-                json={"model": self.model, "messages": ollama_msgs, "stream": False},
+                json={"model": self.model, "messages": ollama_msgs, "stream": False, "keep_alive": 0},
                 timeout=self.timeout,
             )
             resp.raise_for_status()
@@ -118,7 +118,7 @@ class OllamaGatewayLLM(BaseChatModel):
         with httpx.stream(
             "POST",
             f"{self.base_url}/api/chat",
-            json={"model": self.model, "messages": ollama_msgs, "stream": True},
+            json={"model": self.model, "messages": ollama_msgs, "stream": True, "keep_alive": 0},
             timeout=self.timeout,
         ) as resp:
             resp.raise_for_status()

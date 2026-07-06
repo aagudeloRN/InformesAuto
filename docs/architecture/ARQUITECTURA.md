@@ -1,6 +1,6 @@
 # Arquitectura del Sistema — Informes de Inteligencia Competitiva
 
-**Versión:** 5C (post Fase 5C — estabilidad OOM/CJK + ADR-006)
+**Versión:** 5D (post Fase 5D — keep_alive:0 + Cap 4 Ecosistema + markers slow)
 **Última actualización:** 2026-07-06
 **Propósito:** documento vivo de referencia arquitectónica. Las decisiones cerradas
 viven en los ADRs; este documento describe el sistema como está construido y hacia
@@ -53,8 +53,8 @@ El informe incluye:
 │  domain/               Orquestación del DAG          │
 │    · use cases: GenerateEmpresaDescription,          │
 │                ClassifyGICS, GenerateBenchmarking,   │
-│                GenerateTendencias                    │
-│    · chains LCEL: chain_01…chain_04                  │
+│                GenerateTendencias, GenerateEcosistema │
+│    · chains LCEL: chain_01…chain_05                  │
 │    · política de datos ausentes (absent_data.py)     │
 │    · DAG de capítulos (N0→N1→N2→N3→ensamblado) [⏳ orquestador pendiente]│
 └───────┬───────────────────────────────┬──────────────┘
@@ -224,14 +224,26 @@ Input usuario: {nombre_empresa}
 | config (actualizado) | `shared/config.py` | `llm_api_free_alt_model`, `llm_local_timeout=300` |
 | ADR-006 | `docs/architecture/ADR-006-*` | Política presupuestal: solo modelos free o económicos |
 
+### Fase 5D ✅ — 2026-07-06
+
+| Componente | Archivo | Responsabilidad |
+|-----------|---------|-----------------|
+| keep_alive:0 — Embedder | `infrastructure/retrieval/embedder.py` | `"keep_alive": 0` en request de embeddings; descarga el modelo tras cada uso para liberar VRAM |
+| keep_alive:0 — Ollama LLM | `infrastructure/llm/gateway.py` | `"keep_alive": 0` en `_call` y `_stream` de `OllamaGatewayLLM`; solo para Ollama (no OpenRouter) |
+| chain_05_ecosistema | `domain/chains/chain_05_ecosistema.py` | LCEL Cap 4: secciones 5.1 local, 5.2 global, 5.3 disruptores; reutiliza helpers de chain_04 |
+| GenerateEcosistema | `domain/use_cases/generate_ecosistema.py` | 2 búsquedas web (proveedores + alianzas) + RAG + tier free; sin openalex |
+| CapEcosistema | `shared/types.py` | DTO Cap 4 con texto, chunks usados, flag retrieval_suficiente |
+| InformePiloto (actualizado) | `shared/types.py` | Campo `cap_ecosistema: CapEcosistema \| None = None` |
+| PilotAssembler (actualizado) | `domain/assembler.py` | Sección "Capítulo 4. Ecosistema Empresarial" condicional en .docx |
+| run_pilot.py (actualizado) | `scripts/run_pilot.py` | Paso 5/7 Cap 4; referencias combinadas Cap 2+3+4 |
+| pytest markers slow | `pyproject.toml` + `tests/test_llm.py` + `tests/test_retrieval.py` | Marker `slow` en 7 tests que usan Ollama real; excluibles con `-m "not slow"` |
+| test_ecosistema | `tests/test_ecosistema.py` | 9 tests mockeados (4 chain + 5 use case); sin dependencias externas |
+
 ### Pendiente
 
 | Fase | Componente | Descripción |
 |------|-----------|-------------|
-| 5D | **E2E Cap 3** | Prerequisito: validar `.docx` con ≥200 palabras reales en Cap 3 |
-| 5D | `keep_alive=0` | Embedder + OllamaGatewayLLM: descargar modelo tras cada request para eliminar OOM por coexistencia VRAM (ver FASE5C_HALLAZGOS H5C-03) |
-| 5D | Cap 4 — Ecosistema | `chain_05_ecosistema` + use case + retrieval web local/global |
-| 5D | Markers slow | `@pytest.mark.slow` en tests Ollama para excluirlos del flujo rápido |
+| 5D | **E2E Cap 3+4** | Validar `.docx` con ≥200 palabras reales en Cap 3 y Cap 4 |
 | 5E | Cap 5 — Convergencia | `chain_06` + use case + retrieval cruzado (consume outputs N1) + tier synth |
 | 5E | Resumen Ejecutivo | `chain_07` + use case (barrera N3) + tier synth |
 | 6 | DAG orquestador | `domain/orchestrator.py` — N0→N1→N2→N3 con `asyncio.gather()` para N1 paralelo |

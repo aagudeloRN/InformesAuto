@@ -1,4 +1,4 @@
-"""Script CLI para generar un informe de IC piloto (Caps 1, GICS, Cap 2, Cap 3).
+"""Script CLI para generar un informe de IC piloto (Caps 1, GICS, Cap 2, Cap 3, Cap 4).
 
 Uso:
     uv run python scripts/run_pilot.py --empresa "Noel S.A.S."
@@ -102,8 +102,10 @@ def main() -> None:
     from ic.domain.chains.chain_02_gics import build_chain_02
     from ic.domain.chains.chain_03_benchmarking import build_chain_03
     from ic.domain.chains.chain_04_tendencias import build_chain_04
+    from ic.domain.chains.chain_05_ecosistema import build_chain_05
     from ic.domain.use_cases.classify_gics import ClassifyGICS
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
+    from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
     from ic.domain.use_cases.generate_empresa_description import GenerateEmpresaDescription
     from ic.domain.use_cases.generate_tendencias import GenerateTendencias
     from ic.infrastructure.citation.apa_formatter import build_references_section
@@ -145,7 +147,7 @@ def main() -> None:
         store = PGVectorStore(embedder, repo, settings)
 
         # ── Cap 1: Descripción empresa ─────────────────────────────────
-        TOTAL_PASOS = 6
+        TOTAL_PASOS = 7
         _step(1, TOTAL_PASOS, "Cap 1 — Descripción de la empresa")
         t0 = time.time()
         uc_desc = GenerateEmpresaDescription(chain=build_chain_01(cap1_llms), web_connector=web)
@@ -220,25 +222,55 @@ def main() -> None:
             tiempos["Cap 3"] = 0.0
             print(f"⚠️  OPENROUTER_API_KEY no configurada — Cap 3 omitido")
 
+        # ── Cap 4: Ecosistema Empresarial ──────────────────────────────
+        _step(5, TOTAL_PASOS, "Cap 4 — Ecosistema Empresarial (web + LLM)")
+        t0 = time.time()
+        cap_eco = None
+        if api_llm is not None:
+            uc_eco = GenerateEcosistema(
+                chain=build_chain_05(api_llm),
+                store=store,
+                web_connector=web,
+            )
+            cap_eco = uc_eco.execute(
+                nombre_empresa=args.empresa,
+                descripcion_empresa=empresa.texto,
+                sector_gics=gics.grupo_gics,
+            )
+            tiempos["Cap 4"] = time.time() - t0
+            _ok(tiempos["Cap 4"])
+            retrieval_eco = (
+                f"{cap_eco.n_chunks_usados} chunks usados"
+                if cap_eco and cap_eco.retrieval_suficiente
+                else "⚠️  retrieval insuficiente — párrafo de ausencia insertado"
+            )
+            print(f"       Retrieval: {retrieval_eco}")
+        else:
+            tiempos["Cap 4"] = 0.0
+            print(f"⚠️  OPENROUTER_API_KEY no configurada — Cap 4 omitido")
+
     # ── Referencias APA ───────────────────────────────────────────────
-    _step(5, TOTAL_PASOS, "Referencias — Formateo APA 7")
+    _step(6, TOTAL_PASOS, "Referencias — Formateo APA 7")
     t0 = time.time()
     todos_chunks = list(cap.chunks_usados)
     if cap_tend and cap_tend.chunks_usados:
         todos_chunks += cap_tend.chunks_usados
+    if cap_eco and cap_eco.chunks_usados:
+        todos_chunks += cap_eco.chunks_usados
     refs = build_references_section(todos_chunks)
     tiempos["Referencias"] = time.time() - t0
     _ok(tiempos["Referencias"])
     print(f"       {len(refs)} referencias únicas")
 
     # ── Ensamblado .docx ──────────────────────────────────────────────
-    _step(6, TOTAL_PASOS, f"Ensamblado → {output_path}")
+    _step(7, TOTAL_PASOS, f"Ensamblado → {output_path}")
     t0 = time.time()
     informe = InformePiloto(
         empresa=empresa,
         gics=gics,
         cap_benchmarking=cap,
         cap_tendencias=cap_tend,
+        cap_ecosistema=cap_eco,
         referencias=refs,
     )
     assembler = PilotAssembler(DocxBuilder(settings.docx_template_path or None))

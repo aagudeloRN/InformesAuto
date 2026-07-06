@@ -71,11 +71,20 @@ class CapTendencias:
 
 
 @dataclass
+class CapEcosistema:
+    texto: str
+    n_chunks_usados: int
+    retrieval_suficiente: bool
+    chunks_usados: list["ChunkResult"] = field(default_factory=list)
+
+
+@dataclass
 class InformePiloto:
     empresa: DescripcionEmpresa
     gics: ClasificacionGICS
     cap_benchmarking: CapBenchmarking
     cap_tendencias: "CapTendencias | None" = None
+    cap_ecosistema: "CapEcosistema | None" = None
     referencias: list[Referencia] = field(default_factory=list)
     ruta_docx: str | None = None
     cost_reports: list[CostReport] = field(default_factory=list)

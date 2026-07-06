@@ -89,6 +89,7 @@ def test_ciiu_extraction_no_match():
 # --- Embedder ---
 
 
+@pytest.mark.slow
 @requires_ollama
 def test_embedder_returns_correct_dimensions():
     embedder = Embedder(settings)
@@ -97,6 +98,7 @@ def test_embedder_returns_correct_dimensions():
     assert all(isinstance(v, float) for v in vec)
 
 
+@pytest.mark.slow
 @requires_ollama
 def test_embedder_many():
     embedder = Embedder(settings)
@@ -109,6 +111,7 @@ def test_embedder_many():
 # --- Ingest + Search (integración completa) ---
 
 
+@pytest.mark.slow
 @requires_ollama
 def test_ingest_and_search():
     embedder = Embedder(settings)

@@ -64,6 +64,7 @@ def test_absent_data_paragraph_not_empty():
 
 # --- Tests con Ollama real ---
 
+@pytest.mark.slow
 @requires_ollama
 def test_ollama_gateway_simple_complete():
     llm = build_llm(settings)
@@ -73,6 +74,7 @@ def test_ollama_gateway_simple_complete():
     assert result.content.strip() != ""
 
 
+@pytest.mark.slow
 @requires_ollama
 def test_chain_02_gics_noel():
     llm = build_llm(settings)
@@ -87,6 +89,7 @@ def test_chain_02_gics_noel():
     assert any(kw in result_lower for kw in ["alimento", "bebida", "tabaco", "consumo"])
 
 
+@pytest.mark.slow
 @requires_ollama
 def test_use_case_classify_gics_noel():
     llm = build_llm(settings)
@@ -97,6 +100,7 @@ def test_use_case_classify_gics_noel():
     assert result.texto_raw != ""
 
 
+@pytest.mark.slow
 @requires_ollama
 @requires_network
 def test_use_case_prompt01_noel():

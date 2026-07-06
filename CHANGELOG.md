@@ -5,6 +5,46 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.3] — 2026-07-06
+
+### Added
+- `infrastructure/retrieval/embedder.py`: `"keep_alive": 0` en el request de embeddings a Ollama.
+  Descarga el modelo inmediatamente tras cada request, eliminando la coexistencia en VRAM con el
+  LLM (`nomic-embed-text` + `qwen3:8b` ≈ 5.7GB) que causaba OOM en WSL2/8GB.
+- `infrastructure/llm/gateway.py`: `"keep_alive": 0` en `_call` y `_stream` de
+  `OllamaGatewayLLM`. Solo aplica al gateway Ollama; `OpenRouterGatewayLLM` no se modifica.
+- `domain/chains/chain_05_ecosistema.py`: nueva cadena LCEL para Cap 4 "Ecosistema Empresarial".
+  Secciones: 5.1 Ecosistema local (Medellín/Colombia), 5.2 Ecosistema global, 5.3 Actores
+  disruptores. Formato: fichas por categoría con nombre, rol y relevancia. Reutiliza los helpers
+  `format_chunks_as_context()` y `format_academic_sources()` de chain_04 (sin duplicar código).
+- `domain/use_cases/generate_ecosistema.py`: `GenerateEcosistema` — use case N1. 2 búsquedas
+  web específicas (empresa + "ecosistema proveedores" y sector + "alianzas partners"), RAG sobre
+  pgvector, política de datos ausentes si < 3 chunks. Tier free OpenRouter. Sin openalex_connector
+  (web suficiente para mapeo de actores).
+- `shared/types.py`: DTO `CapEcosistema` (texto, n_chunks_usados, retrieval_suficiente,
+  chunks_usados). Campo `cap_ecosistema: CapEcosistema | None = None` en `InformePiloto`.
+- `tests/test_ecosistema.py`: 9 tests mockeados — 4 de chain (build, format_chunks, vacío,
+  format_academic) + 5 de use case (tipo correcto, inputs chain, retrieval insuficiente, web vacío,
+  ingest llamado). Sin llamadas a Ollama ni OpenRouter.
+- `pyproject.toml`: marker `slow` registrado en `[tool.pytest.ini_options]`. Permite
+  `pytest -m "not slow"` para excluir tests que requieren Ollama real.
+
+### Changed
+- `domain/assembler.py`: sección condicional "Capítulo 4. Ecosistema Empresarial" después de
+  Cap 3 Tendencial.
+- `scripts/run_pilot.py`: paso 5/7 Cap 4 Ecosistema; referencias ahora acumulan chunks de Cap 2
+  + Cap 3 + Cap 4; pasos Refs (6/7) y Ensamblado (7/7) renumerados. `TOTAL_PASOS = 7`.
+- `tests/test_llm.py` + `tests/test_retrieval.py`: `@pytest.mark.slow` añadido a 7 tests que
+  invocan Ollama real (4 en test_llm, 3 en test_retrieval).
+
+### Notes
+- **Tests:** 64 passed, 2 skipped. Los 9 tests nuevos cubren los dos flujos de Cap 4:
+  generación exitosa y degradación por retrieval insuficiente.
+- **E2E pendiente:** Validar `run_pilot.py` con Noel SAS para confirmar que Cap 3 y Cap 4
+  generan contenido real en español en el .docx.
+
+---
+
 ## [0.5.2] — 2026-07-06
 
 ### Added

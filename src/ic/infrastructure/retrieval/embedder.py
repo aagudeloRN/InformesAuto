@@ -20,7 +20,7 @@ class Embedder:
             try:
                 resp = httpx.post(
                     f"{self._base_url}/api/embeddings",
-                    json={"model": self._model, "prompt": text},
+                    json={"model": self._model, "prompt": text, "keep_alive": 0},
                     timeout=30,
                 )
                 resp.raise_for_status()

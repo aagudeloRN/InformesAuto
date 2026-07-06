@@ -39,6 +39,11 @@ class PilotAssembler:
             b.add_markdown_section(informe.cap_tendencias.texto)
             b.add_paragraph("")
 
+        if informe.cap_ecosistema is not None:
+            b.add_heading("Capítulo 4. Ecosistema Empresarial", level=2)
+            b.add_markdown_section(informe.cap_ecosistema.texto)
+            b.add_paragraph("")
+
         b.add_heading("Referencias", level=2)
         for ref in informe.referencias:
             b.add_paragraph(ref.apa_string)
