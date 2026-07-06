@@ -5,6 +5,59 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.7.0] — 2026-07-06
+
+### Added
+- `src/ic/domain/use_cases/generate_informe.py`: orchestrator `GenerateInforme` que
+  encapsula el pipeline completo (Caps 1–6 + Resumen Ejecutivo). Acepta un callback
+  `on_step(n, total, label)` que desacopla el reporte de progreso de la ejecución
+  (CLI usa print; UI usa `st.progress`). Retorna `InformeResult` con ruta, costo,
+  tokens y referencias. Cumple SoC: la presentación no contiene lógica de negocio.
+- `src/ic/presentation/app.py`: UI Streamlit en puerto 8503. Formulario con empresa,
+  CIIU opcional y ruta de salida. Verificación de servicios (Ollama + PG) antes de
+  iniciar. Barra de progreso de 10 pasos. Botón de descarga del .docx al finalizar.
+  Expander con resumen de costo, tokens y desglose por llamada.
+- `tests/test_generate_informe.py`: 5 tests rápidos + 1 `@pytest.mark.slow` (E2E
+  completo con servicios reales: Noel S.A.S.).
+
+### Changed
+- `scripts/run_pilot.py`: refactorizado como thin wrapper. La lógica del pipeline
+  migró a `GenerateInforme`. El CLI mantiene: argparse, verificación de servicios,
+  callback de consola `_console_step`, y resumen de ejecución.
+
+### Deferred
+- Persistencia en `historial_informes`: diferida a Fase 7. La tabla requiere FK
+  `empresa_id → empresas.id` (NOT NULL), lo que exige gestión de entidades Empresa.
+
+---
+
+## [0.6.0] — 2026-07-06
+
+### Added
+- `src/ic/domain/chains/chain_intro.py`: cadena LCEL genérica `build_chain_intro(llm)`.
+  Genera un párrafo introductorio de 2-3 oraciones para cualquier capítulo del informe.
+  Recibe `{titulo}`, `{empresa}` y `{resumen_cap}` (primeros 500 chars del cap ya
+  generado). Sin retrieval; usa `api_llm` free para mantener costo bajo.
+- `tests/test_chain_intro.py`: 3 tests rápidos (FakeListChatModel) + 1 @slow.
+  Test de propagación de respuesta, construcción de Runnable y test E2E con Ollama.
+- Párrafos introductorios activos en Caps 2–6: tras la barrera N1 y tras cada cap N2,
+  `intro_chain` se aplica si `api_llm` está configurado y el retrieval fue suficiente.
+- `scripts/run_pilot.py`: resumen de costo API real al final de la ejecución. Muestra
+  costo total en USD + desglose por llamada (modelo, tokens in/out, costo). Reemplaza
+  el placeholder `$0.00 (Etapa B)` con datos reales del `CostTracker`.
+
+### Changed
+- **Paralelización N1**: Caps 2, 3 y 4 ahora corren simultáneamente vía
+  `ThreadPoolExecutor(max_workers=3)`. Tiempo de pared N1 = `max(cap2, cap3, cap4)`
+  en lugar de `cap2 + cap3 + cap4`. Cada hilo crea su propia `SessionLocal()` para
+  thread-safety de SQLAlchemy.
+- Cap 1 y GICS movidos fuera del `with SessionLocal()` (no necesitaban sesión de BD).
+- N2 (Caps 5, 6) ejecutan con su propia `with SessionLocal() as db_n2`, separada de N1.
+- `CostTracker` ahora se instancia al inicio de `main()` y se pasa como
+  `cost_tracker=tracker` a todos los `build_api_llm()`.
+
+---
+
 ## [0.5.5] — 2026-07-06
 
 ### Added

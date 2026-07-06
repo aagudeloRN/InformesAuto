@@ -1,6 +1,6 @@
 # Arquitectura del Sistema — Informes de Inteligencia Competitiva
 
-**Versión:** 5D (post Fase 5D — keep_alive:0 + Cap 4 Ecosistema + markers slow)
+**Versión:** 6 (post Fase 6 — GenerateInforme orchestrator + UI Streamlit + E2E validado)
 **Última actualización:** 2026-07-06
 **Propósito:** documento vivo de referencia arquitectónica. Las decisiones cerradas
 viven en los ADRs; este documento describe el sistema como está construido y hacia
@@ -95,22 +95,22 @@ Input usuario: {nombre_empresa}
           └──────────────┬───────────┘
                          │  (barrera: Prompt-01 debe completar antes de N1)
           ┌──────────────▼───────────────────────────────────┐
-          │  N1: Analíticos (paralelizables)                 │
-          │  · Cap 2 Benchmarking  ← web on-demand + pgvector│
+          │  N1: Analíticos — ThreadPoolExecutor(workers=3)  │ ← Fase 5F: paralelos
+          │  · Cap 2 Benchmarking  ← web on-demand + pgvector│ └─ sesión BD propia
           │  · Cap 3 Tendencial    ← OpenAlex + web + pgvec  │
           │  · Cap 4 Ecosistema    ← web + pgvector           │
-          │  · Cap 5 Convergencia  ← retrieval cruzado       │
           └──────────────┬───────────────────────────────────┘
-                         │  (barrera de sincronización)
+                         │  (barrera de sincronización → intros N1)
           ┌──────────────▼───────────┐
           │  N2: Síntesis            │
-          │  · Cap 6 Accionables     │ ← consume salidas N1
+          │  · Cap 5 Convergencia    │ ← retrieval cruzado
+          │  · Cap 6 Accionables     │ ← consume salidas N1+N2
           └──────────────┬───────────┘
+                         │  (intros N2)
                          │  (barrera de sincronización)
           ┌──────────────▼───────────┐
           │  N3: Meta                │
           │  · Resumen Ejecutivo     │ ← consume informe completo
-          │  · Párrafos Intro        │
           │  · Referencias APA 7     │
           └──────────────┬───────────┘
                          │
@@ -126,7 +126,9 @@ Input usuario: {nombre_empresa}
 **Barreras de sincronización:**
 - Entre N0 y N1: todos los fundacionales deben estar completos antes de iniciar
   los analíticos (cada capítulo N1 usa el output de Prompt-01 como contexto).
-- Entre N1 y N2: los 4 capítulos N1 deben estar persistidos antes de Cap 6.
+- Dentro de N1: los 3 caps corren en paralelo; la barrera es `f2/f3/f4.result()`.
+  Los párrafos intro se añaden después de esta barrera (secuencial, API free).
+- Entre N1 y N2: los 3 capítulos N1 deben estar completos antes de Cap 5/6.
 - Entre N2 y N3: Cap 6 completo antes del resumen ejecutivo.
 
 ---
@@ -239,16 +241,23 @@ Input usuario: {nombre_empresa}
 | pytest markers slow | `pyproject.toml` + `tests/test_llm.py` + `tests/test_retrieval.py` | Marker `slow` en 7 tests que usan Ollama real; excluibles con `-m "not slow"` |
 | test_ecosistema | `tests/test_ecosistema.py` | 9 tests mockeados (4 chain + 5 use case); sin dependencias externas |
 
+### Fase 5F ✅ — 2026-07-06
+
+| Componente | Archivo | Responsabilidad |
+|-----------|---------|-----------------|
+| chain_intro | `domain/chains/chain_intro.py` | Cadena LCEL genérica para párrafos introductorios de 2-3 oraciones por capítulo |
+| Paralelización N1 | `scripts/run_pilot.py` | Caps 2, 3, 4 en `ThreadPoolExecutor(max_workers=3)`; sesión SQLAlchemy propia por hilo |
+| CostTracker wiring | `scripts/run_pilot.py` | `CostTracker` instanciado en `main()` y pasado a todos los `build_api_llm()`; resumen real al final |
+| test_chain_intro | `tests/test_chain_intro.py` | 3 tests rápidos (FakeListChatModel) + 1 @slow |
+
 ### Pendiente
 
 | Fase | Componente | Descripción |
 |------|-----------|-------------|
-| 5D | **E2E Cap 3+4** | Validar `.docx` con ≥200 palabras reales en Cap 3 y Cap 4 |
-| 5E | Cap 5 — Convergencia | `chain_06` + use case + retrieval cruzado (consume outputs N1) + tier synth |
-| 5E | Resumen Ejecutivo | `chain_07` + use case (barrera N3) + tier synth |
-| 6 | DAG orquestador | `domain/orchestrator.py` — N0→N1→N2→N3 con `asyncio.gather()` para N1 paralelo |
-| 6 | CostTracker en Cap 1/GICS | Los use cases locales aún no registran tokens al tracker |
-| 6 | UI Streamlit | `presentation/app.py` puerto 8503 — entrada empresa/CIIU → progreso → descarga |
+| 6 | **E2E con informe real** | Correr `run_pilot.py` con empresa real (Noel S.A.S.) y validar el `.docx` generado |
+| 6 | CostTracker en Cap 1/GICS | Las llamadas Ollama (Cap 1, GICS) no registran tokens en el tracker (costo = $0, impacto bajo) |
+| 6 | UI Streamlit | `presentation/app.py` puerto 8503 — entrada empresa/CIIU → progreso → descarga .docx |
+| 6 | Persistencia en BD | `InformeRepository.save()` para guardar cada informe con costo, tiempo y rutas en `historial_informe` |
 
 ---
 
@@ -297,6 +306,7 @@ LLM_CIRCUIT_BREAKER_MAX_RETRIES=3
 | ADR-004 | LangChain como framework de orquestación | Aceptado |
 | ADR-005 | Diseño de la capa de retrieval | Aceptado |
 | ADR-006 | Presupuesto: solo modelos gratuitos o económicos | Aceptado |
+| ADR-007 | Gestión de memoria WSL2: keep_alive:0 + OPENBLAS threads | Aceptado |
 
 ---
 

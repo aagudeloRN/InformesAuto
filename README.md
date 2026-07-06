@@ -3,9 +3,9 @@
 Genera informes de vigilancia competitiva estructurados y citados a partir del nombre de una empresa,
 usando RAG propio sobre pgvector, modelos locales vía Ollama y cadenas LCEL.
 
-**Estado actual:** Fase 5E — Cap 5 Convergencia + Cap 6 Accionables + Resumen Ejecutivo
+**Estado actual:** Fase 6 — UI Streamlit + GenerateInforme orchestrator
 **Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)
-**Tests:** 78 fast passed, 2 skipped (8 slow excluidos) | **Caps implementados:** 1, GICS, 2, 3, 4, 5, 6, RE
+**Tests:** 86 fast passed, 2 skipped (10 slow excluidos) | **Caps implementados:** 1, GICS, 2, 3, 4, 5, 6, RE + intros
 
 ---
 
@@ -36,7 +36,7 @@ curl http://127.0.0.1:11434/api/tags      # Ollama OK?
 docker ps | grep repositorio_postgres     # BD OK? (puerto 5434)
 
 # 5. Correr tests
-uv run pytest -m "not slow"               # debe mostrar 78 passed, 2 skipped
+uv run pytest -m "not slow"               # debe mostrar 81 passed, 2 skipped
 uv run pytest                             # suite completa (requiere Ollama + BD + red)
 ```
 
@@ -51,6 +51,15 @@ uv run python scripts/run_pilot.py --empresa "Alpina S.A.S." --salida ./output/a
 
 El script verifica servicios, ejecuta los capítulos disponibles y muestra un resumen de tiempos.  
 El `.docx` se guarda en `./output/` (excluido de git).
+
+## Generar un informe desde la UI
+
+```bash
+uv run streamlit run src/ic/presentation/app.py --server.port 8503
+```
+
+Abre `http://localhost:8503`, ingresa el nombre de la empresa y haz clic en **Generar informe**.  
+Al terminar aparece un botón para descargar el `.docx` directamente desde el navegador.
 
 ## Variables de entorno requeridas
 
@@ -94,7 +103,7 @@ DOCX_OUTPUT_DIR=./output
 ## Arquitectura de alto nivel
 
 ```
-presentation/   → Streamlit UI (pendiente — Fase 6)
+presentation/   → Streamlit UI (app.py, puerto 8503)
 domain/         → use cases + cadenas LCEL + política de datos ausentes
 data/           → repositorios ORM + acceso a PostgreSQL/pgvector
 infrastructure/ → LLM gateway (Ollama/API), WebConnector, Embedder, PGVectorStore
@@ -116,8 +125,10 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | 5B | ✅ | Cap 3 Tendencial + OpenAlexConnector + test_connections |
 | 5C | ✅ | Estabilidad OOM/CJK + fallback multi-LLM Cap 1 + ADR-006 |
 | 5D | ✅ | `keep_alive:0` Ollama + Cap 4 Ecosistema + markers slow |
-| 5E | 🔄 | **Siguiente:** Cap 5 Convergencia + Resumen Ejecutivo (N2+N3) |
-| 6 | ⏳ | DAG orquestador + UI Streamlit (puerto 8503) |
+| 5E | ✅ | Cap 5 Convergencia + Cap 6 Accionables + Resumen Ejecutivo (N2+N3) |
+| 5F | ✅ | Párrafos intro Caps 2–6 + paralelización N1 + tracking costo real |
+| 6 | ✅ | `GenerateInforme` orchestrator + UI Streamlit (puerto 8503) |
+| 7 | ⏳ | **Siguiente:** gestión de empresas + persistencia historial en BD |
 
 ## Documentación
 
@@ -133,7 +144,9 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | [`docs/decisions/FASE5B_HALLAZGOS.md`](docs/decisions/FASE5B_HALLAZGOS.md) | Hallazgos operativos Fase 5B (Cap 3, OpenAlex, credenciales BD) |
 | [`docs/decisions/FASE5C_HALLAZGOS.md`](docs/decisions/FASE5C_HALLAZGOS.md) | Hallazgos operativos Fase 5C (OOM/CJK, keep_alive, ADR-006) |
 | [`docs/decisions/FASE5D_HALLAZGOS.md`](docs/decisions/FASE5D_HALLAZGOS.md) | Hallazgos operativos Fase 5D (keep_alive:0 definitivo, Cap 4, markers) |
+| [`docs/decisions/FASE5F_HALLAZGOS.md`](docs/decisions/FASE5F_HALLAZGOS.md) | Hallazgos operativos Fase 5F (paralelización N1, intros, costo real) |
 | [`docs/architecture/ADR-006`](docs/architecture/ADR-006-presupuesto-modelos-gratuitos.md) | Política de presupuesto: solo free o económicos |
+| [`docs/architecture/ADR-007`](docs/architecture/ADR-007-gestion-memoria-wsl2-tests.md) | Gestión de memoria WSL2: keep_alive:0 + threads OpenBLAS |
 | [`docs/business-rules/REGLAS_NEGOCIO.md`](docs/business-rules/REGLAS_NEGOCIO.md) | Reglas de negocio del sistema: datos ausentes, citación, política modelos |
 | [`docs/runbooks/OPERACIONES.md`](docs/runbooks/OPERACIONES.md) | Runbook operativo: ingesta PDF, verificación de servicios, troubleshooting |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Guía para agentes y colaboradores |
