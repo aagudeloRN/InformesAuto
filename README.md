@@ -3,9 +3,9 @@
 Genera informes de vigilancia competitiva estructurados y citados a partir del nombre de una empresa,
 usando RAG propio sobre pgvector, modelos locales vía Ollama y cadenas LCEL.
 
-**Estado actual:** Fase 5C — estabilidad OOM/CJK + fallback multi-LLM Cap 1 + ADR-006
+**Estado actual:** Fase 5D — keep_alive:0 OOM fix + Cap 4 Ecosistema + markers slow
 **Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)
-**Tests:** 55 passed, 2 skipped | **Caps implementados:** 1, GICS, 2, 3
+**Tests:** 64 passed, 2 skipped (57 sin servicios) | **Caps implementados:** 1, GICS, 2, 3, 4
 
 ---
 
@@ -114,8 +114,8 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | 5A | ✅ | Script piloto CLI + Gateway OpenRouter + CostTracker real |
 | 5B | ✅ | Cap 3 Tendencial + OpenAlexConnector + test_connections |
 | 5C | ✅ | Estabilidad OOM/CJK + fallback multi-LLM Cap 1 + ADR-006 |
-| 5D | 🔄 | **Siguiente:** `keep_alive=0` Ollama + Cap 4 Ecosistema |
-| 5E | ⏳ | Cap 5 Convergencia + Resumen Ejecutivo (N2+N3) |
+| 5D | ✅ | `keep_alive:0` Ollama + Cap 4 Ecosistema + markers slow |
+| 5E | 🔄 | **Siguiente:** Cap 5 Convergencia + Resumen Ejecutivo (N2+N3) |
 | 6 | ⏳ | DAG orquestador + UI Streamlit (puerto 8503) |
 
 ## Documentación
@@ -131,7 +131,11 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | [`docs/decisions/FASE5A_HALLAZGOS.md`](docs/decisions/FASE5A_HALLAZGOS.md) | Hallazgos operativos Fase 5A (CLI, OpenRouter, CostTracker, benchmarks) |
 | [`docs/decisions/FASE5B_HALLAZGOS.md`](docs/decisions/FASE5B_HALLAZGOS.md) | Hallazgos operativos Fase 5B (Cap 3, OpenAlex, credenciales BD) |
 | [`docs/decisions/FASE5C_HALLAZGOS.md`](docs/decisions/FASE5C_HALLAZGOS.md) | Hallazgos operativos Fase 5C (OOM/CJK, keep_alive, ADR-006) |
+| [`docs/decisions/FASE5D_HALLAZGOS.md`](docs/decisions/FASE5D_HALLAZGOS.md) | Hallazgos operativos Fase 5D (keep_alive:0 definitivo, Cap 4, markers) |
 | [`docs/architecture/ADR-006`](docs/architecture/ADR-006-presupuesto-modelos-gratuitos.md) | Política de presupuesto: solo free o económicos |
+| [`docs/business-rules/REGLAS_NEGOCIO.md`](docs/business-rules/REGLAS_NEGOCIO.md) | Reglas de negocio del sistema: datos ausentes, citación, política modelos |
+| [`docs/runbooks/OPERACIONES.md`](docs/runbooks/OPERACIONES.md) | Runbook operativo: ingesta PDF, verificación de servicios, troubleshooting |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Guía para agentes y colaboradores |
 | [`docs/prompts/`](docs/prompts/) | Especificación de los prompts del piloto |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historial semántico de cambios |
 | [`CLAUDE.md`](CLAUDE.md) | Reglas operativas para agentes IA |
