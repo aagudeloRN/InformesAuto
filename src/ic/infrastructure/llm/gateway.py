@@ -24,7 +24,7 @@ _PRICING: dict[str, tuple[float, float]] = {
     "google/gemma-3-12b-it": (0.05 / 1_000_000, 0.10 / 1_000_000),
 }
 
-ModelTier = Literal["free", "synth", "paid"]
+ModelTier = Literal["free", "free_alt", "synth", "paid"]
 
 
 @dataclass
@@ -253,6 +253,7 @@ def build_llm(settings: Settings) -> OllamaGatewayLLM:
         base_url=settings.ollama_base_url,
         model=settings.llm_local_analytic_model,
         max_retries=settings.llm_circuit_breaker_max_retries,
+        timeout=settings.llm_local_timeout,
     )
 
 
@@ -269,6 +270,7 @@ def build_api_llm(
     """
     model_map: dict[ModelTier, str] = {
         "free": settings.llm_api_free_model,
+        "free_alt": settings.llm_api_free_alt_model,
         "synth": settings.llm_api_synth_model,
         "paid": settings.llm_api_paid_model,
     }

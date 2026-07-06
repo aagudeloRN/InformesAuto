@@ -5,8 +5,8 @@
 En tu máquina, crea la estructura del proyecto:
 
 ```bash
-mkdir -p sistema-vigilancia-ic
-cd sistema-vigilancia-ic
+mkdir -p informesAuto
+cd informesAuto
 
 # Estructura base (ya incluida en los archivos que descargaste)
 mkdir -p docs/architecture docs/prompts docs/decisions .claude/hooks config
@@ -27,8 +27,8 @@ mkdir -p docs/architecture docs/prompts docs/decisions .claude/hooks config
 
 ```bash
 git init
-git config user.email "tu.email@example.com"
-git config user.name "Tu Nombre"
+git config user.email "alvaro.agudelo@rutanmedellin.org"
+git config user.name "aagudeloRN"
 
 # Crear .gitignore (crucial)
 cat > .gitignore << 'EOF'
@@ -111,15 +111,15 @@ Claude Code debería cargar el CLAUDE.md automáticamente (se detecta al iniciar
 
 ## Checklist antes de empezar
 
-- [ ] Estructura de carpetas creada
-- [ ] Git inicializado (sin stage de código, solo estructura)
-- [ ] `.gitignore` en su lugar
-- [ ] Archivos ADR en `docs/architecture/`
-- [ ] PRIME_DIRECTIVE.md en `docs/architecture/`
-- [ ] CLAUDE.md en raíz
-- [ ] `.claude/` con hooks y settings.json
-- [ ] Prompts originales en `source_prompts/` (referencia)
-- [ ] Roo Code / Claude Code instalado y conectado
+- [x] Estructura de carpetas creada
+- [x] Git inicializado (sin stage de código, solo estructura)
+- [x] `.gitignore` en su lugar
+- [x] Archivos ADR en `docs/architecture/`
+- [x] PRIME_DIRECTIVE.md en `docs/architecture/`
+- [x] CLAUDE.md en raíz
+- [x] `.claude/` con hooks y settings.json
+- [x] Prompts originales en `source_prompts/` (referencia)
+- [x] Roo Code / Claude Code instalado y conectado
 
 ---
 

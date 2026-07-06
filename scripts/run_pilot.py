@@ -128,8 +128,17 @@ def main() -> None:
 
     _banner(f"Generando informe: {args.empresa}")
 
-    # Construir LLM API para capítulos analíticos (OpenRouter free tier)
+    # ── Construir LLMs por tier ────────────────────────────────────────
     api_llm = build_api_llm(settings, tier="free") if settings.openrouter_api_key else None
+    api_llm_alt = (
+        build_api_llm(settings, tier="free_alt")
+        if settings.openrouter_api_key and settings.llm_api_free_alt_model
+        else None
+    )
+
+    # Cadena de fallback para Cap 1: free API → free_alt API → local Ollama
+    # Si no hay API key configurada, usa directamente el modelo local.
+    cap1_llms = [m for m in [api_llm, api_llm_alt, llm] if m is not None]
 
     with SessionLocal() as db:
         repo = EmbeddingRepository(db)
@@ -139,7 +148,7 @@ def main() -> None:
         TOTAL_PASOS = 6
         _step(1, TOTAL_PASOS, "Cap 1 — Descripción de la empresa")
         t0 = time.time()
-        uc_desc = GenerateEmpresaDescription(chain=build_chain_01(llm), web_connector=web)
+        uc_desc = GenerateEmpresaDescription(chain=build_chain_01(cap1_llms), web_connector=web)
         empresa = uc_desc.execute(args.empresa)
         # Si el usuario pasó --ciiu, sobreescribir el extraído automáticamente
         if args.ciiu:
