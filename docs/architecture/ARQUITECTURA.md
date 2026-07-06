@@ -1,7 +1,7 @@
 # Arquitectura del Sistema — Informes de Inteligencia Competitiva
 
-**Versión:** 5B (post Fase 5B — Cap 3 implementado)
-**Última actualización:** 2026-07-02
+**Versión:** 5C (post Fase 5C — estabilidad OOM/CJK + ADR-006)
+**Última actualización:** 2026-07-06
 **Propósito:** documento vivo de referencia arquitectónica. Las decisiones cerradas
 viven en los ADRs; este documento describe el sistema como está construido y hacia
 dónde va.
@@ -35,7 +35,7 @@ El informe incluye:
 |-----------|----------------------|
 | **Separación de capas (SoC)** | `presentation/` no conoce a `data/`; `domain/` no importa librerías externas |
 | **Dependency Agnosticism** | Todo acceso externo pasa por un wrapper en `infrastructure/`; el dominio no depende de langchain, httpx ni pgvector directamente |
-| **Local-primero** | Ollama en el host; la API externa (Claude, Gemini, etc.) solo se invoca si el modelo local no supera el umbral de calidad |
+| **Local-primero** | Ollama en el host; la API externa solo se invoca si el local no supera el umbral de calidad. **Solo modelos free o económicos** (ADR-006) |
 | **Datos ausentes = condición de recuperación** | Si el retrieval no supera el umbral, NO se llama al LLM; se inserta un párrafo de ausencia estándar |
 | **Citación trazable** | Toda afirmación proviene de un chunk con fuente verificable; no hay alucinación por diseño |
 | **Presupuesto máximo** | ≤ 1 USD por informe completo (controlado en el LLM gateway) |
@@ -196,7 +196,7 @@ Input usuario: {nombre_empresa}
 | CostReport | `shared/types.py` | DTO de costo por llamada LLM (modelo, tokens, USD, capítulo) |
 | InformePiloto (actualizado) | `shared/types.py` | Agrega `cost_reports` y `costo_total_usd` |
 
-### Fase 5B ✅ (parcial) — 2026-07-02
+### Fase 5B ✅ — 2026-07-02
 
 | Componente | Archivo | Responsabilidad |
 |-----------|---------|-----------------|
@@ -210,20 +210,33 @@ Input usuario: {nombre_empresa}
 | run_pilot.py (actualizado) | `scripts/run_pilot.py` | Paso 4/6 Cap 3 via OpenRouter; referencias combinadas Cap 2+3 |
 | test_connections.py | `scripts/test_connections.py` | Diagnóstico de 6 servicios; 1 crédito Tavily por ejecución |
 
+### Fase 5C ✅ — 2026-07-06
+
+| Componente | Archivo | Responsabilidad |
+|-----------|---------|-----------------|
+| text_utils | `shared/text_utils.py` | `has_cjk_characters()` + `format_web_results_as_context()` |
+| chain_01 (refactorizado) | `domain/chains/chain_01_descripcion.py` | Prompt con `{web_context}`, anti-CJK, fallback multi-LLM via `.with_fallbacks()` |
+| chain_03 (actualizado) | `domain/chains/chain_03_benchmarking.py` | Regla idioma reforzada |
+| chain_04 (actualizado) | `domain/chains/chain_04_tendencias.py` | Regla idioma reforzada |
+| GenerateEmpresaDescription | `domain/use_cases/generate_empresa_description.py` | 3 queries web, inyecta `{web_context}`, detección CJK post-generación |
+| Embedder (actualizado) | `infrastructure/retrieval/embedder.py` | Retries con backoff `[0,3,8]s` ante HTTP 500 de Ollama |
+| gateway (actualizado) | `infrastructure/llm/gateway.py` | Tier `free_alt`, `llm_local_timeout` en `build_llm()` |
+| config (actualizado) | `shared/config.py` | `llm_api_free_alt_model`, `llm_local_timeout=300` |
+| ADR-006 | `docs/architecture/ADR-006-*` | Política presupuestal: solo modelos free o económicos |
+
 ### Pendiente
 
 | Fase | Componente | Descripción |
 |------|-----------|-------------|
-| 5B | **E2E Cap 3** | Validar con `run_pilot.py` que el .docx incluye ≥200 palabras reales en Cap 3 |
-| 5B | Cap 4 — Ecosistema | `chain_05` + use case + retrieval web local/global |
-| 5B | Cap 5 — Convergencias | `chain_06` + use case + retrieval cruzado (consume N1) |
-| 5B | Cap 6 — Accionables | `chain_07` + use case (barrera N2) + tier synth OpenRouter |
-| 5B | Párrafos Intro | `chain_08` + use case (barrera N3) |
-| 5B | Resumen Ejecutivo | `chain_09` + use case (barrera N3) + tier synth OpenRouter |
-| 5B | DAG orquestador | `domain/orchestrator.py` — N0→N1→N2→N3 con barreras + `asyncio.gather()` para N1 |
+| 5D | **E2E Cap 3** | Prerequisito: validar `.docx` con ≥200 palabras reales en Cap 3 |
+| 5D | `keep_alive=0` | Embedder + OllamaGatewayLLM: descargar modelo tras cada request para eliminar OOM por coexistencia VRAM (ver FASE5C_HALLAZGOS H5C-03) |
+| 5D | Cap 4 — Ecosistema | `chain_05_ecosistema` + use case + retrieval web local/global |
+| 5D | Markers slow | `@pytest.mark.slow` en tests Ollama para excluirlos del flujo rápido |
+| 5E | Cap 5 — Convergencia | `chain_06` + use case + retrieval cruzado (consume outputs N1) + tier synth |
+| 5E | Resumen Ejecutivo | `chain_07` + use case (barrera N3) + tier synth |
+| 6 | DAG orquestador | `domain/orchestrator.py` — N0→N1→N2→N3 con `asyncio.gather()` para N1 paralelo |
+| 6 | CostTracker en Cap 1/GICS | Los use cases locales aún no registran tokens al tracker |
 | 6 | UI Streamlit | `presentation/app.py` puerto 8503 — entrada empresa/CIIU → progreso → descarga |
-| 6 | Lookup CIIU | CSV DANE local + validación RUES antes de generar |
-| 6 | Panel de consumo | Tab en UI con tabla de llamadas LLM, costo total, histórico |
 
 ---
 
@@ -234,7 +247,7 @@ Input usuario: {nombre_empresa}
 | PostgreSQL + pgvector | `repositorio_postgres` Docker, `localhost:5434` | DB: `repositorio_ctie`, schema: `informes_ic` |
 | Ollama | Host (no Docker) | `http://127.0.0.1:11434` |
 | Modelos Ollama | Ollama host | `nomic-embed-text:latest` (embeddings 768d, 137MB), `qwen2.5:7b` (analítico, 4.7GB) |
-| Modelos API | OpenRouter | Tier free: `nemotron-super/ultra`; pago: `gemma-3-27b-it` |
+| Modelos API | OpenRouter | Tier free: `nemotron-super/ultra`, `llama-3.3-70b:free`; pago (fallback): `gemma-3-27b-it` — política ADR-006 |
 | Python runtime | `.venv` gestionado por `uv` | Python 3.12 |
 
 **Variables de entorno críticas** (en `.env`, nunca en código):
@@ -271,6 +284,7 @@ LLM_CIRCUIT_BREAKER_MAX_RETRIES=3
 | ADR-003 | Estrategia de fuentes doble vía | Aceptado |
 | ADR-004 | LangChain como framework de orquestación | Aceptado |
 | ADR-005 | Diseño de la capa de retrieval | Aceptado |
+| ADR-006 | Presupuesto: solo modelos gratuitos o económicos | Aceptado |
 
 ---
 

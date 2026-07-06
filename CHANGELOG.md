@@ -5,6 +5,63 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.2] — 2026-07-06
+
+### Added
+- `shared/text_utils.py`: módulo compartido nuevo con dos utilidades:
+  - `has_cjk_characters(text, threshold=5)`: detecta si una respuesta del LLM contiene
+    ≥5 caracteres de rangos CJK (chino, japonés, coreano) — umbral > 1 para no rechazar
+    marcas asiáticas mencionadas como texto.
+  - `format_web_results_as_context(results, max_chars_per_result=1500)`: formatea una lista
+    de `WebResult` como bloque numerado para inyectar en el prompt del LLM; incluye URL,
+    fuente, año y primeros 1500 chars de contenido.
+- `infrastructure/llm/gateway.py`: tier `"free_alt"` en `ModelTier` y en `build_api_llm()`.
+  Permite configurar un segundo modelo gratuito de fallback (`LLM_API_FREE_ALT_MODEL`).
+- `infrastructure/llm/gateway.py`: parámetro `timeout` en `build_llm()` — se pasa
+  `llm_local_timeout` desde settings. Corrige timeouts en `qwen3:8b` con contexto amplio.
+- `shared/config.py`: campo `llm_api_free_alt_model: str = ""` — modelo free alternativo.
+- `shared/config.py`: campo `llm_local_timeout: int = 300` — timeout en segundos para Ollama
+  local (valor anterior implícito era 120s, insuficiente para `qwen3:8b` con contexto amplio).
+- `docs/architecture/ADR-006-presupuesto-modelos-gratuitos.md`: formaliza la política de
+  costo-cero / bajo costo para todos los modelos de API: solo `free` o económicos en OpenRouter;
+  nunca top-tier (Claude, GPT-4o, Gemini Ultra) por restricción presupuestaria del proyecto.
+
+### Changed
+- `domain/chains/chain_01_descripcion.py`: refactor completo del prompt:
+  - Inyección explícita de `{web_context}` en el user prompt: el LLM solo puede usar
+    la información web provista, no su conocimiento propio (reduce alucinación).
+  - System prompt reforzado: prohibición explícita de CJK con instrucción de reescritura.
+  - `build_chain_01()` acepta `BaseChatModel | list[BaseChatModel]` y encadena con
+    `.with_fallbacks()` cuando se recibe lista — cadena de fallback automática.
+- `domain/chains/chain_03_benchmarking.py`: refuerzo de la regla de idioma en system prompt.
+- `domain/chains/chain_04_tendencias.py`: ídem; prohibición CJK explícita.
+- `domain/use_cases/generate_empresa_description.py`:
+  - 3 queries de búsqueda web en lugar de 1 (más contexto para el LLM).
+  - Formatea resultados con `format_web_results_as_context()` e inyecta como `{web_context}`.
+  - Detecta respuestas CJK post-generación con `has_cjk_characters()` y devuelve párrafo
+    de ausencia estándar en lugar de guardar texto en idioma incorrecto.
+- `infrastructure/retrieval/embedder.py`: reintentos con backoff ante HTTP 500 de Ollama
+  (`[0, 3, 8]` segundos). Cubre el swap de VRAM que Ollama necesita entre requests.
+- `scripts/run_pilot.py`: construye `api_llm_alt` y `cap1_llms` (lista con fallback);
+  la cadena del Cap 1 usa el orden `[api_llm, api_llm_alt, llm_local]`.
+
+### Fixed
+- Cap 1 respondía en chino cuando `qwen3:8b` era el modelo local y el prompt no forzaba
+  el idioma con suficiente determinismo. Corregido por doble vía: prompt más restrictivo +
+  detección post-generación.
+- Ollama tiraba errores HTTP 500 transitorios durante el E2E completo por contención de VRAM
+  entre el embedder y el LLM. Corregido con retries y `llm_local_timeout` extendido.
+- `PRIME DIRECTIVE.md` en la raíz eliminado — el canónico vive en `docs/architecture/`.
+- `*.docx` añadido a `.gitignore` (artefactos de output no deben ir en git).
+
+### Notes
+- **Tests:** 55 passed, 2 skipped (suite completa). Los 8 tests nuevos cubren los dos nuevos
+  flujos: fallback CJK en Cap 1 y `text_utils`.
+- **E2E pendiente:** Validar `run_pilot.py` con Noel SAS para confirmar que Cap 3 genera
+  ≥200 palabras en español en el .docx antes de arrancar Fase 5D (Cap 4 Ecosistema).
+
+---
+
 ## [0.5.1] — 2026-07-02
 
 ### Added

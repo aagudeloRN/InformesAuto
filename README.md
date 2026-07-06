@@ -3,9 +3,9 @@
 Genera informes de vigilancia competitiva estructurados y citados a partir del nombre de una empresa,
 usando RAG propio sobre pgvector, modelos locales vía Ollama y cadenas LCEL.
 
-**Estado actual:** Fase 5B — Cap 3 Tendencial + OpenAlexConnector + test_connections  
-**Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)  
-**Tests:** 47 definidos, 37/37 pasando en frío | **Caps implementados:** 1, GICS, 2, 3
+**Estado actual:** Fase 5C — estabilidad OOM/CJK + fallback multi-LLM Cap 1 + ADR-006
+**Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)
+**Tests:** 55 passed, 2 skipped | **Caps implementados:** 1, GICS, 2, 3
 
 ---
 
@@ -36,7 +36,7 @@ curl http://127.0.0.1:11434/api/tags      # Ollama OK?
 docker ps | grep repositorio_postgres     # BD OK? (puerto 5434)
 
 # 5. Correr tests
-uv run pytest tests/ -v                   # debe mostrar 37/37 passed
+uv run pytest tests/ -v                   # debe mostrar 55 passed, 2 skipped
 ```
 
 ## Generar un informe desde CLI
@@ -64,12 +64,14 @@ LLM_LOCAL_EMBED_MODEL=nomic-embed-text:latest   # siempre local, 137MB
 LLM_LOCAL_DRAFT_MODEL=qwen2.5:7b               # cap 1, GICS — seguro en WSL 8GB
 LLM_LOCAL_ANALYTIC_MODEL=qwen2.5:7b
 
-# OpenRouter — escalado API para caps analíticos (ADR-002)
+# OpenRouter — escalado API para caps analíticos (ADR-002, ADR-006)
+# POLÍTICA: solo modelos free o económicos — nunca top-tier (Claude, GPT-4, Gemini Ultra)
 # Obtener clave: https://openrouter.ai/keys
 OPENROUTER_API_KEY=sk-or-...
-LLM_API_FREE_MODEL=nvidia/nemotron-3-super-120b-a12b:free   # caps 2, 3, 4 — $0
-LLM_API_SYNTH_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free  # caps 5, 6, resumen — $0
-LLM_API_PAID_MODEL=google/gemma-3-27b-it                    # respaldo pago si rate limit
+LLM_API_FREE_MODEL=nvidia/nemotron-3-super-120b-a12b:free      # tier free primario — $0
+LLM_API_FREE_ALT_MODEL=meta-llama/llama-3.3-70b-instruct:free  # tier free alternativo — $0
+LLM_API_SYNTH_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free     # síntesis (caps 5/6/resumen) — $0
+LLM_API_PAID_MODEL=google/gemma-3-27b-it                       # respaldo pago <$0.20/MTok
 
 # RAG
 RAG_SIMILARITY_THRESHOLD=0.7
@@ -78,6 +80,7 @@ RAG_TOP_K=10
 # Presupuesto y circuit breaker
 LLM_BUDGET_LIMIT_USD=1.0
 LLM_CIRCUIT_BREAKER_MAX_RETRIES=3
+LLM_LOCAL_TIMEOUT=300                                           # segundos; qwen3:8b necesita >120s
 
 # Fuentes web (vacío = fallback a DDG gratuito)
 TAVILY_API_KEY=
@@ -109,8 +112,11 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | 3 | ✅ | LLM Gateway + Cadenas LCEL + Use Cases del piloto |
 | 4 | ✅ | Ensamblado .docx + Citación APA 7 + Ingesta PDF |
 | 5A | ✅ | Script piloto CLI + Gateway OpenRouter + CostTracker real |
-| 5B | 🔄 | Cap 3 Tendencial ✅ → Cap 4 Ecosistema → Cap 5/6 → Resumen + DAG orquestador |
-| 6 | ⏳ | UI Streamlit (puerto 8503) + lookup CIIU + panel de consumo |
+| 5B | ✅ | Cap 3 Tendencial + OpenAlexConnector + test_connections |
+| 5C | ✅ | Estabilidad OOM/CJK + fallback multi-LLM Cap 1 + ADR-006 |
+| 5D | 🔄 | **Siguiente:** `keep_alive=0` Ollama + Cap 4 Ecosistema |
+| 5E | ⏳ | Cap 5 Convergencia + Resumen Ejecutivo (N2+N3) |
+| 6 | ⏳ | DAG orquestador + UI Streamlit (puerto 8503) |
 
 ## Documentación
 
@@ -123,7 +129,10 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | [`docs/decisions/FASE3_HALLAZGOS.md`](docs/decisions/FASE3_HALLAZGOS.md) | Hallazgos operativos Fase 3 |
 | [`docs/decisions/FASE4_HALLAZGOS.md`](docs/decisions/FASE4_HALLAZGOS.md) | Hallazgos operativos Fase 4 |
 | [`docs/decisions/FASE5A_HALLAZGOS.md`](docs/decisions/FASE5A_HALLAZGOS.md) | Hallazgos operativos Fase 5A (CLI, OpenRouter, CostTracker, benchmarks) |
-| [`docs/prompts/`](docs/prompts/) | Especificación de los 3 prompts del piloto |
+| [`docs/decisions/FASE5B_HALLAZGOS.md`](docs/decisions/FASE5B_HALLAZGOS.md) | Hallazgos operativos Fase 5B (Cap 3, OpenAlex, credenciales BD) |
+| [`docs/decisions/FASE5C_HALLAZGOS.md`](docs/decisions/FASE5C_HALLAZGOS.md) | Hallazgos operativos Fase 5C (OOM/CJK, keep_alive, ADR-006) |
+| [`docs/architecture/ADR-006`](docs/architecture/ADR-006-presupuesto-modelos-gratuitos.md) | Política de presupuesto: solo free o económicos |
+| [`docs/prompts/`](docs/prompts/) | Especificación de los prompts del piloto |
 | [`CHANGELOG.md`](CHANGELOG.md) | Historial semántico de cambios |
 | [`CLAUDE.md`](CLAUDE.md) | Reglas operativas para agentes IA |
 | [`docs/architecture/PRIME DIRECTIVE.md`](docs/architecture/PRIME%20DIRECTIVE.md) | Norma arquitectónica completa |
