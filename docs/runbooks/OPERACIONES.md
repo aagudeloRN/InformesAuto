@@ -47,18 +47,51 @@ uv run python scripts/run_pilot.py --empresa "Alpina S.A.S." --ciiu 1040
 uv run python scripts/run_pilot.py --empresa "Alpina" --salida ./output/alpina_2026.docx
 ```
 
-El script genera 7 pasos (Fase 5D):
-1. Cap 1 — Descripción empresa
-2. GICS — Clasificación de sector
-3. Cap 2 — Análisis Competitivo
-4. Cap 3 — Análisis Tendencial
-5. Cap 4 — Ecosistema Empresarial
-6. Referencias — Formateo APA 7
-7. Ensamblado .docx
+El script genera **10 pasos** (Fase 6 — via `GenerateInforme` orchestrator):
+1. Cap 1 — Descripción empresa (~50s)
+2. GICS — Clasificación de sector (~30s)
+3. N1 paralelo — Caps 2, 3, 4 simultáneos (~12 min)
+4. Párrafos introductorios N1 (~12s)
+5. PDF Convergencia — ingesta condicional (~23 min si hay PDF, puede fallar por OOM)
+6. Cap 5 — Convergencia Empresarial (~79 min en tier free — ver H6-02)
+7. Cap 6 — Accionables Estratégicos (~48s)
+8. Párrafos introductorios N2 (~6s)
+9. Resumen Ejecutivo (~94s)
+10. Referencias APA + Ensamblado .docx (<1s)
+
+**Tiempo total esperado:** ~117 min (dominado por Cap 5 y PDF ingesta).
+Ver `docs/decisions/FASE6_HALLAZGOS.md` para análisis completo de tiempos.
 
 ---
 
-## 3. Ingestar un PDF manual
+## 3. Generar un informe desde la UI Streamlit
+
+```bash
+# Iniciar servidor (puerto 8503, no conflicta con el default 8501)
+uv run streamlit run src/ic/presentation/app.py --server.port 8503
+
+# Abrir en el navegador
+# → http://localhost:8503
+```
+
+**Flujo:**
+1. Ingresar nombre de empresa (requerido), CIIU (opcional), ruta de salida (opcional)
+2. Click "🚀 Generar informe"
+3. La UI verifica Ollama + PostgreSQL antes de empezar
+4. Barra de progreso muestra los 10 pasos en tiempo real
+5. Al finalizar: botón de descarga del `.docx` + expander con métricas
+
+**Nota:** El informe puede tardar ~2 horas. El servidor Streamlit mantiene la conexión
+abierta. Si la terminal se cierra, el proceso muere. Para ejecuciones largas, usar `tmux`:
+```bash
+tmux new-session -s informe
+uv run streamlit run src/ic/presentation/app.py --server.port 8503
+# Ctrl+B, D para detach; tmux attach -t informe para reconnectar
+```
+
+---
+
+## 4. Ingestar un PDF manual
 
 Los PDFs sectoriales (EMIS, informes del distrito, etc.) se ingresan via:
 
@@ -81,7 +114,7 @@ uv run python scripts/ingest_pdf.py \
 
 ---
 
-## 4. Correr los tests
+## 6. Correr los tests
 
 ```bash
 # Suite rápida (sin Ollama ni BD) — siempre disponible
@@ -103,7 +136,7 @@ uv run pytest -s tests/test_tendencias.py
 
 ---
 
-## 5. Troubleshooting OOM (Out of Memory en VRAM)
+## 7. Troubleshooting OOM (Out of Memory en VRAM)
 
 **Síntoma:** Ollama retorna error 500, timeout, o el sistema WSL2 se congela.
 
@@ -126,7 +159,7 @@ curl -s http://127.0.0.1:11434/api/embeddings \
 
 ---
 
-## 6. Gestión de modelos Ollama
+## 8. Gestión de modelos Ollama
 
 ```bash
 # Modelos requeridos
@@ -146,7 +179,7 @@ ollama stop qwen2.5:7b
 
 ---
 
-## 7. Linting y formateo
+## 9. Linting y formateo
 
 ```bash
 # Verificar linting (solo errores no-E501 bloquean)
@@ -161,7 +194,7 @@ uv run ruff check . && uv run black --check src/ tests/
 
 ---
 
-## 8. Backup de la BD
+## 10. Backup de la BD
 
 ```bash
 # Backup del schema del proyecto
@@ -176,7 +209,7 @@ psql -h 127.0.0.1 -p 5434 -U repositorio_user -d repositorio_ctie \
 
 ---
 
-## 9. Variables de entorno críticas
+## 11. Variables de entorno críticas
 
 Ver `.env.example` en la raíz del proyecto. Las más importantes:
 

@@ -93,8 +93,9 @@ N3 (meta): Resumen Ejecutivo + Párrafos Introductorios + Referencias APA
 Ensamblado .docx con plantilla membrete
 ```
 
-**Estado actual de implementación:** N0 + N1 parcial (Caps 1, GICS, 2, 3, 4) implementados.
-N2, N3 y el orquestador DAG están pendientes.
+**Estado actual de implementación (Fase 6):** DAG completo implementado en
+`GenerateInforme` (ADR-008). N0 (Caps 1+GICS), N1 paralelo (Caps 2+3+4), N2 (Caps 5+6),
+N3 (Resumen Ejecutivo + Referencias) + ensamblado .docx. E2E validado con Noel S.A.S.
 
 ---
 
@@ -108,6 +109,9 @@ N2, N3 y el orquestador DAG están pendientes.
 
 **Razón:** Auditoría, reproducibilidad y mejora del sistema. Un analista debe poder reconstruir
 exactamente por qué el sistema generó un texto determinado.
+
+**Estado (Fase 6):** ⏳ Pendiente. La FK `empresa_id UUID NOT NULL → empresas.id` requiere
+gestionar la entidad `Empresa` primero. Bloqueado hasta Fase 7.
 
 ---
 
@@ -133,3 +137,64 @@ como último recurso y emite alerta.
 
 **Nota:** Los modelos `free` tienen costo $0. El presupuesto aplica principalmente al tier `paid`
 (< $0.20/MTok). Un informe completo con 6 caps debería costar entre $0 y $0.30.
+
+---
+
+## RN-009 — Divide y vencerás: caps de síntesis largos se subdividen por eje temático
+
+**Regla:** Cuando un capítulo de síntesis requiere analizar múltiples ejes temáticos
+independientes, el sistema realiza una llamada LLM por eje y luego agrega los resultados,
+en lugar de una única llamada monolítica.
+
+**Motivación (H6-02):** Cap 5 Convergencia tardó 79 minutos con una sola llamada a
+Nemotron Ultra 550B (free tier). La causa fue rate limiting o latencia extrema del modelo.
+Al subdividir en 3 llamadas de ~5 min al modelo más rápido (Nemotron Super 120B),
+el tiempo total estimado baja a ~15 min.
+
+**Aplicación en Cap 5 — Convergencia (diseño Fase 7):**
+```
+Llamada 1: Convergencia Tecnológica   → api_llm (free, ~120B)
+Llamada 2: Convergencia de Mercado    → api_llm (free, ~120B)
+Llamada 3: Convergencia Competitiva   → api_llm (free, ~120B)
+  ↓
+Llamada 4: Síntesis integradora corta → api_llm_synth (synth, ~10% del contexto original)
+```
+
+**Implementación esperada:**
+- `chain_06a_convergencia_eje.py` — chain genérico para un eje de convergencia
+- `GenerateConvergencia.execute()` — 3 llamadas paralelas a `chain_06a` + 1 síntesis
+
+**Regla general:** Si un capítulo devuelve por primera vez en > 30 minutos y el modelo
+es free tier, aplicar subdivisión. El umbral de subdivisión es configurable en `.env`
+como `LLM_CAP_TIMEOUT_SPLIT_THRESHOLD=1800` (segundos).
+
+---
+
+## RN-010 — Ingesta de PDFs grandes: procesamiento por lotes con liberación de memoria
+
+**Regla:** Los PDFs de más de N páginas (`PDF_BATCH_SIZE_PAGES=20`, configurable) se
+ingestaran en lotes secuenciales. Tras cada lote, se libera la memoria de Ollama
+explícitamente antes de continuar.
+
+**Motivación (H6-03):** El PDF Convergencia (~120 páginas) falló por OOM tras 23 min
+de embeddings secuenciales. El proceso agotó la VRAM de 8GB antes de completar.
+
+**Algoritmo de ingesta por lotes:**
+```
+1. Abrir PDF y calcular total_paginas
+2. Para cada lote [i*N, (i+1)*N]:
+   a. Extraer texto de las páginas del lote
+   b. Verificar si los chunks ya existen en BD (SHA-256 del texto) — skip si sí
+   c. Chunk → embed (nomic-embed-text) → store en pgvector
+   d. POST http://127.0.0.1:11434/api/generate {keep_alive:0} para liberar VRAM
+   e. Log: "Lote i/total completado en Xs"
+3. Log: "PDF completamente ingestado — N chunks totales"
+```
+
+**Implementación esperada:**
+- `infrastructure/sources/pdf_ingestor.py` — `PdfIngestor` con `ingest_batched()`
+- Anti-duplicados por SHA-256 del chunk (no del PDF completo) para reanudación
+- Si un lote falla: loguear el error, continuar con el siguiente lote (degradación graceful)
+
+**Relación con DT-002:** La ingesta debe salir de `scripts/` y vivir en `infrastructure/`
+para cumplir con la separación de capas.

@@ -42,7 +42,7 @@ perf(scope): descripción
 El **cuerpo** del commit explica el **por qué**, no el qué (el diff ya muestra el qué).
 
 **Scopes válidos:** `gateway`, `embedder`, `retrieval`, `chains`, `use-cases`, `assembler`,
-`pipeline`, `tests`, `docs`, `config`, `types`, `ci`.
+`orchestrator`, `presentation`, `pipeline`, `tests`, `docs`, `config`, `types`, `ci`.
 
 ---
 
@@ -130,6 +130,19 @@ Nunca rellenar con conocimiento general del LLM cuando el retrieval falla.
 [ ] Commit con Conventional Commits
 [ ] ruff check pasa sin errores no-E501
 ```
+
+---
+
+### Nuevo use case orquestador (tipo GenerateInforme)
+
+Si el caso de uso requiere más de 3 pasos, múltiples llamadas LLM o UI progress tracking,
+usar el patrón `GenerateInforme` (ADR-008):
+
+- Clase con `__init__(self, settings)`
+- Método `run(self, params: ParamsDTO, on_step: StepCallback | None = None) -> ResultDTO`
+- `on_step(n, total, label)` se llama antes de cada paso
+- Todos los imports de dominio diferidos dentro de `run()` si hay riesgo de circularidades
+- Archivo < 300 líneas; si supera, extraer `_run_phase_N()` como métodos privados
 
 ---
 

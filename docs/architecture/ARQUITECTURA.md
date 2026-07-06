@@ -56,7 +56,7 @@ El informe incluye:
 │                GenerateTendencias, GenerateEcosistema │
 │    · chains LCEL: chain_01…chain_05                  │
 │    · política de datos ausentes (absent_data.py)     │
-│    · DAG de capítulos (N0→N1→N2→N3→ensamblado) [⏳ orquestador pendiente]│
+│    · DAG de capítulos orquestado por GenerateInforme (ADR-008)            │
 └───────┬───────────────────────────────┬──────────────┘
         │                               │
 ┌───────▼───────────┐       ┌───────────▼──────────────┐
@@ -250,14 +250,37 @@ Input usuario: {nombre_empresa}
 | CostTracker wiring | `scripts/run_pilot.py` | `CostTracker` instanciado en `main()` y pasado a todos los `build_api_llm()`; resumen real al final |
 | test_chain_intro | `tests/test_chain_intro.py` | 3 tests rápidos (FakeListChatModel) + 1 @slow |
 
-### Pendiente
+### Fase 6 ✅ — 2026-07-06
+
+| Componente | Archivo | Responsabilidad |
+|-----------|---------|-----------------|
+| GenerateInforme | `domain/use_cases/generate_informe.py` | Orquestador completo del pipeline con callback `on_step` (ADR-008) |
+| InformeParams / InformeResult | `domain/use_cases/generate_informe.py` | DTOs de entrada/salida del orchestrator |
+| app.py | `presentation/app.py` | UI Streamlit (puerto 8503): formulario → progreso 10 pasos → descarga .docx |
+| run_pilot.py (refactor) | `scripts/run_pilot.py` | Thin wrapper CLI: argparse → `GenerateInforme.run()` → resumen |
+| test_generate_informe | `tests/test_generate_informe.py` | 5 tests rápidos + 1 @slow E2E |
+
+**E2E validado (2026-07-06):** Noel S.A.S. → 10 pasos, 49 headings, ~12k palabras, 19 refs APA, $0.0000.
+Ver `docs/decisions/FASE6_HALLAZGOS.md` para tiempos y issues conocidos.
+
+### Deuda técnica activa (Fase 7)
+
+| ID | Descripción | Impacto |
+|----|-------------|---------|
+| DT-001 | `generate_informe.py` tiene 348 líneas (Red Flag PRIME DIRECTIVE §IX) | Alto — refactorizar en métodos privados |
+| DT-002 | PDF ingesta en `run()` llama a `scripts/ingest_pdf.py` vía `sys.path` (violación SoC) | Medio — mover a `infrastructure/sources/pdf_ingestor.py` |
+| DT-003 | Cap 5 puede tardar >79 min por rate limiting en Nemotron Ultra 550B free | Medio — estrategia divide y vencerás (ver RN-009) |
+
+### Pendiente (Fase 7+)
 
 | Fase | Componente | Descripción |
 |------|-----------|-------------|
-| 6 | **E2E con informe real** | Correr `run_pilot.py` con empresa real (Noel S.A.S.) y validar el `.docx` generado |
-| 6 | CostTracker en Cap 1/GICS | Las llamadas Ollama (Cap 1, GICS) no registran tokens en el tracker (costo = $0, impacto bajo) |
-| 6 | UI Streamlit | `presentation/app.py` puerto 8503 — entrada empresa/CIIU → progreso → descarga .docx |
-| 6 | Persistencia en BD | `InformeRepository.save()` para guardar cada informe con costo, tiempo y rutas en `historial_informe` |
+| 7 | **Entidad Empresa** | `data/models/empresa.py` ya existe (ORM). Implementar `EmpresaRepository.upsert_by_name()` |
+| 7 | **Persistencia historial** | Wiring de `InformeRepository.save()` en `GenerateInforme.run()` — bloqueado por FK `empresa_id` |
+| 7 | **Historial UI** | Vista en `app.py` con lista de informes pasados y descarga retroactiva |
+| 7 | **PDF ingestor modular** | Mover lógica de `scripts/ingest_pdf.py` a `infrastructure/sources/pdf_ingestor.py` con batch processing |
+| 7 | **Refactor generate_informe** | Resolver DT-001: extraer `_setup_infra()`, `_run_n1()`, `_run_n2()`, `_run_n3()` |
+| 7 | CostTracker en Cap 1/GICS | Ollama no expone tokens; registrar tiempo como proxy de costo |
 
 ---
 
@@ -307,6 +330,7 @@ LLM_CIRCUIT_BREAKER_MAX_RETRIES=3
 | ADR-005 | Diseño de la capa de retrieval | Aceptado |
 | ADR-006 | Presupuesto: solo modelos gratuitos o económicos | Aceptado |
 | ADR-007 | Gestión de memoria WSL2: keep_alive:0 + OPENBLAS threads | Aceptado |
+| ADR-008 | GenerateInforme orchestrator + patrón on_step callback | Aceptado |
 
 ---
 
@@ -440,7 +464,8 @@ curl http://127.0.0.1:11434/api/tags | python3 -c \  # modelos disponibles con t
 
 # Desarrollo
 uv sync                                    # sincronizar deps
-uv run pytest tests/ -v                    # suite completa (37 tests)
+uv run pytest -m "not slow" -q             # suite rápida (86 tests, sin Ollama/BD)
+uv run pytest tests/ -v                    # suite completa
 uv run python scripts/create_schema.py    # re-crear schema si hay cambios ORM
 
 # Generar informe desde CLI (Fase 5A)
