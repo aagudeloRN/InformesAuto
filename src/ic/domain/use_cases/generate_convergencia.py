@@ -1,9 +1,16 @@
+"""Genera Cap 5 — Convergencia Empresarial usando divide y vencerás (RN-009).
+
+3 llamadas paralelas (un eje por llamada con api_llm free ~120B) + 1 síntesis
+integradora (api_llm_synth). Tiempo estimado: ~15 min vs 79 min monolítico.
+"""
+
+from concurrent.futures import ThreadPoolExecutor
+
 from langchain_core.runnables import Runnable
 
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
-from ic.domain.chains.chain_06_convergencia import (
-    format_chunks_as_context,
-)
+from ic.domain.chains.chain_06_convergencia import format_chunks_as_context
+from ic.domain.chains.chain_06a_convergencia_eje import EJE_MERCADO, EJE_SOCIAL, EJE_TECNOLOGICO
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
 from ic.shared.types import CapConvergencia, ChunkResult
@@ -17,8 +24,10 @@ class GenerateConvergencia:
         chain: Runnable,
         store: PGVectorStore,
         web_connector: WebConnector,
+        chain_eje: Runnable | None = None,
     ) -> None:
-        self._chain = chain
+        self._chain_synth = chain
+        self._chain_eje = chain_eje
         self._store = store
         self._web = web_connector
 
@@ -28,11 +37,10 @@ class GenerateConvergencia:
         descripcion_empresa: str,
         sector_gics: str,
     ) -> CapConvergencia:
-        web_queries = [
+        for q in [
             f"{sector_gics} sostenibilidad ambiental Colombia regulaciones",
             f"{sector_gics} transformación digital gobierno inteligente Colombia",
-        ]
-        for q in web_queries:
+        ]:
             results = self._web.search(q)
             if results:
                 self._store.ingest(
@@ -41,15 +49,13 @@ class GenerateConvergencia:
                     urls=[r.url for r in results],
                 )
 
-        query_caps = (
+        chunks_caps = self._store.search(
             f"{sector_gics} {nombre_empresa} tendencias ecosistema benchmarking estrategia"
         )
         query_territorial = (
             f"{sector_gics} {nombre_empresa} "
             "sostenibilidad transformación digital desarrollo económico Medellín"
         )
-
-        chunks_caps = self._store.search(query_caps)
         chunks_territorial = self._store.search(query_territorial)
 
         seen: set[str] = set()
@@ -68,18 +74,42 @@ class GenerateConvergencia:
                 chunks_usados=[],
             )
 
-        context_caps = format_chunks_as_context(chunks_caps)
-        context_territorial = format_chunks_as_context(chunks_territorial)
-
-        texto = self._chain.invoke({
+        retrieval_context = format_chunks_as_context(unique_chunks)
+        base_args = {
             "descripcion_empresa": descripcion_empresa,
             "sector_gics": sector_gics,
-            "retrieval_caps_anteriores": context_caps,
-            "retrieval_convergencia_territorial": context_territorial,
+            "retrieval_context": retrieval_context,
+        }
+
+        # Ruta rápida: sin chain_eje → llamada monolítica legacy
+        if self._chain_eje is None:
+            context_caps = format_chunks_as_context(chunks_caps)
+            context_territorial = format_chunks_as_context(chunks_territorial)
+            texto = self._chain_synth.invoke({
+                "descripcion_empresa": descripcion_empresa,
+                "sector_gics": sector_gics,
+                "retrieval_caps_anteriores": context_caps,
+                "retrieval_convergencia_territorial": context_territorial,
+            })
+            return CapConvergencia(texto=texto, n_chunks_usados=len(unique_chunks),
+                                   retrieval_suficiente=True, chunks_usados=unique_chunks)
+
+        # Divide y vencerás (RN-009): 3 ejes en paralelo + síntesis
+        def _invoke_eje(eje_def: dict) -> str:
+            return self._chain_eje.invoke({**base_args, **eje_def})
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            f_tec = pool.submit(_invoke_eje, EJE_TECNOLOGICO)
+            f_mer = pool.submit(_invoke_eje, EJE_MERCADO)
+            f_soc = pool.submit(_invoke_eje, EJE_SOCIAL)
+        texto_tec, texto_mer, texto_soc = f_tec.result(), f_mer.result(), f_soc.result()
+
+        texto_final = self._chain_synth.invoke({
+            "partes": "\n\n---\n\n".join([texto_tec, texto_soc, texto_mer])
         })
 
         return CapConvergencia(
-            texto=texto,
+            texto=texto_final,
             n_chunks_usados=len(unique_chunks),
             retrieval_suficiente=True,
             chunks_usados=unique_chunks,

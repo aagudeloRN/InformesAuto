@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     docx_template_path: str = ""
     docx_output_dir: str = "./output"
 
+    # Ingesta PDF (RN-010)
+    pdf_batch_size_pages: int = 20
+
     # Aplicación
     app_env: str = "development"
     log_level: str = "INFO"

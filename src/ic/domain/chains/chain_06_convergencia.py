@@ -72,3 +72,30 @@ def build_chain_06(llm: object) -> Runnable:
         ("human", USER_PROMPT_06),
     ])
     return prompt | llm | StrOutputParser()
+
+
+_SYNTH_SYSTEM = (
+    "Eres un consultor senior en estrategia empresarial. Integra los análisis de convergencia "
+    "recibidos en un capítulo cohesivo. Mantén todas las secciones numeradas, elimina repeticiones "
+    "y asegura transiciones fluidas. Conserva títulos en negrilla y tono ejecutivo. "
+    "IDIOMA OBLIGATORIO: español latino neutro."
+)
+
+_SYNTH_USER = (
+    "Integra los siguientes análisis en el Capítulo 5. Convergencia Empresarial en las Áreas "
+    "Estratégicas del Distrito.\n\n"
+    "Inicia con: \"La convergencia empresarial analiza cómo las estrategias de la empresa se "
+    "alinean con las prioridades del territorio y las tendencias del sector, identificando puntos "
+    "de intersección que generan ventajas competitivas sostenibles y contribuyen al desarrollo "
+    "regional.\"\n\n"
+    "{partes}"
+)
+
+
+def build_chain_06_synth(llm: object) -> Runnable:
+    """Síntesis integradora: recibe {partes} (output de 3 ejes) y produce Cap 5 final."""
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", _SYNTH_SYSTEM),
+        ("human", _SYNTH_USER),
+    ])
+    return prompt | llm | StrOutputParser()

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -35,6 +35,8 @@ class InformeRepository:
         ruta_docx: str,
         costo: float,
         tiempo_s: float | None = None,
+        tokens_in: int | None = None,
+        tokens_out: int | None = None,
     ) -> None:
         informe = self._db.get(HistorialInforme, informe_id)
         if informe is None:
@@ -44,7 +46,11 @@ class InformeRepository:
         informe.costo_usd = costo
         if tiempo_s is not None:
             informe.tiempo_generacion_s = tiempo_s
-        informe.completed_at = datetime.now(timezone.utc)
+        if tokens_in is not None:
+            informe.tokens_in = tokens_in
+        if tokens_out is not None:
+            informe.tokens_out = tokens_out
+        informe.completed_at = datetime.now(UTC)
         self._db.commit()
 
     def get_by_id(self, informe_id: uuid.UUID) -> HistorialInforme | None:

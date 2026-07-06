@@ -3,10 +3,11 @@
 Todos los tests usan mocks — sin llamadas reales a OpenRouter ni Tavily.
 """
 
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 from ic.domain.chains.chain_06_convergencia import (
     build_chain_06,
+    build_chain_06_synth,
     format_chunks_as_context,
 )
 from ic.domain.use_cases.generate_convergencia import GenerateConvergencia
@@ -34,6 +35,12 @@ def _make_web_result(title: str, content: str, url: str = "https://conv.org/W1")
 
 
 class TestChain06:
+    def test_build_chain_06_synth_returns_runnable(self):
+        mock_llm = MagicMock()
+        mock_llm.__or__ = MagicMock(return_value=MagicMock())
+        chain = build_chain_06_synth(mock_llm)
+        assert chain is not None
+
     def test_build_chain_06_returns_runnable(self):
         mock_llm = MagicMock()
         mock_llm.__or__ = MagicMock(return_value=MagicMock())
@@ -66,7 +73,9 @@ class TestGenerateConvergencia:
 
         mock_store = MagicMock()
         default_caps = [_make_chunk(f"Benchmark {i}", f"https://cap.com/{i}") for i in range(3)]
-        default_territorial = [_make_chunk(f"Territorial {i}", f"https://terr.com/{i}") for i in range(3)]
+        default_territorial = [
+            _make_chunk(f"Territorial {i}", f"https://terr.com/{i}") for i in range(3)
+        ]
         mock_store.search.side_effect = [
             chunks_caps if chunks_caps is not None else default_caps,
             chunks_territorial if chunks_territorial is not None else default_territorial,
@@ -151,6 +160,34 @@ class TestGenerateConvergencia:
         result = uc.execute("Empresa", "Desc.", "Sector")
 
         assert result.n_chunks_usados < len(chunk_dup) + len(chunk_nuevo)
+
+    def test_execute_con_chain_eje_llama_tres_ejes_en_paralelo(self):
+        """Con chain_eje provisto, se hacen 3 llamadas al chain_eje + 1 síntesis."""
+        mock_chain_synth = MagicMock()
+        mock_chain_synth.invoke.return_value = "Cap 5 sintetizado."
+
+        mock_chain_eje = MagicMock()
+        mock_chain_eje.invoke.return_value = "Texto del eje."
+
+        mock_store = MagicMock()
+        chunks_caps = [_make_chunk(f"caps-{i}", f"https://caps.com/{i}") for i in range(3)]
+        chunks_terr = [_make_chunk(f"terr-{i}", f"https://terr.com/{i}") for i in range(3)]
+        mock_store.search.side_effect = [chunks_caps, chunks_terr]
+        mock_web = MagicMock()
+        mock_web.search.return_value = []
+
+        uc = GenerateConvergencia(
+            chain=mock_chain_synth,
+            chain_eje=mock_chain_eje,
+            store=mock_store,
+            web_connector=mock_web,
+        )
+        result = uc.execute("Empresa", "Desc.", "Sector")
+
+        assert mock_chain_eje.invoke.call_count == 3
+        assert mock_chain_synth.invoke.call_count == 1
+        assert result.retrieval_suficiente
+        assert result.texto == "Cap 5 sintetizado."
 
     def test_execute_ingesta_resultados_web(self):
         mock_chain = MagicMock()
