@@ -5,6 +5,25 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.5] — 2026-07-06
+
+### Added
+- `pytest-env==1.6.0` como dependencia de desarrollo. Necesario para que la sección
+  `[tool.pytest.ini_options] env` de `pyproject.toml` tenga efecto.
+- `docs/architecture/ADR-007-gestion-memoria-wsl2-tests.md`: documenta la raíz y
+  corrección de los dos crasheos OOM de esta sesión (OpenBLAS multithreading +
+  Ollama cargado durante compilación de Rust).
+
+### Fixed
+- `pyproject.toml`: `OPENBLAS_NUM_THREADS=1` y `OMP_NUM_THREADS=1` fijados para toda
+  la suite de tests vía `pytest-env`. Elimina crasheos SIGABRT/IOT por OpenBLAS
+  saturando RAM en WSL2 al correr múltiples tests en paralelo.
+- `tests/test_assembler.py`: `test_pilot_end_to_end_noel` marcado `@pytest.mark.slow`.
+  Sin el marker, la suite rápida (`-m "not slow"`) incluía este test y podía encontrar
+  un 500 del embedder Ollama si el modelo estaba bajo presión de memoria.
+
+---
+
 ## [0.5.4] — 2026-07-06
 
 ### Added

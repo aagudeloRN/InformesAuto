@@ -85,10 +85,45 @@ Se añade un tercer tier LLM al pipeline:
 
 ---
 
+## Correctivo de estabilidad — crasheos OOM (post-implementación)
+
+> Ver decisión completa en `docs/architecture/ADR-007-gestion-memoria-wsl2-tests.md`.
+
+Durante la ejecución de tests al finalizar Fase 5E se produjeron **dos crasheos por agotamiento
+de RAM** en el entorno WSL2 (8 GB):
+
+### Crash 1 — OpenBLAS multithreading en pytest
+
+`numpy`/`langchain-community` lanzan un pool de hilos OpenBLAS al importarse. Sin la variable
+`OPENBLAS_NUM_THREADS` fijada, el número de hilos iguala las CPUs lógicas del host Windows
+(8–16), multiplicando el consumo de RAM durante la suite.
+
+**Fix aplicado:** `OPENBLAS_NUM_THREADS=1` + `OMP_NUM_THREADS=1` en `[tool.pytest.ini_options]`
+vía plugin `pytest-env` (dev dependency). Ambas variables ahora se inyectan antes de cualquier
+import del código bajo test.
+
+### Crash 2 — Compilador Rust (hatchling) con Ollama cargado
+
+Al ejecutar `uv add --dev pytest-env` con `qwen3:8b` en RAM (~4 GB), el compilador de Rust
+lanzado por hatchling agotó la memoria restante.
+
+**Fix aplicado:** `keep_alive: 0` ya estaba en embedder y gateway (ADR-002, Fase 5C).
+El crash fue aislado. Procedimiento operativo documentado en ADR-007 D3: verificar RAM libre
+(`free -m`) antes de operaciones de compilación.
+
+### Corrección adicional
+
+`test_pilot_end_to_end_noel` no tenía `@pytest.mark.slow` a pesar de llamar al embedder Ollama
+real. Añadido en esta sesión. La suite rápida (`-m "not slow"`) ahora excluye correctamente los
+8 tests de integración con servicios externos.
+
+---
+
 ## Métricas de calidad
 
 - Tests antes de Fase 5E: 64 passed, 2 skipped
-- Tests después: 86 passed, 2 skipped (+22 nuevos)
+- Tests después Fase 5E (commit d1f8866): 86 passed, 2 skipped (+22 nuevos)
+- Tests suite rápida (post correctivo 0.5.5): 78 passed, 2 skipped, 8 deselected (slow)
 - Cobertura domain/: mantenida >80%
 
 ---

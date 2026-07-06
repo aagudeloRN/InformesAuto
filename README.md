@@ -3,9 +3,9 @@
 Genera informes de vigilancia competitiva estructurados y citados a partir del nombre de una empresa,
 usando RAG propio sobre pgvector, modelos locales vía Ollama y cadenas LCEL.
 
-**Estado actual:** Fase 5D — keep_alive:0 OOM fix + Cap 4 Ecosistema + markers slow
+**Estado actual:** Fase 5E — Cap 5 Convergencia + Cap 6 Accionables + Resumen Ejecutivo
 **Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)
-**Tests:** 64 passed, 2 skipped (57 sin servicios) | **Caps implementados:** 1, GICS, 2, 3, 4
+**Tests:** 78 fast passed, 2 skipped (8 slow excluidos) | **Caps implementados:** 1, GICS, 2, 3, 4, 5, 6, RE
 
 ---
 
@@ -36,7 +36,8 @@ curl http://127.0.0.1:11434/api/tags      # Ollama OK?
 docker ps | grep repositorio_postgres     # BD OK? (puerto 5434)
 
 # 5. Correr tests
-uv run pytest tests/ -v                   # debe mostrar 55 passed, 2 skipped
+uv run pytest -m "not slow"               # debe mostrar 78 passed, 2 skipped
+uv run pytest                             # suite completa (requiere Ollama + BD + red)
 ```
 
 ## Generar un informe desde CLI
