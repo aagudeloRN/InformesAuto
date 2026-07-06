@@ -1,6 +1,6 @@
 # Arquitectura del Sistema — Informes de Inteligencia Competitiva
 
-**Versión:** 7 (post Fase 7 — orchestrator refactorizado + EmpresaRepository + PdfIngestor + Cap5 paralelo)
+**Versión:** 8 (post Fase 8 — ruff limpio + historial UI + test E2E Cap5)
 **Última actualización:** 2026-07-06
 **Propósito:** documento vivo de referencia arquitectónica. Las decisiones cerradas
 viven en los ADRs; este documento describe el sistema como está construido y hacia
@@ -263,24 +263,53 @@ Input usuario: {nombre_empresa}
 **E2E validado (2026-07-06):** Noel S.A.S. → 10 pasos, 49 headings, ~12k palabras, 19 refs APA, $0.0000.
 Ver `docs/decisions/FASE6_HALLAZGOS.md` para tiempos y issues conocidos.
 
-### Deuda técnica cerrada en Fase 7
+### Fase 7 ✅ — 2026-07-06
 
-| ID | Descripción | Estado |
-|----|-------------|--------|
-| DT-001 | `generate_informe.py` tenía 348 líneas (Red Flag) | ✅ Resuelto — 6 métodos privados + `_PipelineContext` |
-| DT-002 | PDF ingesta en `scripts/` violaba SoC | ✅ Resuelto — `infrastructure/sources/pdf_ingestor.py` |
-| DT-003 | Cap 5 tardaba >79 min monolítico | ✅ Resuelto — 3 ejes paralelos + síntesis (~15 min) |
+| Componente | Archivo | Responsabilidad |
+|-----------|---------|-----------------|
+| `_PipelineContext` | `domain/use_cases/generate_informe.py` | Dataclass de estado del pipeline; elimina paso de kwargs entre métodos |
+| `_run_n0/n1/n2/n3` | `domain/use_cases/generate_informe.py` | 6 métodos privados; SoC dentro del orchestrator (ADR-009) |
+| EmpresaRepository | `data/repositories/empresa_repo.py` | `upsert_by_name()`: crea o recupera empresa; wired en `_run_n3()` |
+| `ensure_historial_columns()` | `data/database.py` | Migración idempotente que agrega `tokens_in`/`tokens_out` si no existen |
+| PdfIngestor | `infrastructure/sources/pdf_ingestor.py` | Ingesta PDF en lotes de 20 págs + SHA-256 anti-duplicados + keep_alive:0 (RN-010) |
+| chain_06a | `domain/chains/chain_06a_convergencia_eje.py` | Chain LCEL genérico para un eje de convergencia (TECNOLÓGICO/MERCADO/SOCIAL) |
+| build_chain_06_synth | `domain/chains/chain_06_convergencia.py` | Chain síntesis que recibe `{partes}` concatenadas de los 3 ejes |
+| GenerateConvergencia (actualizado) | `domain/use_cases/generate_convergencia.py` | 3 ejes en `ThreadPoolExecutor(max_workers=3)` + síntesis; `chain_eje=None` → ruta legacy |
 
-### Pendiente (Fase 8+)
+**E2E referencia (Fase 7):** 97 tests fast + `docs/decisions/FASE7_HALLAZGOS.md`
 
-| Fase | Componente | Descripción |
-|------|-----------|-------------|
-| 8 | **Historial UI** | Vista en `app.py` con lista de informes pasados y descarga retroactiva |
-| 8 | **Validación idioma global** | `has_cjk_characters()` se aplica solo en Cap 1; extender a todos los caps |
-| 8 | **CostTracker en Cap 1/GICS** | Ollama no expone tokens; registrar tiempo como proxy de costo |
-| 8 | **E2E paralelo real** | Validar Cap 5 con `chain_eje` real sobre Ollama (requiere tiempo >> slow marker) |
-| 8+ | **Fuentes EMIS/sectoriales** | Ingestar PDFs privados (EMIS, informes Ruta N) con mismo `PdfIngestor` |
-| 8+ | **Multi-empresa** | UI para generar múltiples informes en cola; historial paginado |
+### Fase 8 ✅ — 2026-07-06
+
+| Componente | Archivo | Responsabilidad |
+|-----------|---------|-----------------|
+| `# noqa: E501` en prompts | `chain_01`, `03`, `04`, `05`, `06` + `test_chain_intro` | P1 DT-007: silencia E501 en strings de prompt (>100 chars legítimos) |
+| `list_recientes(limit=20)` | `data/repositories/informe_repo.py` | P2 DT-008: JOIN con Empresa, ORDER BY created_at DESC, retorna `list[tuple[HistorialInforme, str]]` |
+| `_render_historial()` | `presentation/app.py` | P2 DT-008: tab Historial con 4 estados (error/vacío/datos/descarga); `key=str(informe.id)` para unicidad |
+| `st.tabs()` | `presentation/app.py` | P2 DT-008: divide UI en "Generar Informe" y "Historial" |
+| `test_informe_repo.py` | `tests/test_informe_repo.py` | P2: 3 tests rápidos mocked para `list_recientes` |
+| `test_convergencia_e2e.py` | `tests/test_convergencia_e2e.py` | P3 DT-005: `@pytest.mark.slow`; verifica 3 ejes paralelos < 30 min con servicios reales |
+
+### Deuda técnica cerrada
+
+| ID | Descripción | Fase | Estado |
+|----|-------------|------|--------|
+| DT-001 | `generate_informe.py` >300 líneas | 7 | ✅ Resuelto — ADR-009 |
+| DT-002 | PDF ingesta en `scripts/` | 7 | ✅ Resuelto — `PdfIngestor` en infrastructure/ |
+| DT-003 | Cap 5 monolítico ~79 min | 7 | ✅ Resuelto — 3 ejes paralelos |
+| DT-007 | ~38 errores ruff E501 en chains | 8 | ✅ Resuelto — `# noqa: E501` + refactor |
+| DT-008 | UI sin historial de informes | 8 | ✅ Resuelto — `st.tabs` + `list_recientes` |
+
+### Pendiente (Fase 9+)
+
+| ID | Fase | Componente | Descripción |
+|----|------|-----------|-------------|
+| DT-004 | monitor | `generate_informe.py` ≥380 líneas | Si el archivo crece, separar `_run_n1` en módulo propio |
+| DT-005 | 9 | E2E Cap5 con servicios reales | Test creado (`test_convergencia_e2e.py`); pendiente ejecutar con Ollama + OpenRouter reales |
+| DT-006 | 9 | PDF 120 págs validación real | `InformeConvergenciaLocal2026V3RvADAA.pdf` — confirmar no-OOM post-fix |
+| DT-009 | 9 | Validación idioma global | `has_cjk_characters()` solo cubre Cap 1; extender a todos los caps N1+ |
+| DT-010 | 9 | CostTracker en Ollama | Ollama no expone tokens; registrar tiempo como proxy de costo en `HistorialInforme` |
+| DT-011 | 9+ | Fuentes EMIS/sectoriales | Ingestar PDFs privados con `PdfIngestor` ya disponible |
+| DT-012 | 9+ | Multi-empresa / cola | UI para generar múltiples informes; historial paginado (actualmente muestra 20) |
 
 ---
 
@@ -331,6 +360,7 @@ LLM_CIRCUIT_BREAKER_MAX_RETRIES=3
 | ADR-006 | Presupuesto: solo modelos gratuitos o económicos | Aceptado |
 | ADR-007 | Gestión de memoria WSL2: keep_alive:0 + OPENBLAS threads | Aceptado |
 | ADR-008 | GenerateInforme orchestrator + patrón on_step callback | Aceptado |
+| ADR-009 | Refactor orchestrator Fase 7: límite 300 líneas aceptado + imports diferidos | Aceptado |
 
 ---
 
@@ -464,7 +494,7 @@ curl http://127.0.0.1:11434/api/tags | python3 -c \  # modelos disponibles con t
 
 # Desarrollo
 uv sync                                    # sincronizar deps
-uv run pytest -m "not slow" -q             # suite rápida (86 tests, sin Ollama/BD)
+uv run pytest -m "not slow" -q             # suite rápida (≥100 tests, sin Ollama/BD)
 uv run pytest tests/ -v                    # suite completa
 uv run python scripts/create_schema.py    # re-crear schema si hay cambios ORM
 

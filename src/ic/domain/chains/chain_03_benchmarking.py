@@ -36,7 +36,7 @@ SYSTEM_PROMPT_03 = (
     "- Estilo general para 2.2, 2.4 y 2.5:\n"
     "    * Variar el ritmo: alternar frases cortas (≤12 palabras) con frases más largas.\n"
     "    * Máximo 1 ejemplo concreto por párrafo.\n"
-    "    * Prohibido: \"en resumen\", \"por lo tanto\", \"cabe destacar\", \"es importante mencionar\".\n"
+    "    * Prohibido: \"en resumen\", \"por lo tanto\", \"cabe destacar\", \"es importante mencionar\".\n"  # noqa: E501
     "    * Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo que haya evidencia "
     "cuantificable en las fuentes.\n"
     "    * Cada párrafo: entre 80 y 150 palabras.\n"
@@ -54,10 +54,10 @@ USER_PROMPT_03 = (
     "{retrieval_competidores}\n\n"
     "Desarrolla exactamente las siguientes secciones en este orden:\n\n"
     "## 2.1. Jugadores Clave - Líderes del Mercado\n\n"
-    "Identifica y analiza 14 actores: 8 líderes globales, 3 referentes regionales (LatAm/Colombia) "
+    "Identifica y analiza 14 actores: 8 líderes globales, 3 referentes regionales (LatAm/Colombia) "  # noqa: E501
     "y 3 startups/FoodTech disruptivas.\n"
     "Para cada actor, una ficha/tabla con los 8 puntos indicados en el system prompt.\n"
-    "Agrupa por subcategoría: ### Referentes Globales / ### Referentes Regionales LatAm/Colombia / "
+    "Agrupa por subcategoría: ### Referentes Globales / ### Referentes Regionales LatAm/Colombia / "  # noqa: E501
     "### Startups / FoodTech Disruptivas.\n\n"
     "## 2.2. División de Competidores\n\n"
     "Genera una matriz 2×2 que clasifique los 14 actores cruzando:\n"

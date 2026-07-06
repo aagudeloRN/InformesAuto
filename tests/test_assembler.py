@@ -193,7 +193,10 @@ def _make_informe() -> InformePiloto:
             fuente_tipo="web",
             fuente_url="https://fuente-a.com/informe",
             score=0.91,
-            metadatos={"titulo": "Informe A", "fuente_nombre": "fuente-a.com", "año": "2024", "autor": None},
+            metadatos={
+                "titulo": "Informe A", "fuente_nombre": "fuente-a.com",
+                "año": "2024", "autor": None,
+            },
         ),
     ]
     cap = CapBenchmarking(

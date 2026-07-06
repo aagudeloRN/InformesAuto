@@ -5,6 +5,29 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.9.0] — 2026-07-06
+
+### Added
+- `src/ic/data/repositories/informe_repo.py`: nuevo método `list_recientes(limit=20)`
+  — JOIN con `Empresa` para recuperar los últimos N informes con nombre de empresa
+  incluido. Tipo de retorno: `list[tuple[HistorialInforme, str]]` (RN-006 / DT-008).
+- `src/ic/presentation/app.py`: pestaña "Historial" via `st.tabs()`. Muestra los
+  últimos 20 informes generados (empresa, estado, fecha, costo, tiempo) con botón de
+  descarga retroactiva para informes completados cuyo `.docx` existe en disco (DT-008).
+- `tests/test_informe_repo.py`: 3 tests rápidos mocked para `list_recientes`
+  (execute llamado, LIMIT aplicado, desempaquetado de tuplas).
+- `tests/test_convergencia_e2e.py`: test `@pytest.mark.slow` que valida DT-005 —
+  ejecuta `GenerateConvergencia` con `chain_eje` real (3 ejes paralelos), verifica
+  texto ≥ 500 chars, ≥ 3 secciones y tiempo < 30 min. Omitido si Ollama o PG no
+  disponibles.
+
+### Fixed
+- **Ruff DT-007**: ~N errores E501 pre-existentes en `chain_01` – `chain_06`,
+  `test_chain_intro.py` y `test_assembler.py`. Cadenas de prompt: `# noqa: E501`.
+  Código regular: refactor multi-línea.
+
+---
+
 ## [0.8.0] — 2026-07-06
 
 ### Added

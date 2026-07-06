@@ -3,9 +3,9 @@
 Genera informes de vigilancia competitiva estructurados y citados a partir del nombre de una empresa,
 usando RAG propio sobre pgvector, modelos locales vía Ollama y cadenas LCEL.
 
-**Estado actual:** Fase 7 — orchestrator refactorizado + EmpresaRepository + PdfIngestor + Cap5 paralelo
+**Estado actual:** Fase 8 — ruff limpio + Historial UI + test E2E Cap5 creado
 **Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)
-**Tests:** 97 fast passed, 2 skipped (slow excluidos) | **Caps implementados:** 1, GICS, 2, 3, 4, 5, 6, RE + intros
+**Tests:** ≥100 fast passed, 2 skipped (slow excluidos) | **Caps implementados:** 1, GICS, 2, 3, 4, 5, 6, RE + intros
 
 ---
 
@@ -36,7 +36,7 @@ curl http://127.0.0.1:11434/api/tags      # Ollama OK?
 docker ps | grep repositorio_postgres     # BD OK? (puerto 5434)
 
 # 5. Correr tests
-uv run pytest -m "not slow"               # debe mostrar 81 passed, 2 skipped
+uv run pytest -m "not slow"               # debe mostrar ≥100 passed, 2 skipped
 uv run pytest                             # suite completa (requiere Ollama + BD + red)
 ```
 
@@ -58,8 +58,9 @@ El `.docx` se guarda en `./output/` (excluido de git).
 uv run streamlit run src/ic/presentation/app.py --server.port 8503
 ```
 
-Abre `http://localhost:8503`, ingresa el nombre de la empresa y haz clic en **Generar informe**.  
-Al terminar aparece un botón para descargar el `.docx` directamente desde el navegador.
+Abre `http://localhost:8503`. La UI tiene dos pestañas:
+- **Generar Informe**: formulario de empresa → progreso de 10 pasos → descarga `.docx`
+- **Historial**: lista los últimos 20 informes generados (empresa, fecha, estado, costo, tiempo) con botón de descarga retroactiva por informe completado
 
 ## Ingestar PDFs sectoriales (fuentes manuales)
 
@@ -146,14 +147,16 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | 5E | ✅ | Cap 5 Convergencia + Cap 6 Accionables + Resumen Ejecutivo (N2+N3) |
 | 5F | ✅ | Párrafos intro Caps 2–6 + paralelización N1 + tracking costo real |
 | 6 | ✅ | `GenerateInforme` orchestrator + UI Streamlit (puerto 8503) |
-| 7 | ⏳ | **Siguiente:** gestión de empresas + persistencia historial en BD |
+| 7 | ✅ | EmpresaRepository + PdfIngestor en infrastructure/ + Cap5 paralelo (3 ejes) |
+| 8 | ✅ | Ruff limpio (DT-007) + Historial UI (DT-008) + test E2E Cap5 (DT-005) |
+| 9 | ⏳ | **Siguiente:** validación idioma global + CostTracker Ollama + PDF 120 pgs real |
 
 ## Documentación
 
 | Documento | Descripción |
 |-----------|-------------|
 | [`docs/architecture/ARQUITECTURA.md`](docs/architecture/ARQUITECTURA.md) | Arquitectura viva del sistema |
-| [`docs/architecture/ADR-001`](docs/architecture/ADR-001-rag-propio-reemplaza-notebooklm.md) a [`ADR-005`](docs/architecture/ADR-005-retrieval-layer-design.md) | Decisiones arquitectónicas |
+| [`docs/architecture/ADR-001`](docs/architecture/ADR-001-rag-propio-reemplaza-notebooklm.md) a [`ADR-009`](docs/architecture/ADR-009-orchestrator-refactor-fase7.md) | Decisiones arquitectónicas (RAG, routing, fuentes, orquestación) |
 | [`docs/decisions/FASE0_HALLAZGOS.md`](docs/decisions/FASE0_HALLAZGOS.md) | Hallazgos operativos Fase 0 |
 | [`docs/decisions/FASE2_HALLAZGOS.md`](docs/decisions/FASE2_HALLAZGOS.md) | Hallazgos operativos Fase 2 |
 | [`docs/decisions/FASE3_HALLAZGOS.md`](docs/decisions/FASE3_HALLAZGOS.md) | Hallazgos operativos Fase 3 |
@@ -163,6 +166,9 @@ El sistema genera un informe siguiendo un DAG de capítulos:
 | [`docs/decisions/FASE5C_HALLAZGOS.md`](docs/decisions/FASE5C_HALLAZGOS.md) | Hallazgos operativos Fase 5C (OOM/CJK, keep_alive, ADR-006) |
 | [`docs/decisions/FASE5D_HALLAZGOS.md`](docs/decisions/FASE5D_HALLAZGOS.md) | Hallazgos operativos Fase 5D (keep_alive:0 definitivo, Cap 4, markers) |
 | [`docs/decisions/FASE5F_HALLAZGOS.md`](docs/decisions/FASE5F_HALLAZGOS.md) | Hallazgos operativos Fase 5F (paralelización N1, intros, costo real) |
+| [`docs/decisions/FASE6_HALLAZGOS.md`](docs/decisions/FASE6_HALLAZGOS.md) | Hallazgos Fase 6 (orchestrator, E2E validado) |
+| [`docs/decisions/FASE7_HALLAZGOS.md`](docs/decisions/FASE7_HALLAZGOS.md) | Hallazgos Fase 7 (refactor orchestrator, PdfIngestor, Cap5 paralelo) |
+| [`docs/decisions/FASE8_HALLAZGOS.md`](docs/decisions/FASE8_HALLAZGOS.md) | Hallazgos Fase 8 (ruff cleanup, historial UI, E2E Cap5) |
 | [`docs/architecture/ADR-006`](docs/architecture/ADR-006-presupuesto-modelos-gratuitos.md) | Política de presupuesto: solo free o económicos |
 | [`docs/architecture/ADR-007`](docs/architecture/ADR-007-gestion-memoria-wsl2-tests.md) | Gestión de memoria WSL2: keep_alive:0 + threads OpenBLAS |
 | [`docs/business-rules/REGLAS_NEGOCIO.md`](docs/business-rules/REGLAS_NEGOCIO.md) | Reglas de negocio del sistema: datos ausentes, citación, política modelos |

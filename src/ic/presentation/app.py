@@ -33,6 +33,61 @@ st.set_page_config(
 st.title("📊 Informes de Inteligencia Competitiva")
 st.caption("Sistema automatizado de generación de informes — Ruta N")
 
+tab_gen, tab_hist = st.tabs(["Generar Informe", "Historial"])
+
+
+def _render_historial() -> None:
+    st.subheader("Informes generados")
+    try:
+        from ic.data.database import SessionLocal
+        from ic.data.repositories.informe_repo import InformeRepository
+
+        with SessionLocal() as db:
+            rows = InformeRepository(db).list_recientes(limit=20)
+    except Exception as e:
+        st.error(f"No se pudo consultar el historial: {e}")
+        return
+
+    if not rows:
+        st.info("Aún no se han generado informes.")
+        return
+
+    from ic.shared.constants import EstadoInforme
+
+    for informe, empresa_nombre in rows:
+        fecha = informe.created_at.strftime("%Y-%m-%d %H:%M") if informe.created_at else "—"
+        with st.expander(f"{empresa_nombre} — {fecha}"):
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Estado", informe.estado)
+            costo = f"${informe.costo_usd:.4f}" if informe.costo_usd is not None else "—"
+            col2.metric("Costo", costo)
+            tiempo = (
+                f"{informe.tiempo_generacion_s:.0f}s"
+                if informe.tiempo_generacion_s is not None
+                else "—"
+            )
+            col3.metric("Tiempo", tiempo)
+
+            if (
+                informe.estado == EstadoInforme.COMPLETADO
+                and informe.ruta_documento_final
+            ):
+                docx_path = Path(informe.ruta_documento_final)
+                if docx_path.exists():
+                    with open(docx_path, "rb") as f:
+                        st.download_button(
+                            label="⬇️ Descargar .docx",
+                            data=f,
+                            file_name=docx_path.name,
+                            mime=(
+                                "application/vnd.openxmlformats-"
+                                "officedocument.wordprocessingml.document"
+                            ),
+                            key=str(informe.id),
+                        )
+                else:
+                    st.caption(f"Archivo no encontrado: `{informe.ruta_documento_final}`")
+
 
 def _check_services(settings) -> tuple[bool, bool]:
     import httpx
@@ -58,130 +113,137 @@ def _check_services(settings) -> tuple[bool, bool]:
     return ollama_ok, pg_ok
 
 
+with tab_hist:
+    _render_historial()
+
 # ── Formulario ─────────────────────────────────────────────────────────────
-with st.form("informe_form"):
-    empresa = st.text_input(
-        "Nombre de la empresa *",
-        placeholder='Ej: "Noel S.A.S."',
-        help="Nombre oficial de la empresa a analizar",
-    )
-    ciiu = st.text_input(
-        "Código CIIU (opcional)",
-        placeholder="Ej: 1081",
-        help="Si se omite, se intenta extraer automáticamente",
-    )
-    output_path = st.text_input(
-        "Ruta de salida (opcional)",
-        placeholder="./output/noel_informe.docx",
-        help="Ruta donde se guardará el .docx. Se crea el directorio si no existe.",
-    )
-    submitted = st.form_submit_button("🚀 Generar informe", use_container_width=True)
-
-# ── Ejecución ──────────────────────────────────────────────────────────────
-if submitted:
-    if not empresa.strip():
-        st.error("El nombre de la empresa es obligatorio.")
-        st.stop()
-
-    from ic.shared.config import get_settings
-
-    try:
-        settings = get_settings()
-    except Exception as e:
-        st.error(
-            f"Error cargando configuración: {e}\n"
-            "Verifica que el archivo `.env` esté presente."
+with tab_gen:
+    with st.form("informe_form"):
+        empresa = st.text_input(
+            "Nombre de la empresa *",
+            placeholder='Ej: "Noel S.A.S."',
+            help="Nombre oficial de la empresa a analizar",
         )
-        st.stop()
-
-    # Verificación de servicios
-    with st.spinner("Verificando servicios..."):
-        ollama_ok, pg_ok = _check_services(settings)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if ollama_ok:
-            st.success("Ollama ✅")
-        else:
-            st.error(f"Ollama ❌ — no disponible en {settings.ollama_base_url}")
-    with col2:
-        if pg_ok:
-            st.success("PostgreSQL ✅")
-        else:
-            st.error("PostgreSQL ❌ — no disponible")
-
-    if not ollama_ok or not pg_ok:
-        st.error(
-            "Uno o más servicios no están disponibles. "
-            "Verifica que Ollama esté corriendo (`curl http://127.0.0.1:11434/api/tags`) "
-            "y que el contenedor `repositorio_postgres` esté activo (`docker ps`)."
+        ciiu = st.text_input(
+            "Código CIIU (opcional)",
+            placeholder="Ej: 1081",
+            help="Si se omite, se intenta extraer automáticamente",
         )
-        st.stop()
-
-    # Barra de progreso y label de paso
-    progress_bar = st.progress(0.0, text="Iniciando pipeline...")
-    step_label = st.empty()
-
-    TOTAL_PASOS = 10
-
-    def on_step(n: int, total: int, label: str) -> None:
-        progress_bar.progress(n / total, text=f"[{n}/{total}] {label}")
-        step_label.markdown(f"**Paso {n}/{total}:** {label}…")
-
-    try:
-        from ic.domain.use_cases.generate_informe import GenerateInforme, InformeParams
-
-        uc = GenerateInforme(settings)
-        params = InformeParams(
-            empresa=empresa.strip(),
-            ciiu=ciiu.strip() or None,
-            output_path=output_path.strip() or None,
+        output_path = st.text_input(
+            "Ruta de salida (opcional)",
+            placeholder="./output/noel_informe.docx",
+            help="Ruta donde se guardará el .docx. Se crea el directorio si no existe.",
         )
-        result = uc.run(params, on_step=on_step)
+        submitted = st.form_submit_button("🚀 Generar informe", use_container_width=True)
 
-    except Exception as exc:
-        progress_bar.empty()
+    # ── Ejecución ──────────────────────────────────────────────────────────
+    if submitted:
+        if not empresa.strip():
+            st.error("El nombre de la empresa es obligatorio.")
+            st.stop()
+
+        from ic.shared.config import get_settings
+
+        try:
+            settings = get_settings()
+        except Exception as e:
+            st.error(
+                f"Error cargando configuración: {e}\n"
+                "Verifica que el archivo `.env` esté presente."
+            )
+            st.stop()
+
+        # Verificación de servicios
+        with st.spinner("Verificando servicios..."):
+            ollama_ok, pg_ok = _check_services(settings)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if ollama_ok:
+                st.success("Ollama ✅")
+            else:
+                st.error(f"Ollama ❌ — no disponible en {settings.ollama_base_url}")
+        with col2:
+            if pg_ok:
+                st.success("PostgreSQL ✅")
+            else:
+                st.error("PostgreSQL ❌ — no disponible")
+
+        if not ollama_ok or not pg_ok:
+            st.error(
+                "Uno o más servicios no están disponibles. "
+                "Verifica que Ollama esté corriendo (`curl http://127.0.0.1:11434/api/tags`) "
+                "y que el contenedor `repositorio_postgres` esté activo (`docker ps`)."
+            )
+            st.stop()
+
+        # Barra de progreso y label de paso
+        progress_bar = st.progress(0.0, text="Iniciando pipeline...")
+        step_label = st.empty()
+
+        TOTAL_PASOS = 10
+
+        def on_step(n: int, total: int, label: str) -> None:
+            progress_bar.progress(n / total, text=f"[{n}/{total}] {label}")
+            step_label.markdown(f"**Paso {n}/{total}:** {label}…")
+
+        try:
+            from ic.domain.use_cases.generate_informe import GenerateInforme, InformeParams
+
+            uc = GenerateInforme(settings)
+            params = InformeParams(
+                empresa=empresa.strip(),
+                ciiu=ciiu.strip() or None,
+                output_path=output_path.strip() or None,
+            )
+            result = uc.run(params, on_step=on_step)
+
+        except Exception as exc:
+            progress_bar.empty()
+            step_label.empty()
+            st.error(
+                f"Error durante la generación: {exc}\n\n"
+                "Revisa los logs de la terminal para más detalles."
+            )
+            st.stop()
+
+        # ── Resultado ──────────────────────────────────────────────────────
+        progress_bar.progress(1.0, text="✅ Informe completado")
         step_label.empty()
-        st.error(
-            f"Error durante la generación: {exc}\n\n"
-            "Revisa los logs de la terminal para más detalles."
-        )
-        st.stop()
 
-    # ── Resultado ──────────────────────────────────────────────────────
-    progress_bar.progress(1.0, text="✅ Informe completado")
-    step_label.empty()
+        st.success(f"✅ Informe generado: `{result.ruta_docx}`")
 
-    st.success(f"✅ Informe generado: `{result.ruta_docx}`")
-
-    docx_path = Path(result.ruta_docx)
-    if docx_path.exists():
-        with open(docx_path, "rb") as f:
-            st.download_button(
-                label="⬇️ Descargar informe .docx",
-                data=f,
-                file_name=docx_path.name,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True,
-            )
-    else:
-        st.warning(f"El archivo no se encontró en `{result.ruta_docx}`.")
-
-    with st.expander("📊 Resumen de ejecución"):
-        col_t, col_c, col_r = st.columns(3)
-        col_t.metric("Tiempo total", f"{result.tiempo_total_s:.0f}s")
-        col_c.metric("Costo API", f"${result.costo_usd:.4f} USD")
-        col_r.metric("Referencias", str(result.n_referencias))
-
-        if result.tokens_in or result.tokens_out:
-            st.caption(
-                f"Tokens: {result.tokens_in:,} entrada / {result.tokens_out:,} salida"
-            )
-
-        if result.cost_records:
-            st.markdown("**Desglose por llamada:**")
-            for rec in result.cost_records:
-                st.text(
-                    f"  {rec.modelo[:50]:<50}  "
-                    f"in={rec.tokens_in:>7,}  out={rec.tokens_out:>6,}  ${rec.costo_usd:.4f}"
+        docx_path = Path(result.ruta_docx)
+        if docx_path.exists():
+            with open(docx_path, "rb") as f:
+                st.download_button(
+                    label="⬇️ Descargar informe .docx",
+                    data=f,
+                    file_name=docx_path.name,
+                    mime=(
+                        "application/vnd.openxmlformats-"
+                        "officedocument.wordprocessingml.document"
+                    ),
+                    use_container_width=True,
                 )
+        else:
+            st.warning(f"El archivo no se encontró en `{result.ruta_docx}`.")
+
+        with st.expander("📊 Resumen de ejecución"):
+            col_t, col_c, col_r = st.columns(3)
+            col_t.metric("Tiempo total", f"{result.tiempo_total_s:.0f}s")
+            col_c.metric("Costo API", f"${result.costo_usd:.4f} USD")
+            col_r.metric("Referencias", str(result.n_referencias))
+
+            if result.tokens_in or result.tokens_out:
+                st.caption(
+                    f"Tokens: {result.tokens_in:,} entrada / {result.tokens_out:,} salida"
+                )
+
+            if result.cost_records:
+                st.markdown("**Desglose por llamada:**")
+                for rec in result.cost_records:
+                    st.text(
+                        f"  {rec.modelo[:50]:<50}  "
+                        f"in={rec.tokens_in:>7,}  out={rec.tokens_out:>6,}  ${rec.costo_usd:.4f}"
+                    )

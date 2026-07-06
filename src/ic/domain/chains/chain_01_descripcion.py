@@ -22,19 +22,19 @@ SYSTEM_PROMPT_01 = (
     "No inventes datos que no estén en ese contexto.\n"
     "3. AUSENCIA: Si un dato específico no aparece en el contexto, escribe exactamente: "
     "\"Dato no disponible en fuentes consultadas.\"\n"
-    "4. INFERENCIAS: Si realizas una inferencia lógica a partir del contexto, márcala con \"Inferencia:\".\n"
+    "4. INFERENCIAS: Si realizas una inferencia lógica a partir del contexto, márcala con \"Inferencia:\".\n"  # noqa: E501
     "5. FORMATO: Sin emojis. Sin encabezados genéricos. Sin meta-comentarios. "
     "Solo el perfil estructurado solicitado."
 )
 
 USER_PROMPT_01 = (
-    "Elabora una descripción integral de la siguiente empresa basándote ÚNICAMENTE en el contexto web "
-    "provisto más abajo. No uses conocimiento propio: todo lo que escribas debe poder rastrearse al contexto.\n\n"
+    "Elabora una descripción integral de la siguiente empresa basándote ÚNICAMENTE en el contexto web "  # noqa: E501
+    "provisto más abajo. No uses conocimiento propio: todo lo que escribas debe poder rastrearse al contexto.\n\n"  # noqa: E501
     "NOMBRE: {nombre_empresa}\n"
     "ACTIVIDAD CIIU (RUES): {actividad_ciiu}\n\n"
     "CONTEXTO WEB (única fuente autorizada para este capítulo):\n"
     "{web_context}\n\n"
-    "Estructura la respuesta en las siguientes secciones, respetando este orden y estos títulos exactos:\n\n"
+    "Estructura la respuesta en las siguientes secciones, respetando este orden y estos títulos exactos:\n\n"  # noqa: E501
     "## Descripción general\n"
     "## Productos y servicios\n"
     "## Segmentos de clientes\n"

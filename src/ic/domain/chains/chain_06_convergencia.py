@@ -10,9 +10,9 @@ from ic.domain.chains.chain_04_tendencias import (  # noqa: F401
 )
 
 SYSTEM_PROMPT_06 = (
-    "Eres un consultor senior en estrategia empresarial y transformación digital con más de 15 años "
-    "de experiencia asesorando empresas en América Latina. Tienes conocimiento profundo en análisis "
-    "de tendencias tecnológicas, económicas y sociales, frameworks de competitividad y planificación "
+    "Eres un consultor senior en estrategia empresarial y transformación digital con más de 15 años "  # noqa: E501
+    "de experiencia asesorando empresas en América Latina. Tienes conocimiento profundo en análisis "  # noqa: E501
+    "de tendencias tecnológicas, económicas y sociales, frameworks de competitividad y planificación "  # noqa: E501
     "estratégica.\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada afirmación en los fragmentos de fuentes proporcionados.\n"
@@ -41,12 +41,12 @@ USER_PROMPT_06 = (
     "{retrieval_convergencia_territorial}\n\n"
     "Inicia con el siguiente párrafo introductorio (transcríbelo exactamente):\n"
     "\"La convergencia empresarial analiza cómo las estrategias de la empresa se alinean con las "
-    "prioridades del territorio y las tendencias del sector, identificando puntos de intersección que "
+    "prioridades del territorio y las tendencias del sector, identificando puntos de intersección que "  # noqa: E501
     "generan ventajas competitivas sostenibles y contribuyen al desarrollo regional.\"\n\n"
     "## 5.1 Área Estratégica: Sostenibilidad Ambiental\n\n"
-    "Identifica oportunidades concretas para la empresa en sostenibilidad ambiental derivadas del "
-    "contexto territorial y sectorial. Explica el por qué de cada oportunidad. Propone 3 acciones "
-    "específicas con título en negrilla. Formato: storytelling sin viñetas. Mínimo 300 palabras.\n\n"
+    "Identifica oportunidades concretas para la empresa en sostenibilidad ambiental derivadas del "  # noqa: E501
+    "contexto territorial y sectorial. Explica el por qué de cada oportunidad. Propone 3 acciones "  # noqa: E501
+    "específicas con título en negrilla. Formato: storytelling sin viñetas. Mínimo 300 palabras.\n\n"  # noqa: E501
     "## 5.2 Área Estratégica: Transformación Digital y Gobierno Inteligente\n\n"
     "Ídem para transformación digital: cómo la empresa puede aprovechar las iniciativas de "
     "digitalización del sector y del territorio. Propone 3 acciones con título en negrilla. "
@@ -85,7 +85,7 @@ _SYNTH_USER = (
     "Integra los siguientes análisis en el Capítulo 5. Convergencia Empresarial en las Áreas "
     "Estratégicas del Distrito.\n\n"
     "Inicia con: \"La convergencia empresarial analiza cómo las estrategias de la empresa se "
-    "alinean con las prioridades del territorio y las tendencias del sector, identificando puntos "
+    "alinean con las prioridades del territorio y las tendencias del sector, identificando puntos "  # noqa: E501
     "de intersección que generan ventajas competitivas sostenibles y contribuyen al desarrollo "
     "regional.\"\n\n"
     "{partes}"

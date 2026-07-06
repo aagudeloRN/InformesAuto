@@ -21,7 +21,7 @@ SYSTEM_PROMPT_04 = (
     "REGLAS DE ESTILO:\n"
     "- Tono ejecutivo y directo. Prohibido: \"podría\", \"quizás\", \"en resumen\", "
     "\"por lo tanto\", \"cabe destacar\", \"es importante mencionar\".\n"
-    "- Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo que haya evidencia cuantificable.\n"
+    "- Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo que haya evidencia cuantificable.\n"  # noqa: E501
     "- Cada sección narrativa: texto corrido (storytelling), sin viñetas ni listas.\n"
     "- Varía el ritmo: alterna frases cortas (≤12 palabras) con frases más largas.\n"
     "- Sin mini-checklists ni meta-comentarios al final.\n"
@@ -64,7 +64,7 @@ USER_PROMPT_04 = (
     "## 3.3. Casos de Éxito\n\n"
     "### Casos Globales\n"
     "Un caso real por cada tendencia MECE (4 casos). "
-    "Cada caso: título sugestivo en negrilla + storytelling sin viñetas (empresa, qué hizo, resultado). "
+    "Cada caso: título sugestivo en negrilla + storytelling sin viñetas (empresa, qué hizo, resultado). "  # noqa: E501
     "Profundidad: al menos 150 palabras por caso.\n\n"
     "### Casos Locales\n"
     "Un caso de startup/scaleup en Medellín, Antioquia o Colombia por cada tendencia Tecnológica "

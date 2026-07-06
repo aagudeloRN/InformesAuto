@@ -93,9 +93,10 @@ N3 (meta): Resumen Ejecutivo + Párrafos Introductorios + Referencias APA
 Ensamblado .docx con plantilla membrete
 ```
 
-**Estado actual de implementación (Fase 6):** DAG completo implementado en
-`GenerateInforme` (ADR-008). N0 (Caps 1+GICS), N1 paralelo (Caps 2+3+4), N2 (Caps 5+6),
-N3 (Resumen Ejecutivo + Referencias) + ensamblado .docx. E2E validado con Noel S.A.S.
+**Estado actual de implementación (Fase 8):** DAG completo implementado en
+`GenerateInforme` (ADR-008). N0 (Caps 1+GICS), N1 paralelo (Caps 2+3+4), N2 (Caps 5 con 3 ejes
+paralelos + Cap 6), N3 (Resumen Ejecutivo + Referencias) + ensamblado .docx. E2E validado con
+Noel S.A.S. Ver `docs/decisions/FASE6_HALLAZGOS.md` y `FASE8_HALLAZGOS.md`.
 
 ---
 

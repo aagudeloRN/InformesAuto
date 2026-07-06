@@ -74,12 +74,19 @@ uv run streamlit run src/ic/presentation/app.py --server.port 8503
 # → http://localhost:8503
 ```
 
-**Flujo:**
+La UI tiene **dos pestañas** (Fase 8+):
+
+**Pestaña "Generar Informe":**
 1. Ingresar nombre de empresa (requerido), CIIU (opcional), ruta de salida (opcional)
 2. Click "🚀 Generar informe"
 3. La UI verifica Ollama + PostgreSQL antes de empezar
 4. Barra de progreso muestra los 10 pasos en tiempo real
 5. Al finalizar: botón de descarga del `.docx` + expander con métricas
+
+**Pestaña "Historial":**
+- Muestra los últimos 20 informes generados ordenados por fecha
+- Por cada informe: empresa, fecha, estado, costo USD, tiempo total
+- Botón "⬇️ Descargar .docx" disponible para informes con `estado = COMPLETADO` cuyo archivo aún existe en disco
 
 **Nota:** El informe puede tardar ~2 horas. El servidor Streamlit mantiene la conexión
 abierta. Si la terminal se cierra, el proceso muere. Para ejecuciones largas, usar `tmux`:
@@ -132,7 +139,7 @@ PDF_BATCH_SIZE_PAGES=10
 ## 6. Correr los tests
 
 ```bash
-# Suite rápida (sin Ollama ni BD) — siempre disponible (97 passed, 2 skipped — Fase 7)
+# Suite rápida (sin Ollama ni BD) — siempre disponible (≥100 passed, 2 skipped — Fase 8)
 uv run pytest -m "not slow" -q
 
 # Suite completa con tests lentos (requiere Ollama + PostgreSQL)
@@ -146,8 +153,15 @@ uv run pytest -s tests/test_tendencias.py
 ```
 
 **Tests que requieren servicios externos** (marcados `@pytest.mark.slow`):
-- `test_llm.py`: `test_ollama_gateway_simple_complete`, `test_chain_02_gics_noel`, `test_use_case_classify_gics_noel`, `test_use_case_prompt01_noel`
-- `test_retrieval.py`: `test_embedder_returns_correct_dimensions`, `test_embedder_many`, `test_ingest_and_search`
+- `test_llm.py`: gateway Ollama y cadenas básicas
+- `test_retrieval.py`: embedder real + pgvector
+- `test_generate_informe.py`: E2E del pipeline completo con Noel S.A.S.
+- `test_convergencia_e2e.py`: valida 3 ejes paralelos de Cap5 < 30 min (DT-005)
+
+```bash
+# Ejecutar solo el E2E de Cap5 paralelo (requiere Ollama + BD + OpenRouter)
+uv run pytest -m slow tests/test_convergencia_e2e.py -v -s
+```
 
 ---
 

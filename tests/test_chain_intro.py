@@ -10,7 +10,7 @@ from ic.domain.chains.chain_intro import build_chain_intro
 _SAMPLE_INPUT = {
     "titulo": "Análisis Competitivo",
     "empresa": "Noel S.A.S.",
-    "resumen_cap": "Este capítulo examina los competidores globales y regionales en el sector de alimentos.",
+    "resumen_cap": "Este capítulo examina los competidores globales y regionales en el sector de alimentos.",  # noqa: E501
 }
 
 

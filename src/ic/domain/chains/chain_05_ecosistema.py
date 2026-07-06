@@ -23,7 +23,7 @@ SYSTEM_PROMPT_05 = (
     "REGLAS DE ESTILO:\n"
     "- Tono ejecutivo y directo. Prohibido: \"podría\", \"quizás\", \"en resumen\", "
     "\"por lo tanto\", \"cabe destacar\", \"es importante mencionar\".\n"
-    "- Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo que haya evidencia cuantificable.\n"
+    "- Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo que haya evidencia cuantificable.\n"  # noqa: E501
     "- Cada actor o categoría: ficha estructurada con nombre, rol y relevancia estratégica.\n"
     "- Sin mini-checklists ni meta-comentarios al final.\n"
     "- Sin citaciones inline en las secciones narrativas.\n"
@@ -61,7 +61,7 @@ USER_PROMPT_05 = (
     "Identifica startups, scale-ups y tecnologías emergentes que están reconfigurando "
     "el sector a nivel global y latinoamericano. "
     "Para cada actor: **Nombre** — Modelo de negocio disruptivo — Amenaza u oportunidad "
-    "para la empresa — Horizonte de impacto (Corto: 0-2 años / Mediano: 2-5 años / Largo: +5 años). "
+    "para la empresa — Horizonte de impacto (Corto: 0-2 años / Mediano: 2-5 años / Largo: +5 años). "  # noqa: E501
     "Incluye al menos 4 actores disruptores con evidencia de mercado."
 )
 
