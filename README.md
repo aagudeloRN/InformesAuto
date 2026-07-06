@@ -3,9 +3,9 @@
 Genera informes de vigilancia competitiva estructurados y citados a partir del nombre de una empresa,
 usando RAG propio sobre pgvector, modelos locales vía Ollama y cadenas LCEL.
 
-**Estado actual:** Fase 6 — UI Streamlit + GenerateInforme orchestrator
+**Estado actual:** Fase 7 — orchestrator refactorizado + EmpresaRepository + PdfIngestor + Cap5 paralelo
 **Piloto de referencia:** Compañía de Galletas NOEL SAS (Grupo Nutresa)
-**Tests:** 86 fast passed, 2 skipped (10 slow excluidos) | **Caps implementados:** 1, GICS, 2, 3, 4, 5, 6, RE + intros
+**Tests:** 97 fast passed, 2 skipped (slow excluidos) | **Caps implementados:** 1, GICS, 2, 3, 4, 5, 6, RE + intros
 
 ---
 
@@ -60,6 +60,24 @@ uv run streamlit run src/ic/presentation/app.py --server.port 8503
 
 Abre `http://localhost:8503`, ingresa el nombre de la empresa y haz clic en **Generar informe**.  
 Al terminar aparece un botón para descargar el `.docx` directamente desde el navegador.
+
+## Ingestar PDFs sectoriales (fuentes manuales)
+
+```bash
+# Ingestar un PDF con metadatos explícitos
+uv run python scripts/ingest_pdf.py \
+  --pdf /ruta/al/informe.pdf \
+  --titulo "Informe Sectorial 2026" \
+  --autor "Ruta N" \
+  --año 2026
+
+# Con empresa_id específica (UUID de la BD)
+uv run python scripts/ingest_pdf.py --pdf informe.pdf --empresa-id <uuid>
+```
+
+El ingestor procesa en lotes de `PDF_BATCH_SIZE_PAGES=20` páginas, deduplica chunks por SHA-256
+y libera VRAM de Ollama (`keep_alive:0`) entre lotes. Es idempotente: puede reiniciarse sin
+duplicar chunks ya ingestados. Ver `docs/business-rules/REGLAS_NEGOCIO.md#rn-010`.
 
 ## Variables de entorno requeridas
 

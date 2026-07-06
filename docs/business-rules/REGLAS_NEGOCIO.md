@@ -110,8 +110,9 @@ N3 (Resumen Ejecutivo + Referencias) + ensamblado .docx. E2E validado con Noel S
 **Razón:** Auditoría, reproducibilidad y mejora del sistema. Un analista debe poder reconstruir
 exactamente por qué el sistema generó un texto determinado.
 
-**Estado (Fase 6):** ⏳ Pendiente. La FK `empresa_id UUID NOT NULL → empresas.id` requiere
-gestionar la entidad `Empresa` primero. Bloqueado hasta Fase 7.
+**Estado (Fase 7):** ✅ Implementado. `EmpresaRepository.upsert_by_name()` en
+`data/repositories/empresa_repo.py`. Wiring en `GenerateInforme._run_n3()`. Columnas
+`tokens_in`/`tokens_out` agregadas con migración idempotente `ensure_historial_columns(engine)`.
 
 ---
 
@@ -160,9 +161,11 @@ Llamada 3: Convergencia Competitiva   → api_llm (free, ~120B)
 Llamada 4: Síntesis integradora corta → api_llm_synth (synth, ~10% del contexto original)
 ```
 
-**Implementación esperada:**
-- `chain_06a_convergencia_eje.py` — chain genérico para un eje de convergencia
-- `GenerateConvergencia.execute()` — 3 llamadas paralelas a `chain_06a` + 1 síntesis
+**Implementación (Fase 7):** ✅
+- `chain_06a_convergencia_eje.py` — chain genérico con `EJE_TECNOLOGICO`, `EJE_MERCADO`, `EJE_SOCIAL`
+- `GenerateConvergencia.execute()` — 3 llamadas paralelas ThreadPoolExecutor(max_workers=3) + 1 síntesis
+- `build_chain_06_synth(llm)` en `chain_06_convergencia.py` — síntesis que recibe `{partes}`
+- El constructor acepta `chain_eje=None` (ruta legacy monolítica conservada por compatibilidad)
 
 **Regla general:** Si un capítulo devuelve por primera vez en > 30 minutos y el modelo
 es free tier, aplicar subdivisión. El umbral de subdivisión es configurable en `.env`
@@ -191,10 +194,8 @@ de embeddings secuenciales. El proceso agotó la VRAM de 8GB antes de completar.
 3. Log: "PDF completamente ingestado — N chunks totales"
 ```
 
-**Implementación esperada:**
-- `infrastructure/sources/pdf_ingestor.py` — `PdfIngestor` con `ingest_batched()`
-- Anti-duplicados por SHA-256 del chunk (no del PDF completo) para reanudación
+**Implementación (Fase 7):** ✅
+- `infrastructure/sources/pdf_ingestor.py` — `PdfIngestor.ingest_batched(pdf_path, empresa_id, titulo, autor, año)`
+- Anti-duplicados por `hashlib.sha256(chunk_texto).hexdigest()` guardado en JSONB `metadatos->>'chunk_sha256'`
 - Si un lote falla: loguear el error, continuar con el siguiente lote (degradación graceful)
-
-**Relación con DT-002:** La ingesta debe salir de `scripts/` y vivir en `infrastructure/`
-para cumplir con la separación de capas.
+- `scripts/ingest_pdf.py` convertido en thin wrapper del `PdfIngestor` — DT-002 cerrado

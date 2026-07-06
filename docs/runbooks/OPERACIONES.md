@@ -47,20 +47,20 @@ uv run python scripts/run_pilot.py --empresa "Alpina S.A.S." --ciiu 1040
 uv run python scripts/run_pilot.py --empresa "Alpina" --salida ./output/alpina_2026.docx
 ```
 
-El script genera **10 pasos** (Fase 6 — via `GenerateInforme` orchestrator):
+El script genera **10 pasos** (Fase 7 — via `GenerateInforme` orchestrator):
 1. Cap 1 — Descripción empresa (~50s)
 2. GICS — Clasificación de sector (~30s)
 3. N1 paralelo — Caps 2, 3, 4 simultáneos (~12 min)
 4. Párrafos introductorios N1 (~12s)
-5. PDF Convergencia — ingesta condicional (~23 min si hay PDF, puede fallar por OOM)
-6. Cap 5 — Convergencia Empresarial (~79 min en tier free — ver H6-02)
+5. PDF Convergencia — ingesta por lotes con `PdfIngestor` (~5–23 min si hay PDF; idempotente)
+6. Cap 5 — Convergencia Empresarial: 3 ejes paralelos + síntesis (~15 min estimado, RN-009)
 7. Cap 6 — Accionables Estratégicos (~48s)
 8. Párrafos introductorios N2 (~6s)
 9. Resumen Ejecutivo (~94s)
-10. Referencias APA + Ensamblado .docx (<1s)
+10. Referencias APA + Ensamblado .docx + persistencia BD (<5s)
 
-**Tiempo total esperado:** ~117 min (dominado por Cap 5 y PDF ingesta).
-Ver `docs/decisions/FASE6_HALLAZGOS.md` para análisis completo de tiempos.
+**Tiempo total esperado:** ~55–60 min (vs ~117 min en Fase 6; Cap 5 mejorado x5 por paralelismo).
+Ver `docs/decisions/FASE7_HALLAZGOS.md` para análisis de tiempos y decisiones de Fase 7.
 
 ---
 
@@ -91,33 +91,48 @@ uv run streamlit run src/ic/presentation/app.py --server.port 8503
 
 ---
 
-## 4. Ingestar un PDF manual
+## 4. Ingestar un PDF manual (Fase 7+)
 
-Los PDFs sectoriales (EMIS, informes del distrito, etc.) se ingresan via:
+Los PDFs sectoriales (EMIS, informes del distrito, etc.) se ingresan via `PdfIngestor`
+(ver RN-010). El proceso es idempotente: si se interrumpe, relanzarlo omite los chunks
+ya procesados (anti-duplicados por SHA-256).
 
 ```bash
-# Ingestar un PDF con metadatos mínimos
+# Ingestar un PDF con metadatos
 uv run python scripts/ingest_pdf.py \
-  --archivo "/path/al/InformeConvergenciaLocal2026V3RvADAA.pdf" \
-  --titulo "Informe de Convergencia Local 2026" \
-  --fuente "Alcaldía de Medellín" \
+  --pdf "/path/al/InformeConvergenciaLocal2026V3RvADAA.pdf" \
+  --titulo "Informe de Convergencia Local Medellín 2026" \
+  --autor "Alcaldía de Medellín" \
   --año 2026
 
-# El script calcula el SHA-256 del archivo para evitar duplicados.
-# El PDF se chunkea, embebe e indexa en pgvector.
+# Asociar a una empresa específica (UUID de la BD)
+uv run python scripts/ingest_pdf.py \
+  --pdf informe.pdf \
+  --empresa-id "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# El ingestor usa PdfIngestor.ingest_batched() internamente:
+# - Lotes de PDF_BATCH_SIZE_PAGES=20 páginas
+# - SHA-256 por chunk para skip de duplicados
+# - keep_alive:0 tras cada lote (libera VRAM Ollama)
 ```
 
 **Cuándo ingestar PDFs:**
-- Antes de generar Cap 5 Convergencia (el informe de convergencia territorial del distrito)
+- Antes de generar Cap 5 Convergencia (informe de convergencia territorial del distrito)
 - Cuando un cap devuelve párrafo de ausencia por retrieval insuficiente
 - Para incorporar informes sectoriales de EMIS, Fedesarrollo, DANE, etc.
+
+**Si el PDF es muy denso (>5k chars/pág) y hay OOM:**
+```bash
+# Reducir el tamaño del lote en .env
+PDF_BATCH_SIZE_PAGES=10
+```
 
 ---
 
 ## 6. Correr los tests
 
 ```bash
-# Suite rápida (sin Ollama ni BD) — siempre disponible
+# Suite rápida (sin Ollama ni BD) — siempre disponible (97 passed, 2 skipped — Fase 7)
 uv run pytest -m "not slow" -q
 
 # Suite completa con tests lentos (requiere Ollama + PostgreSQL)

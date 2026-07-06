@@ -1,6 +1,6 @@
 # Arquitectura del Sistema — Informes de Inteligencia Competitiva
 
-**Versión:** 6 (post Fase 6 — GenerateInforme orchestrator + UI Streamlit + E2E validado)
+**Versión:** 7 (post Fase 7 — orchestrator refactorizado + EmpresaRepository + PdfIngestor + Cap5 paralelo)
 **Última actualización:** 2026-07-06
 **Propósito:** documento vivo de referencia arquitectónica. Las decisiones cerradas
 viven en los ADRs; este documento describe el sistema como está construido y hacia
@@ -263,24 +263,24 @@ Input usuario: {nombre_empresa}
 **E2E validado (2026-07-06):** Noel S.A.S. → 10 pasos, 49 headings, ~12k palabras, 19 refs APA, $0.0000.
 Ver `docs/decisions/FASE6_HALLAZGOS.md` para tiempos y issues conocidos.
 
-### Deuda técnica activa (Fase 7)
+### Deuda técnica cerrada en Fase 7
 
-| ID | Descripción | Impacto |
-|----|-------------|---------|
-| DT-001 | `generate_informe.py` tiene 348 líneas (Red Flag PRIME DIRECTIVE §IX) | Alto — refactorizar en métodos privados |
-| DT-002 | PDF ingesta en `run()` llama a `scripts/ingest_pdf.py` vía `sys.path` (violación SoC) | Medio — mover a `infrastructure/sources/pdf_ingestor.py` |
-| DT-003 | Cap 5 puede tardar >79 min por rate limiting en Nemotron Ultra 550B free | Medio — estrategia divide y vencerás (ver RN-009) |
+| ID | Descripción | Estado |
+|----|-------------|--------|
+| DT-001 | `generate_informe.py` tenía 348 líneas (Red Flag) | ✅ Resuelto — 6 métodos privados + `_PipelineContext` |
+| DT-002 | PDF ingesta en `scripts/` violaba SoC | ✅ Resuelto — `infrastructure/sources/pdf_ingestor.py` |
+| DT-003 | Cap 5 tardaba >79 min monolítico | ✅ Resuelto — 3 ejes paralelos + síntesis (~15 min) |
 
-### Pendiente (Fase 7+)
+### Pendiente (Fase 8+)
 
 | Fase | Componente | Descripción |
 |------|-----------|-------------|
-| 7 | **Entidad Empresa** | `data/models/empresa.py` ya existe (ORM). Implementar `EmpresaRepository.upsert_by_name()` |
-| 7 | **Persistencia historial** | Wiring de `InformeRepository.save()` en `GenerateInforme.run()` — bloqueado por FK `empresa_id` |
-| 7 | **Historial UI** | Vista en `app.py` con lista de informes pasados y descarga retroactiva |
-| 7 | **PDF ingestor modular** | Mover lógica de `scripts/ingest_pdf.py` a `infrastructure/sources/pdf_ingestor.py` con batch processing |
-| 7 | **Refactor generate_informe** | Resolver DT-001: extraer `_setup_infra()`, `_run_n1()`, `_run_n2()`, `_run_n3()` |
-| 7 | CostTracker en Cap 1/GICS | Ollama no expone tokens; registrar tiempo como proxy de costo |
+| 8 | **Historial UI** | Vista en `app.py` con lista de informes pasados y descarga retroactiva |
+| 8 | **Validación idioma global** | `has_cjk_characters()` se aplica solo en Cap 1; extender a todos los caps |
+| 8 | **CostTracker en Cap 1/GICS** | Ollama no expone tokens; registrar tiempo como proxy de costo |
+| 8 | **E2E paralelo real** | Validar Cap 5 con `chain_eje` real sobre Ollama (requiere tiempo >> slow marker) |
+| 8+ | **Fuentes EMIS/sectoriales** | Ingestar PDFs privados (EMIS, informes Ruta N) con mismo `PdfIngestor` |
+| 8+ | **Multi-empresa** | UI para generar múltiples informes en cola; historial paginado |
 
 ---
 

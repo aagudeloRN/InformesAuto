@@ -5,6 +5,59 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.8.0] — 2026-07-06
+
+### Added
+- `src/ic/data/repositories/empresa_repo.py`: `EmpresaRepository.upsert_by_name(nombre)`
+  — idempotente: busca la empresa por nombre exacto o la crea. Desbloquea la FK
+  `empresa_id` en `historial_informes` (RN-006).
+- `src/ic/infrastructure/sources/pdf_ingestor.py`: `PdfIngestor.ingest_batched()` —
+  procesa PDFs en lotes de `PDF_BATCH_SIZE_PAGES=20` páginas. Anti-duplicados por SHA-256
+  del chunk en JSONB `metadatos->>'chunk_sha256'`. `keep_alive:0` tras cada lote para
+  liberar VRAM (RN-010, DT-002).
+- `src/ic/domain/chains/chain_06a_convergencia_eje.py`: chain LCEL genérico para un eje
+  de convergencia. Recibe `{eje_nombre, eje_instrucciones, ...}`. Tres ejes definidos:
+  `EJE_TECNOLOGICO`, `EJE_MERCADO`, `EJE_SOCIAL`. (RN-009)
+- `src/ic/data/models/historial_informe.py`: columnas `tokens_in: int | None` y
+  `tokens_out: int | None`. Función `ensure_historial_columns(engine)` — migración
+  idempotente via `ALTER TABLE … ADD COLUMN IF NOT EXISTS`.
+- `tests/test_empresa_repo.py`: 5 tests rápidos mocked (upsert crea, upsert idempotente,
+  get_by_id, historial con tokens).
+- `tests/test_pdf_ingestor.py`: 4 tests rápidos mocked (skip duplicados SHA-256,
+  keep_alive tras cada lote, 2 lotes = 2 releases, error de conexión no propaga).
+
+### Changed
+- `src/ic/domain/use_cases/generate_informe.py`: refactor DT-001 — extraído en 6 métodos
+  privados (`_setup_infra`, `_run_n0`, `_run_n1`, `_run_pdf`, `_run_n2`, `_run_n3`) con
+  `_PipelineContext` dataclass. Imports diferidos por método (no `locals()` pattern).
+  `_run_n3()` persiste empresa, costo, tiempo y tokens al finalizar (wrapped en
+  try/except para degradación graceful).
+- `src/ic/domain/use_cases/generate_convergencia.py`: constructor acepta `chain_eje`
+  opcional. Con `chain_eje`: 3 llamadas paralelas (ThreadPoolExecutor max_workers=3) a
+  los 3 ejes + 1 síntesis. Sin `chain_eje`: ruta legacy monolítica conservada.
+  Cap 5 estimado ~15 min vs ~79 min previo (RN-009).
+- `src/ic/domain/chains/chain_06_convergencia.py`: agrega `build_chain_06_synth(llm)` —
+  chain de síntesis que recibe `{partes}` (textos de los 3 ejes concatenados).
+- `src/ic/data/repositories/informe_repo.py`: `update_completado()` acepta
+  `tokens_in: int | None` y `tokens_out: int | None`.
+- `src/ic/shared/config.py`: agrega `pdf_batch_size_pages: int = 20`.
+- `scripts/ingest_pdf.py`: refactorizado como thin wrapper que delega a
+  `PdfIngestor.ingest_batched()`. Mantiene la misma interfaz CLI.
+- `tests/test_convergencia.py`: actualizado para el nuevo constructor de dos chains;
+  agrega test de paralelismo (chain_eje.invoke.call_count == 3).
+
+### Fixed
+- Deuda DT-001 cerrada: `generate_informe.py` descompuesto en métodos cohesivos,
+  cada uno < 60 líneas.
+- Deuda DT-002 cerrada: ingesta PDF migrada de `scripts/` a `infrastructure/sources/`.
+- Persistencia historial desbloqueada (RN-006): `_run_n3()` persiste con
+  `EmpresaRepository.upsert_by_name()` antes de `InformeRepository.create()`.
+
+### Tests
+- 97 fast passed, 2 skipped (antes: 86 fast passed post Fase 6).
+
+---
+
 ## [0.7.0] — 2026-07-06
 
 ### Added
