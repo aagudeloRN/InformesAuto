@@ -142,7 +142,7 @@ class GenerateInforme:
                 texto=ctx.empresa.texto,
             )
         ctx.step_fn(2, "GICS — Clasificación de sector")
-        ctx.gics = ClassifyGICS(chain=build_chain_02(ctx.llm)).execute(
+        ctx.gics = ClassifyGICS(chain=build_chain_02(ctx.api_llm or ctx.llm)).execute(
             nombre_empresa=ctx.params.empresa, descripcion_empresa=ctx.empresa.texto,
         )
 
@@ -167,7 +167,7 @@ class GenerateInforme:
 
         def _fn_cap2(store):
             return GenerateBenchmarking(
-                chain=build_chain_03(ctx.llm), store=store, web_connector=ctx.web
+                chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=ctx.web
             ).execute(nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g)
 
         def _fn_cap3(store):

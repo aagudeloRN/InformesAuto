@@ -93,6 +93,9 @@ class PdfIngestor:
             "fecha_acceso": None,
         }
 
+        # Evita OOM: desaloja el LLM generativo (qwen3:8b) antes de cargar nomic-embed-text
+        _release_vram(self._settings.ollama_base_url, self._settings.llm_local_analytic_model)
+
         embedder = Embedder(self._settings)
         total_inserted = 0
         n_batches = (total_pages + batch_size - 1) // batch_size

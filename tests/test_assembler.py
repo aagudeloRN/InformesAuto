@@ -19,7 +19,7 @@ from ic.infrastructure.citation.apa_formatter import (
     format_reference,
 )
 from ic.infrastructure.docx_builder import DocxBuilder
-from ic.infrastructure.llm.gateway import build_llm
+from ic.infrastructure.llm.gateway import build_api_llm, build_llm
 from ic.infrastructure.retrieval.embedder import Embedder
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
@@ -241,6 +241,7 @@ def test_pilot_end_to_end_noel(tmp_path):
     out = str(tmp_path / "noel_piloto.docx")
 
     llm = build_llm(settings)
+    api_llm = build_api_llm(settings) if settings.openrouter_api_key else llm
     embedder = Embedder(settings)
 
     with SessionLocal() as db:
@@ -251,11 +252,11 @@ def test_pilot_end_to_end_noel(tmp_path):
         uc_desc = GenerateEmpresaDescription(chain=build_chain_01(llm), web_connector=web)
         empresa = uc_desc.execute("Noel S.A.S.")
 
-        uc_gics = ClassifyGICS(chain=build_chain_02(llm))
+        uc_gics = ClassifyGICS(chain=build_chain_02(api_llm))
         gics = uc_gics.execute(nombre_empresa="Noel S.A.S.", descripcion_empresa=empresa.texto)
 
         uc_bench = GenerateBenchmarking(
-            chain=build_chain_03(llm),
+            chain=build_chain_03(api_llm),
             store=store,
             web_connector=web,
         )

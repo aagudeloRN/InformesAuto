@@ -10,6 +10,7 @@ def fake_settings():
     s = MagicMock()
     s.ollama_base_url = "http://127.0.0.1:11434"
     s.llm_local_embed_model = "nomic-embed-text"
+    s.llm_local_analytic_model = "qwen3:8b"
     s.pdf_batch_size_pages = 2
     s.db_schema = "informes_ic"
     s.rag_top_k = 10
@@ -81,7 +82,8 @@ def test_ingest_batched_calls_keep_alive_after_each_batch(fake_settings):
         # batch_size=2, 2 páginas → 1 lote
         ingestor.ingest_batched(pdf_path="/fake/test.pdf")
 
-    assert mock_release.call_count == 1
+    # 1 pre-call (desaloja qwen3:8b) + 1 post-batch (nomic-embed-text) = 2
+    assert mock_release.call_count == 2
     mock_release.assert_called_with("http://127.0.0.1:11434", "nomic-embed-text")
 
 
@@ -114,7 +116,8 @@ def test_ingest_batched_two_batches_calls_release_twice(fake_settings):
         ingestor = PdfIngestor(fake_settings)
         ingestor.ingest_batched(pdf_path="/fake/test.pdf")
 
-    assert mock_release.call_count == 2
+    # 1 pre-call (desaloja qwen3:8b) + 2 post-batch (nomic-embed-text) = 3
+    assert mock_release.call_count == 3
 
 
 def test_release_vram_handles_connection_error():

@@ -21,12 +21,16 @@ class Embedder:
                 resp = httpx.post(
                     f"{self._base_url}/api/embeddings",
                     json={"model": self._model, "prompt": text, "keep_alive": 0},
-                    timeout=30,
+                    timeout=60,
                 )
                 resp.raise_for_status()
                 return resp.json()["embedding"]
-            except httpx.HTTPStatusError as exc:
-                if exc.response.status_code == 500 and attempt < len(_RETRY_WAITS) - 1:
+            except (httpx.HTTPStatusError, httpx.TimeoutException) as exc:
+                is_retryable = (
+                    isinstance(exc, httpx.TimeoutException)
+                    or (isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 500)
+                )
+                if is_retryable and attempt < len(_RETRY_WAITS) - 1:
                     last_exc = exc
                     continue
                 raise
