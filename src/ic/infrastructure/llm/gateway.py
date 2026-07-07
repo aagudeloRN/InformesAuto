@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, Literal
+
+logger = logging.getLogger(__name__)
 
 import httpx
 from langchain_core.callbacks import CallbackManagerForLLMRun
@@ -197,7 +200,17 @@ class OpenRouterGatewayLLM(BaseChatModel):
                 timeout=self.timeout,
             )
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            # OpenRouter puede devolver HTTP 200 con {"error": {...}} cuando el modelo
+            # no está disponible o hay rate-limit. Esto NO dispara raise_for_status().
+            if "error" in data:
+                err = data["error"]
+                logger.warning("OpenRouter error en body (model=%s): %s", self.model, err)
+                raise RuntimeError(f"OpenRouter error: {err}")
+            if "choices" not in data or not data["choices"]:
+                logger.error("OpenRouter respuesta inesperada (sin choices, model=%s): %s", self.model, data)
+                raise RuntimeError(f"OpenRouter sin 'choices' (model={self.model}): {data}")
+            return data
 
         data = _call()
         content = data["choices"][0]["message"]["content"]
@@ -243,6 +256,11 @@ class OpenRouterGatewayLLM(BaseChatModel):
                     continue
                 if line.startswith("data: "):
                     chunk_data = json.loads(line[6:])
+                    if "error" in chunk_data:
+                        logger.error("OpenRouter stream error (model=%s): %s", self.model, chunk_data["error"])
+                        raise RuntimeError(f"OpenRouter stream error: {chunk_data['error']}")
+                    if "choices" not in chunk_data or not chunk_data["choices"]:
+                        continue
                     delta = chunk_data["choices"][0].get("delta", {})
                     token = delta.get("content", "")
                     if token:
