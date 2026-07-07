@@ -5,6 +5,27 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.9.1] — 2026-07-07
+
+### Fixed
+- **DT-013 OOM WSL2**: GICS y Benchmarking (Cap 2) usan OpenRouter free tier como primario;
+  `qwen3:8b` (Ollama) queda como fallback cuando no hay `OPENROUTER_API_KEY`. Elimina el
+  overlap de VRAM que causaba OOM en WSL2 8 GB (ADR-010).
+- `pdf_ingestor.py`: `_release_vram(llm_local_analytic_model)` al inicio de `ingest_batched()`
+  para desalojar `qwen3:8b` antes de cargar `nomic-embed-text`.
+- `embedder.py`: timeout 30 s → 60 s + reintento en `httpx.TimeoutException`.
+- `tests/test_assembler.py`: E2E Noel usa `build_api_llm` para GICS y Benchmarking.
+- `tests/test_pdf_ingestor.py`: conteos de `_release_vram` actualizados (pre-call + post-batch).
+
+### Added
+- **DT-014 PDF fast-path**: `_document_already_ingested()` en `PdfIngestor` — una sola query
+  JSONB evita re-procesar PDFs ya indexados en la BD. El Informe de Convergencia Local no
+  vuelve a pasar por los 582 checks SHA-256 en cada generación de informe.
+- `docs/architecture/ADR-010-routing-api-first-vram-constraint.md`: formaliza la inversión
+  de prioridad de routing para GICS y Cap 2 respecto a ADR-002.
+
+---
+
 ## [0.9.0] — 2026-07-06
 
 ### Added

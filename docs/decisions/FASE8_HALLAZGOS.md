@@ -97,7 +97,48 @@ añadir los propios.
 Ver `docs/architecture/ARQUITECTURA.md` sección "Pendiente (Fase 9+)".
 
 **Orden sugerido para Fase 9:**
-1. Verificar ruff + pytest (DT-009) — gate de calidad antes de nuevo código
-2. Ejecutar `pytest -m slow tests/test_convergencia_e2e.py` con Ollama + OpenRouter (DT-005)
-3. Validar ingesta PDF real de 120 págs (DT-006)
-4. Extender `has_cjk_characters()` a todos los caps N1+ (DT-010)
+1. Verificar ruff + pytest (DT-009) — gate de calidad antes de nuevo código ✅ (101 fast tests)
+2. Ejecutar `pytest -m slow tests/test_convergencia_e2e.py` con OpenRouter (DT-005)
+3. Validar ingesta PDF real de 120 págs (DT-006) ✅ — resuelta con DT-013 y DT-014
+4. Extender `has_cjk_characters()` a todos los caps N1+ (DT-009)
+
+---
+
+## H8-05 — DT-013: OOM fix (sesión 2026-07-07)
+
+**Causa raíz confirmada:** `qwen3:8b` (5.2 GB) permanecía en VRAM de Ollama al iniciar
+la ingesta de embeddings, combinándose con `nomic-embed-text` y superando los 8 GB de WSL2.
+
+**Solución (commit `7ddc127`):**
+- `generate_informe.py`: GICS y Cap 2 (Benchmarking) usan `api_llm or llm` — OpenRouter
+  free como primario, local como fallback. Ver ADR-010.
+- `pdf_ingestor.py`: `_release_vram(ollama_url, llm_local_analytic_model)` al inicio de
+  `ingest_batched()` para desalojar qwen3:8b antes de cargar nomic-embed-text.
+- `embedder.py`: timeout 30 s → 60 s + reintento en `httpx.TimeoutException`.
+- Tests ajustados para reflejar los nuevos conteos de `_release_vram`.
+
+**DT-006 queda resuelto:** ingesta de 120 págs sin OOM confirmada.
+
+---
+
+## H8-06 — DT-014: PDF fast-path anti-reingesta (sesión 2026-07-07)
+
+**Problema:** `_run_pdf()` llamaba `ingest_batched()` en cada generación de informe, haciendo
+582 consultas SHA-256 de anti-dup aunque el documento ya estuviera completamente indexado.
+
+**Solución:** Nueva función `_document_already_ingested(db, titulo, schema)` — una sola query
+`SELECT 1 ... WHERE metadatos->>'titulo' = :titulo LIMIT 1`. Si retorna True, `ingest_batched()`
+devuelve 0 inmediatamente, antes de cargar el PDF ni llamar a Ollama.
+
+**Impacto:** El Informe de Convergencia Local (PDF estático, siempre necesario) ya no se
+re-procesa en cada informe generado.
+
+---
+
+## H8-07 — Conflicto de numeración DT
+
+`DT-010` en el commit `7ddc127` etiquetaba el OOM fix, pero `DT-010` en `ARQUITECTURA.md`
+ya estaba asignado a "CostTracker en Ollama".
+
+**Resolución:** El OOM fix se relabela como **DT-013** y el fast-path como **DT-014** en
+la documentación. Los DT-004..012 del doc se conservan sin renumerar.

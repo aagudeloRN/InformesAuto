@@ -89,16 +89,16 @@ Input usuario: {nombre_empresa}
                          ▼
           ┌──────────────────────────┐
           │  N0: Fundacionales       │
-          │  · Prompt-01: Descripción│ ← web RUES+CIIU (WebConnector) → OllamaGatewayLLM
-          │  · Prompt-02: GICS       │ ← 25 grupos en system prompt (sin retrieval)
+          │  · Prompt-01: Descripción│ ← web RUES+CIIU → api_llm‖api_llm_alt‖local
+          │  · Prompt-02: GICS       │ ← 25 grupos en system prompt → api_llm‖local (ADR-010)
           │  · Prompt-00: Ecuaciones │ ← genera queries de búsqueda por canal
           └──────────────┬───────────┘
                          │  (barrera: Prompt-01 debe completar antes de N1)
           ┌──────────────▼───────────────────────────────────┐
           │  N1: Analíticos — ThreadPoolExecutor(workers=3)  │ ← Fase 5F: paralelos
-          │  · Cap 2 Benchmarking  ← web on-demand + pgvector│ └─ sesión BD propia
-          │  · Cap 3 Tendencial    ← OpenAlex + web + pgvec  │
-          │  · Cap 4 Ecosistema    ← web + pgvector           │
+          │  · Cap 2 Benchmarking  ← web + pgvector → api_llm‖local (ADR-010)
+          │  · Cap 3 Tendencial    ← OpenAlex + web + pgvec → api_llm
+          │  · Cap 4 Ecosistema    ← web + pgvector → api_llm
           └──────────────┬───────────────────────────────────┘
                          │  (barrera de sincronización → intros N1)
           ┌──────────────▼───────────┐
@@ -288,6 +288,8 @@ Ver `docs/decisions/FASE6_HALLAZGOS.md` para tiempos y issues conocidos.
 | `st.tabs()` | `presentation/app.py` | P2 DT-008: divide UI en "Generar Informe" y "Historial" |
 | `test_informe_repo.py` | `tests/test_informe_repo.py` | P2: 3 tests rápidos mocked para `list_recientes` |
 | `test_convergencia_e2e.py` | `tests/test_convergencia_e2e.py` | P3 DT-005: `@pytest.mark.slow`; verifica 3 ejes paralelos < 30 min con servicios reales |
+| DT-013 OOM fix | `generate_informe.py`, `pdf_ingestor.py`, `embedder.py` | GICS+Cap2→OpenRouter primary; `_release_vram(llm_analytic)` antes de embed; timeout 60s+retry |
+| DT-014 PDF fast-path | `pdf_ingestor.py`, `tests/test_pdf_ingestor.py` | `_document_already_ingested()`: 1 query → 0 chunks si ya indexado; evita 582 checks SHA-256 |
 
 ### Deuda técnica cerrada
 
@@ -296,16 +298,18 @@ Ver `docs/decisions/FASE6_HALLAZGOS.md` para tiempos y issues conocidos.
 | DT-001 | `generate_informe.py` >300 líneas | 7 | ✅ Resuelto — ADR-009 |
 | DT-002 | PDF ingesta en `scripts/` | 7 | ✅ Resuelto — `PdfIngestor` en infrastructure/ |
 | DT-003 | Cap 5 monolítico ~79 min | 7 | ✅ Resuelto — 3 ejes paralelos |
+| DT-006 | PDF 120 págs validación real | 9 | ✅ Resuelto — ingesta sin OOM confirmada (DT-013) |
 | DT-007 | ~38 errores ruff E501 en chains | 8 | ✅ Resuelto — `# noqa: E501` + refactor |
 | DT-008 | UI sin historial de informes | 8 | ✅ Resuelto — `st.tabs` + `list_recientes` |
+| DT-013 | OOM WSL2 GICS+Cap2 | 9 | ✅ Resuelto — commit `7ddc127` + ADR-010 |
+| DT-014 | PDF fast-path anti-reingesta | 9 | ✅ Resuelto — `_document_already_ingested()` |
 
 ### Pendiente (Fase 9+)
 
 | ID | Fase | Componente | Descripción |
 |----|------|-----------|-------------|
 | DT-004 | monitor | `generate_informe.py` ≥380 líneas | Si el archivo crece, separar `_run_n1` en módulo propio |
-| DT-005 | 9 | E2E Cap5 con servicios reales | Test creado (`test_convergencia_e2e.py`); pendiente ejecutar con Ollama + OpenRouter reales |
-| DT-006 | 9 | PDF 120 págs validación real | `InformeConvergenciaLocal2026V3RvADAA.pdf` — confirmar no-OOM post-fix |
+| DT-005 | 9 | E2E Cap5 con servicios reales | Test creado (`test_convergencia_e2e.py`); pendiente ejecutar con OpenRouter reales |
 | DT-009 | 9 | Validación idioma global | `has_cjk_characters()` solo cubre Cap 1; extender a todos los caps N1+ |
 | DT-010 | 9 | CostTracker en Ollama | Ollama no expone tokens; registrar tiempo como proxy de costo en `HistorialInforme` |
 | DT-011 | 9+ | Fuentes EMIS/sectoriales | Ingestar PDFs privados con `PdfIngestor` ya disponible |
@@ -319,7 +323,7 @@ Ver `docs/decisions/FASE6_HALLAZGOS.md` para tiempos y issues conocidos.
 |----------|-----------|--------|
 | PostgreSQL + pgvector | `repositorio_postgres` Docker, `localhost:5434` | DB: `repositorio_ctie`, schema: `informes_ic` |
 | Ollama | Host (no Docker) | `http://127.0.0.1:11434` |
-| Modelos Ollama | Ollama host | `nomic-embed-text:latest` (embeddings 768d, 137MB), `qwen2.5:7b` (analítico, 4.7GB) |
+| Modelos Ollama | Ollama host | `nomic-embed-text:latest` (embeddings 768d, 137MB); `qwen3:8b` (fallback GICS/Cap2 solo sin `OPENROUTER_API_KEY`) |
 | Modelos API | OpenRouter | Tier free: `nemotron-super/ultra`, `llama-3.3-70b:free`; pago (fallback): `gemma-3-27b-it` — política ADR-006 |
 | Python runtime | `.venv` gestionado por `uv` | Python 3.12 |
 
@@ -361,6 +365,7 @@ LLM_CIRCUIT_BREAKER_MAX_RETRIES=3
 | ADR-007 | Gestión de memoria WSL2: keep_alive:0 + OPENBLAS threads | Aceptado |
 | ADR-008 | GenerateInforme orchestrator + patrón on_step callback | Aceptado |
 | ADR-009 | Refactor orchestrator Fase 7: límite 300 líneas aceptado + imports diferidos | Aceptado |
+| ADR-010 | Routing API-primero para GICS y Cap 2 por restricción de VRAM en WSL2 | Aceptado |
 
 ---
 

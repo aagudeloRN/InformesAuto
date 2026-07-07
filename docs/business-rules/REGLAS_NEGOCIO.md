@@ -45,16 +45,19 @@ documento comparten referencia.
 
 ---
 
-## RN-003 — Política de modelos: local-primero, API solo si supera umbral
+## RN-003 — Política de modelos: API-primero para LLM generativo, local solo para embeddings
 
-**Regla:** El LLM local (Ollama) tiene prioridad. La API externa (OpenRouter) se usa para caps
-analíticos y de síntesis que requieren mayor capacidad de razonamiento.
+**Regla:** El LLM generativo usa OpenRouter (free tier) como primario. Ollama solo corre
+`nomic-embed-text` (embeddings, 0.3 GB) y actúa como fallback de LLM cuando no hay
+`OPENROUTER_API_KEY`. Esto aplica desde ADR-010 por restricción de VRAM en WSL2.
 
-**Tiers (ver ADR-006):**
-- N0 (Cap 1, GICS): local Ollama con fallback API free
-- N1 (Caps 2-5): API free OpenRouter
-- N2 (Cap 6 Accionables): API free o synth
-- N3 (Resumen Ejecutivo): API synth
+**Tiers (ver ADR-006 y ADR-010):**
+- N0 Cap 1: `api_llm → api_llm_alt → local` (cadena fallback)
+- N0 GICS: `api_llm → local` (ADR-010: invertido respecto a ADR-002)
+- N1 Cap 2 Benchmarking: `api_llm → local` (ADR-010)
+- N1 Caps 3-4: `api_llm` (sin fallback local)
+- N2 Cap 5 Convergencia / Cap 6 Accionables: `api_llm_synth` / `api_llm`
+- N3 Resumen Ejecutivo: `api_llm_synth`
 
 **Prohibición absoluta:** Modelos top-tier (Claude-3, GPT-4o, Gemini Ultra, o1/o3). Presupuesto
 máximo: $1.00 USD por informe completo.

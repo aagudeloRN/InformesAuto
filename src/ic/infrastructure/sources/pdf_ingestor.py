@@ -48,6 +48,15 @@ def _chunk_exists(db_session, chunk_sha: str, schema: str) -> bool:
     return row is not None
 
 
+def _document_already_ingested(db_session, titulo: str, schema: str) -> bool:
+    """True si ya existe al menos un chunk con este título en el índice vectorial."""
+    sql = (
+        f"SELECT 1 FROM {schema}.embeddings_vectoriales "
+        "WHERE metadatos->>'titulo' = :titulo LIMIT 1"
+    )
+    return db_session.execute(text(sql), {"titulo": titulo}).fetchone() is not None
+
+
 def _release_vram(base_url: str, model: str) -> None:
     try:
         httpx.post(
@@ -84,6 +93,12 @@ class PdfIngestor:
         titulo_final = titulo or pdf_info.get("/Title") or Path(pdf_path).name
         autor_final = autor or pdf_info.get("/Author")
         año_str = str(año) if año else None
+
+        # Fast-path: si el documento ya está indexado, no re-procesar
+        with SessionLocal() as _db:
+            if _document_already_ingested(_db, titulo_final, schema):
+                logger.info("PDF ya indexado: '%s' — saltando re-ingesta", titulo_final)
+                return 0
 
         metadatos_base = {
             "titulo": titulo_final,
