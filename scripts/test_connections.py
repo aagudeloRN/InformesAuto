@@ -22,8 +22,8 @@ logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-import httpx
-import sqlalchemy
+import httpx  # noqa: E402
+import sqlalchemy  # noqa: E402
 
 VERDE = "\033[92m✅"
 ROJO = "\033[91m❌"

@@ -30,7 +30,6 @@ from ic.shared.types import (
     ClasificacionGICS,
     DescripcionEmpresa,
     InformePiloto,
-    Referencia,
 )
 
 settings = get_settings()
@@ -158,14 +157,14 @@ def test_apa_formatter_deduplication():
         fuente_tipo="web",
         fuente_url="https://example.com/page",
         score=0.9,
-        metadatos={"titulo": "Page A", "fuente_nombre": "example.com", "año": "2022", "autor": None},
+        metadatos={"titulo": "Page A", "fuente_nombre": "example.com", "año": "2022", "autor": None},  # noqa: E501
     )
     chunk_b = ChunkResult(
         chunk_texto="Texto B diferente",
         fuente_tipo="web",
         fuente_url="https://example.com/page",
         score=0.8,
-        metadatos={"titulo": "Page A", "fuente_nombre": "example.com", "año": "2022", "autor": None},
+        metadatos={"titulo": "Page A", "fuente_nombre": "example.com", "año": "2022", "autor": None},  # noqa: E501
     )
     refs = build_references_section([chunk_a, chunk_b])
     assert len(refs) == 1

@@ -3,9 +3,7 @@
 Todos los tests usan mocks — sin llamadas reales a OpenRouter, OpenAlex ni Tavily.
 """
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from ic.domain.chains.chain_04_tendencias import (
     build_chain_04,

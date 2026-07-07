@@ -15,7 +15,7 @@ SYSTEM_PROMPT_07 = (
     "sectoriales complejos en acciones concretas y ejecutables.\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Cada accionable debe estar sustentado en evidencia de las fuentes proporcionadas.\n"
-    "- Si no hay evidencia para un accionable, escribe: \"Dato no disponible en fuentes consultadas.\"\n"
+    "- Si no hay evidencia para un accionable, escribe: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
     "- No inventar datos, cifras ni tendencias.\n"
     "- IDIOMA OBLIGATORIO: Toda la respuesta en español latino neutro.\n\n"
     "REGLAS DE ESTILO:\n"
@@ -40,7 +40,7 @@ USER_PROMPT_07 = (
     "- Seguir con una descripción narrativa de al menos 150 palabras (storytelling, sin viñetas).\n"
     "- Cerrar con una justificación de por qué este accionable es prioritario, basada en los "
     "hallazgos del análisis.\n\n"
-    "Los 6 accionables deben cubrir diferentes dimensiones: competitividad, transformación digital, "
+    "Los 6 accionables deben cubrir diferentes dimensiones: competitividad, transformación digital, "  # noqa: E501
     "sostenibilidad, talento, ecosistema y desarrollo de mercado. No repetir dimensiones.\n"
 )
 

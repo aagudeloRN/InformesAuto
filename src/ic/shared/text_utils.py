@@ -24,7 +24,9 @@ def has_cjk_characters(text: str, threshold: int = 5) -> bool:
     return len(_CJK_RE.findall(text)) >= threshold
 
 
-def format_web_results_as_context(results: list[WebResult], max_chars_per_result: int = 1500) -> str:
+def format_web_results_as_context(
+    results: list[WebResult], max_chars_per_result: int = 1500
+) -> str:
     """Formatea una lista de WebResult como contexto numerado para el LLM."""
     parts = []
     for i, r in enumerate(results, 1):

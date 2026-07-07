@@ -1,6 +1,5 @@
 from datetime import date
 
-from ic.infrastructure.citation import apa_formatter
 from ic.infrastructure.docx_builder import DocxBuilder
 from ic.shared.types import InformePiloto
 

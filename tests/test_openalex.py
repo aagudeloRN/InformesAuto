@@ -6,8 +6,6 @@ para no depender de disponibilidad externa ni consumir rate limit.
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from ic.infrastructure.sources.openalex_connector import (
     OpenAlexConnector,
     _reconstruct_abstract,

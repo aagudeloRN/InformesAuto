@@ -15,7 +15,7 @@ SYSTEM_PROMPT_05 = (
     "América Latina.\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada afirmación clave con datos de las fuentes proporcionadas.\n"
-    "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"
+    "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
     "- No inventar actores, alianzas ni relaciones bajo ninguna circunstancia.\n"
     "- No menciones escasez de fuentes; solo reporta el estado del dato.\n"
     "- IDIOMA OBLIGATORIO: Toda la respuesta debe estar íntegramente en español latino neutro. "
@@ -42,7 +42,7 @@ USER_PROMPT_05 = (
     "\"El análisis del ecosistema empresarial identifica los actores clave que conforman la "
     "cadena de valor de la industria: proveedores, clientes, aliados, reguladores y agentes "
     "disruptores. Conocer este entorno permite a la empresa posicionarse estratégicamente, "
-    "anticipar dependencias críticas y detectar oportunidades de colaboración o diferenciación.\"\n\n"
+    "anticipar dependencias críticas y detectar oportunidades de colaboración o diferenciación.\"\n\n"  # noqa: E501
     "## 5.1. Ecosistema Local (Medellín / Colombia)\n\n"
     "Mapea los actores del ecosistema nacional relevantes para la empresa. "
     "Para cada categoría, presenta fichas con: **Nombre del actor** — Rol en el ecosistema — "

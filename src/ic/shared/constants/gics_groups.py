@@ -56,7 +56,8 @@ GICS_GROUPS: list[str] = [
     "electrónicos físicos: equipos de comunicación, smartphones, computadoras, servidores, "
     "componentes electrónicos y manufactura por contrato (EMS).",
     "Grupo 22 — Software y servicios (GICS 4510): Desarrollo de software de aplicación y de "
-    "sistemas, consultoría TI, integración de sistemas, infraestructura de internet y data centers.",
+    "sistemas, consultoría TI, integración de sistemas, infraestructura de internet "
+    "y data centers.",
     "Grupo 23 — Medios y entretenimiento (GICS 5020): Creación y distribución de contenido: "
     "publicidad, radiodifusión, cable, editoriales, producción de cine/música, videojuegos y "
     "plataformas digitales/redes sociales.",

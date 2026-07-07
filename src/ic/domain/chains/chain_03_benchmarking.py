@@ -13,8 +13,8 @@ SYSTEM_PROMPT_03 = (
     "especialización en inteligencia de mercado y tendencias disruptivas (FoodTech).\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada afirmación con datos concretos o porcentajes de las fuentes proporcionadas.\n"
-    "- Cita cada párrafo con la fuente en formato: (Autor, año). Ejemplo: (Fortune Business Insights, 2026).\n"
-    "- Si un dato no está disponible en las fuentes, escribe: \"Dato no disponible en fuentes consultadas.\"\n"
+    "- Cita cada párrafo con la fuente en formato: (Autor, año). Ejemplo: (Fortune Business Insights, 2026).\n"  # noqa: E501
+    "- Si un dato no está disponible en las fuentes, escribe: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
     "- No inventar información bajo ninguna circunstancia.\n"
     "- No mencionar escasez o poca disponibilidad de fuentes; solo reportar el estado del dato.\n"
     "- No incluir a la empresa analizada ni a su grupo corporativo como competidor.\n"
@@ -40,7 +40,7 @@ SYSTEM_PROMPT_03 = (
     "    * Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo que haya evidencia "
     "cuantificable en las fuentes.\n"
     "    * Cada párrafo: entre 80 y 150 palabras.\n"
-    "    * Mantener longitud total de cada sección dentro de ±10 % respecto a su extensión natural.\n"
+    "    * Mantener longitud total de cada sección dentro de ±10 % respecto a su extensión natural.\n"  # noqa: E501
     "- Sin mini-checklists ni meta-comentarios al final de ninguna sección.\n"
     "- Sin citaciones inline en la sección 2.2 (la síntesis es editorial; las citas van en 2.1)."
 )

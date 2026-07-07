@@ -13,7 +13,7 @@ SYSTEM_PROMPT_04 = (
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada afirmación clave con datos de las fuentes proporcionadas.\n"
     "- Indica el nivel de confianza (Alto/Medio/Bajo) de las afirmaciones clave y justifícalo.\n"
-    "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"
+    "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
     "- No inventar información bajo ninguna circunstancia.\n"
     "- No menciones escasez de fuentes; solo reporta el estado del dato.\n"
     "- IDIOMA OBLIGATORIO: Toda la respuesta debe estar íntegramente en español latino neutro. "

@@ -3,13 +3,12 @@
 import pytest
 
 from ic.infrastructure.llm.gateway import (
-    CostTracker,
     _PRICING,
+    CostTracker,
     build_api_llm,
     build_llm,
 )
 from ic.shared.config import get_settings
-
 
 settings = get_settings()
 

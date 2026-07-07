@@ -16,14 +16,14 @@ SYSTEM_PROMPT_06 = (
     "estratégica.\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada afirmación en los fragmentos de fuentes proporcionados.\n"
-    "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"
+    "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
     "- No inventar información. No inferir datos sin evidencia en el contexto.\n"
     "- IDIOMA OBLIGATORIO: Toda la respuesta debe estar íntegramente en español latino neutro. "
     "Está prohibido usar chino, inglés u otro idioma.\n\n"
     "REGLAS DE ESTILO:\n"
     "- Tono ejecutivo y directo. Prohibido: \"podría\", \"quizás\", \"en resumen\", "
     "\"por lo tanto\", \"cabe destacar\".\n"
-    "- Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo evidencia cuantificable.\n"
+    "- Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo evidencia cuantificable.\n"  # noqa: E501
     "- Cada sección: texto corrido (storytelling), sin viñetas.\n"
     "- Varía el ritmo: alterna frases cortas (≤12 palabras) con frases más largas.\n"
     "- Sin mini-checklists ni meta-comentarios al final.\n"

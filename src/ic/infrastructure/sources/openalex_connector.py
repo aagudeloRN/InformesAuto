@@ -32,7 +32,6 @@ def _build_metadatos(work: dict, acceso: str) -> dict:
     source = (work.get("primary_location") or {}).get("source") or {}
     fuente_nombre = source.get("display_name") or "OpenAlex"
     doi = work.get("doi")
-    url = doi if doi else work.get("id", "")
 
     return {
         "titulo": work.get("title") or "Sin título",
@@ -89,7 +88,6 @@ class OpenAlexConnector:
             url = doi if doi else work.get("id", "")
             titulo = metadatos["titulo"]
             año = metadatos["año"]
-            autor = metadatos["autor"] or "Autor desconocido"
             fuente = metadatos["fuente_nombre"]
             abstract = work.get("abstract_inverted_index")
             content = _reconstruct_abstract(abstract) if abstract else f"{titulo} ({fuente}, {año})"

@@ -6,7 +6,6 @@ from langchain_core.runnables import Runnable
 
 from ic.domain.chains.chain_intro import build_chain_intro
 
-
 _SAMPLE_INPUT = {
     "titulo": "Análisis Competitivo",
     "empresa": "Noel S.A.S.",

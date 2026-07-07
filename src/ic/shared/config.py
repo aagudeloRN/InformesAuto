@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_api_key: str = ""
     llm_api_free_model: str = ""      # tier free primario (Nemotron Super 120B)
-    llm_api_free_alt_model: str = ""  # tier free alternativo (ej: meta-llama/llama-3.3-70b-instruct:free)
+    llm_api_free_alt_model: str = ""  # tier free alternativo (ej: meta-llama/llama-3.3-70b-instruct:free)  # noqa: E501
     llm_api_synth_model: str = ""     # tier síntesis free (Nemotron Ultra)
     llm_api_paid_model: str = ""      # respaldo pago (Gemma 3)
 

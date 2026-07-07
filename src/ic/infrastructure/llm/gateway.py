@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, Iterator, Literal
+from typing import Any, Literal
 
 import httpx
 from langchain_core.callbacks import CallbackManagerForLLMRun
@@ -44,13 +45,17 @@ class CostTracker:
     def add_call(self, modelo: str, tokens_in: int, tokens_out: int) -> CallRecord:
         precio_in, precio_out = _PRICING.get(modelo, (0.0, 0.0))
         costo = tokens_in * precio_in + tokens_out * precio_out
-        record = CallRecord(modelo=modelo, tokens_in=tokens_in, tokens_out=tokens_out, costo_usd=costo)
+        record = CallRecord(
+            modelo=modelo, tokens_in=tokens_in, tokens_out=tokens_out, costo_usd=costo
+        )
         self._calls.append(record)
         return record
 
     def add_local_call(self, tokens_in: int, tokens_out: int) -> None:
         """Compatibilidad con código legado — las llamadas locales no tienen costo."""
-        self._calls.append(CallRecord(modelo="local", tokens_in=tokens_in, tokens_out=tokens_out, costo_usd=0.0))
+        self._calls.append(
+            CallRecord(modelo="local", tokens_in=tokens_in, tokens_out=tokens_out, costo_usd=0.0)
+        )
 
     def within_budget(self) -> bool:
         return self.total_cost() <= self._budget_limit
@@ -96,7 +101,7 @@ class OllamaGatewayLLM(BaseChatModel):
         def _call() -> str:
             resp = httpx.post(
                 f"{self.base_url}/api/chat",
-                json={"model": self.model, "messages": ollama_msgs, "stream": False, "keep_alive": 0},
+                json={"model": self.model, "messages": ollama_msgs, "stream": False, "keep_alive": 0},  # noqa: E501
                 timeout=self.timeout,
             )
             resp.raise_for_status()

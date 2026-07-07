@@ -39,7 +39,7 @@ USER_PROMPT_08 = (
     "integrado de los capítulos.\n\n"
     "5. **Hallazgos clave**: Los 3 hallazgos más importantes del análisis (benchmarking, "
     "tendencias, ecosistema, convergencia territorial, accionables).\n\n"
-    "6. **Conclusión y llamado a la acción**: Cierra con una frase que motive la acción inmediata.\n"
+    "6. **Conclusión y llamado a la acción**: Cierra con una frase que motive la acción inmediata.\n"  # noqa: E501
 )
 
 
