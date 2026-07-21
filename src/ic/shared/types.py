@@ -39,6 +39,7 @@ class CapBenchmarking:
     n_chunks_usados: int
     retrieval_suficiente: bool
     chunks_usados: list["ChunkResult"] = field(default_factory=list)
+    tabla_data: list[list[str]] | None = None  # datos estructurados para tabla Word (T11.3)
 
 
 @dataclass

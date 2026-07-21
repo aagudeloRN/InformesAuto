@@ -20,6 +20,7 @@ from ic.infrastructure.citation.apa_formatter import (
 )
 from ic.infrastructure.docx_builder import DocxBuilder
 from ic.infrastructure.llm.gateway import build_api_llm, build_llm
+from ic.infrastructure.render.docx_renderer import DocxRenderer
 from ic.infrastructure.retrieval.embedder import Embedder
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
@@ -211,11 +212,10 @@ def _make_informe() -> InformePiloto:
 
 def test_assembler_with_mock_informe(tmp_path):
     out = str(tmp_path / "piloto.docx")
-    builder = DocxBuilder()
-    assembler = PilotAssembler(builder)
-
     informe = _make_informe()
-    result_path = assembler.assemble(informe, out)
+
+    report_doc = PilotAssembler().build(informe)
+    result_path = DocxRenderer().render(report_doc, out)
 
     assert result_path == out
     doc = Document(out)
@@ -277,8 +277,8 @@ def test_pilot_end_to_end_noel(tmp_path):
         referencias=refs,
     )
 
-    assembler = PilotAssembler(DocxBuilder())
-    result_path = assembler.assemble(informe, out)
+    report_doc = PilotAssembler().build(informe)
+    result_path = DocxRenderer().render(report_doc, out)
 
     doc = Document(result_path)
     all_text = " ".join(p.text for p in doc.paragraphs)
