@@ -8,8 +8,6 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-logger = logging.getLogger(__name__)
-
 import httpx
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models import BaseChatModel
@@ -18,6 +16,8 @@ from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResu
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ic.shared.config import Settings
+
+logger = logging.getLogger(__name__)
 
 # Precios en USD por token (in, out). Los modelos :free tienen costo $0.
 _PRICING: dict[str, tuple[float, float]] = {
@@ -208,7 +208,11 @@ class OpenRouterGatewayLLM(BaseChatModel):
                 logger.warning("OpenRouter error en body (model=%s): %s", self.model, err)
                 raise RuntimeError(f"OpenRouter error: {err}")
             if "choices" not in data or not data["choices"]:
-                logger.error("OpenRouter respuesta inesperada (sin choices, model=%s): %s", self.model, data)
+                logger.error(
+                    "OpenRouter respuesta inesperada (sin choices, model=%s): %s",
+                    self.model,
+                    data,
+                )
                 raise RuntimeError(f"OpenRouter sin 'choices' (model={self.model}): {data}")
             return data
 
@@ -257,7 +261,11 @@ class OpenRouterGatewayLLM(BaseChatModel):
                 if line.startswith("data: "):
                     chunk_data = json.loads(line[6:])
                     if "error" in chunk_data:
-                        logger.error("OpenRouter stream error (model=%s): %s", self.model, chunk_data["error"])
+                        logger.error(
+                            "OpenRouter stream error (model=%s): %s",
+                            self.model,
+                            chunk_data["error"],
+                        )
                         raise RuntimeError(f"OpenRouter stream error: {chunk_data['error']}")
                     if "choices" not in chunk_data or not chunk_data["choices"]:
                         continue
