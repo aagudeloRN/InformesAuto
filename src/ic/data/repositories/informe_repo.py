@@ -37,6 +37,7 @@ class InformeRepository:
         tiempo_s: float | None = None,
         tokens_in: int | None = None,
         tokens_out: int | None = None,
+        metricas: dict | None = None,
     ) -> None:
         informe = self._db.get(HistorialInforme, informe_id)
         if informe is None:
@@ -50,6 +51,8 @@ class InformeRepository:
             informe.tokens_in = tokens_in
         if tokens_out is not None:
             informe.tokens_out = tokens_out
+        if metricas is not None:
+            informe.metricas_fiabilidad = metricas
         informe.completed_at = datetime.now(UTC)
         self._db.commit()
 

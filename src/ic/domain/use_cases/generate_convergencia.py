@@ -13,6 +13,7 @@ from ic.domain.chains.chain_06_convergencia import format_chunks_as_context
 from ic.domain.chains.chain_06a_convergencia_eje import EJE_MERCADO, EJE_SOCIAL, EJE_TECNOLOGICO
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
+from ic.shared.text_utils import has_cjk_characters
 from ic.shared.types import CapConvergencia, ChunkResult
 
 _MIN_CHUNKS = 5
@@ -91,6 +92,16 @@ class GenerateConvergencia:
                 "retrieval_caps_anteriores": context_caps,
                 "retrieval_convergencia_territorial": context_territorial,
             })
+            if has_cjk_characters(texto):
+                return CapConvergencia(
+                    texto=build_absent_paragraph(
+                        "Cap 5 — Convergencia Empresarial",
+                        "El modelo generó texto en un idioma incorrecto (no español)",
+                    ),
+                    n_chunks_usados=len(unique_chunks),
+                    retrieval_suficiente=False,
+                    chunks_usados=unique_chunks,
+                )
             return CapConvergencia(texto=texto, n_chunks_usados=len(unique_chunks),
                                    retrieval_suficiente=True, chunks_usados=unique_chunks)
 
@@ -107,6 +118,17 @@ class GenerateConvergencia:
         texto_final = self._chain_synth.invoke({
             "partes": "\n\n---\n\n".join([texto_tec, texto_soc, texto_mer])
         })
+
+        if has_cjk_characters(texto_final):
+            return CapConvergencia(
+                texto=build_absent_paragraph(
+                    "Cap 5 — Convergencia Empresarial",
+                    "El modelo generó texto en un idioma incorrecto (no español)",
+                ),
+                n_chunks_usados=len(unique_chunks),
+                retrieval_suficiente=False,
+                chunks_usados=unique_chunks,
+            )
 
         return CapConvergencia(
             texto=texto_final,

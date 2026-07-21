@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     # Aplicación
     app_env: str = "development"
     log_level: str = "INFO"
+    informe_disclaimer: str = (
+        "Informe generado automáticamente por IA. "
+        "Los contenidos deben ser verificados por un analista antes de su uso."
+    )
 
 
 @lru_cache

@@ -3,6 +3,7 @@ from langchain_core.runnables import Runnable
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
 from ic.domain.chains.chain_07_accionables import format_chunks_as_context
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
+from ic.shared.text_utils import has_cjk_characters
 from ic.shared.types import CapAccionables
 
 _MIN_CHUNKS = 6
@@ -44,6 +45,17 @@ class GenerateAccionables:
             "sector_gics": sector_gics,
             "retrieval_cruzado": context,
         })
+
+        if has_cjk_characters(texto):
+            return CapAccionables(
+                texto=build_absent_paragraph(
+                    "Cap 6 — Accionables Estratégicos",
+                    "El modelo generó texto en un idioma incorrecto (no español)",
+                ),
+                n_chunks_usados=len(chunks),
+                retrieval_suficiente=False,
+                chunks_usados=chunks,
+            )
 
         return CapAccionables(
             texto=texto,

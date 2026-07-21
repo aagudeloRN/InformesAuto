@@ -7,6 +7,7 @@ from ic.domain.chains.chain_05_ecosistema import (
 )
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
+from ic.shared.text_utils import has_cjk_characters
 from ic.shared.types import CapEcosistema
 
 _MIN_CHUNKS = 3
@@ -65,6 +66,17 @@ class GenerateEcosistema:
             "retrieval_sector": context,
             "fuentes_web": web_context,
         })
+
+        if has_cjk_characters(texto):
+            return CapEcosistema(
+                texto=build_absent_paragraph(
+                    "Cap 4 — Ecosistema Empresarial",
+                    "El modelo generó texto en un idioma incorrecto (no español)",
+                ),
+                n_chunks_usados=len(chunks),
+                retrieval_suficiente=False,
+                chunks_usados=chunks,
+            )
 
         return CapEcosistema(
             texto=texto,
