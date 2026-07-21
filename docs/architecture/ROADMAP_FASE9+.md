@@ -519,113 +519,156 @@ Confirma el mensaje de commit conmigo. Pregunta si algo no está claro.
 
 ---
 
-# FASE 13 — Repositorio Sectorial RAG (26 sectores)
+# FASE 13 — Repositorio Sectorial RAG
 
-**Prioridad:** P1 (mayor palanca de calidad de evidencia) · **Estimación:** ~4–6 días · **Estado:** ⬜ Pendiente
+**Prioridad:** P1 (mayor palanca de calidad de evidencia) · **Estimación:** ~5–7 días · **Estado:** ⬜ Pendiente
 
 ### Objetivo
-Integrar el **repositorio de vigilancias sectoriales de 26 sectores industriales** (PDFs)
-como corpus curado del RAG, de modo que los informes se anclen en evidencia sectorial
-específica para Colombia en vez de solo web genérica. Es la mayor palanca de **fiabilidad**
-y el diferenciador comercial.
+Convertir los documentos sectoriales (EMIS/informes industriales + papers académicos en PDF)
+en un **corpus curado con filtrado por sector GICS**, gestionado desde la UI, con ciclo de vida
+controlado (activar/desactivar/borrar). El retrieval priorizará chunks del corpus del sector
+correcto antes de buscar en la web genérica.
+
+### Decisiones ya tomadas (2026-07-21 — no re-discutir)
+1. **Tipos de documentos:** PDFs sectoriales (EMIS, reportes industriales) + papers académicos.
+   Mismo flujo de ingesta para ambos.
+2. **Metadatos:** cada documento lleva `sector_gics` (ej. `"Consumer Staples"`) y opcionalmente
+   `empresa_nombre`. El retrieval filtra por `sector_gics` del informe activo antes de buscar.
+3. **Ingesta:** el analista sube PDFs manualmente desde un panel en la UI Streamlit.
+4. **Ciclo de vida:** columna `activo: bool = True` en `DocumentoLocal`. Desactivar excluye
+   chunks del retrieval sin borrarlos. Panel permite: listar, activar/desactivar y borrar.
+5. **Carga masiva inicial:** script `scripts/ingest_batch.py` con CSV de índice para los
+   26+ docs existentes (columnas: archivo, sector_gics, tipo, autor, año, empresa).
 
 ### Contexto / por qué
-- La infraestructura ya existe: `PdfIngestor` (RN-010, ingesta por lotes anti-OOM), pgvector,
-  doble vía RN-004. Falta curar, mapear a sector/GICS y **priorizar** ese corpus en el retrieval.
-- El equipo tiene **otro proyecto con un sistema RAG "bastante bueno"**; en esta fase se
-  estudia para incorporar elementos aprovechables (chunking, reranking, filtros, evaluación).
-- Se limpia el acoplamiento del PDF hardcodeado en `_run_pdf` (DT-017) generalizándolo a
-  "corpus sectorial".
+- La infraestructura ya existe: `PdfIngestor` (RN-010), pgvector, `DocumentoLocal`
+  (ya tiene `empresa_id`, `tipo`, `metadatos`). Falta `sector_gics`, `activo` y la UI de gestión.
+- Los 26+ PDFs se ingestan una vez; el retrieval sectorial reemplaza la búsqueda web genérica
+  para evidence sectorial, mejorando fiabilidad y reduciendo costo Tavily.
+- Se limpia `_run_pdf` hardcodeado (DT-017).
 
 ### Lecturas requeridas al iniciar
 - `docs/architecture/ROADMAP_FASE9+.md` → esta sección (Fase 13)
-- `docs/architecture/ADR-001` (RAG propio), `ADR-003` (fuentes doble vía), `ADR-005` (retrieval)
+- `docs/architecture/ADR-001` (RAG propio), `ADR-003` (fuentes), `ADR-005` (retrieval)
 - `docs/business-rules/REGLAS_NEGOCIO.md` (RN-004, RN-010)
-- `src/ic/infrastructure/sources/pdf_ingestor.py`
-- `src/ic/infrastructure/retrieval/pgvector_store.py`, `chunker.py`, `embedder.py`
-- `src/ic/data/repositories/embedding_repo.py` (`search_similar`)
-- `src/ic/shared/constants/gics_groups.py` (mapeo GICS existente)
-- `src/ic/domain/use_cases/generate_informe.py` (`_run_pdf`, `_run_n1`, `_run_n2`)
-- **Externo:** el proyecto RAG del equipo en **`~/Test/RepositorioRN`** + carpeta de PDFs
-  sectoriales (el usuario la coloca al arrancar la fase) + CSV de equivalencia CIIU/GICS (§7-Q3)
+- `src/ic/data/models/documento_local.py` (DocumentoLocal — base a extender)
+- `src/ic/data/models/embedding_vectorial.py` (EmbeddingVectorial — sin cambiar tabla)
+- `src/ic/shared/constants/__init__.py` (TipoDocumento, FuenteTipo actuales)
+- `src/ic/infrastructure/sources/pdf_ingestor.py` (firma de ingest_batched)
+- `src/ic/infrastructure/retrieval/pgvector_store.py` (search — añadir filtros)
+- `src/ic/data/repositories/embedding_repo.py` (search_similar)
+- `src/ic/shared/constants/gics_groups.py` (sectores GICS disponibles)
+- `src/ic/presentation/app.py` (patrón UI existente — pestaña Historial como referencia)
+- **Externo:** carpeta con los PDFs sectoriales + CSV de índice (el usuario los provee al arrancar)
 
-### Tareas
-- [ ] **T13.1** Estudiar el RAG del otro proyecto del equipo: documentar qué elementos vale la
-      pena incorporar (chunking, reranking, filtros por metadatos, evaluación de retrieval).
-      Registrar en un ADR si cambia el diseño de retrieval actual.
-- [ ] **T13.2** Mapeo **sector → GICS/CIIU**: tabla en `shared/constants/` que asocie cada uno
-      de los 26 sectores a su(s) grupo(s) GICS (reusa `gics_groups.py`).
-- [ ] **T13.3** Ingesta curada de los 26 PDFs con `PdfIngestor`, metadata rica:
-      `fuente_tipo="sectorial"`, `sector_codigo`, `año`, `fuente_nombre`, versión. Script/UI
-      de gestión del corpus. Anti-duplicados SHA-256 ya existe.
-- [ ] **T13.4** Retrieval con **prioridad sectorial**: tras GICS (Cap 2), seleccionar el/los
-      dossier(s) del sector y hacer boost/filtrado de esos chunks en Caps 3/4/5. Extender
-      `search_similar()` con filtro por `sector_codigo`.
-- [ ] **T13.5** Generalizar `_run_pdf` (DT-017): de un PDF hardcodeado a "cargar corpus
-      sectorial relevante según GICS".
-- [ ] **T13.6** Citación de fuentes sectoriales en APA (coordina con Fase 10) + registro de
-      vigencia/frescura del dossier.
-- [ ] **T13.7** Evaluación: medir en 2–3 empresas si baja el % de "datos ausentes" y sube el
-      nº de fuentes citadas frente a la línea base sin corpus sectorial.
+### Tareas — Parte A: Diseño (antes de código)
+- [ ] **T13.A** Leer esquema actual → proponer cambios → ADR-012 → esperar aprobación:
+  - `DocumentoLocal`: añadir `sector_gics TEXT`, `activo BOOL DEFAULT TRUE`.
+    Migración idempotente `ensure_documento_columns()` (patrón de `ensure_historial_columns()`).
+  - `EmbeddingVectorial`: NO cambiar tabla; propagar `sector_gics` a `metadatos` JSONB
+    de cada chunk en ingesta (más simple que JOIN en query pgvector) O añadir columna
+    `sector_gics TEXT` directa (decide según benchmark de query).
+  - `TipoDocumento`: añadir `PAPER_ACADEMICO = "paper_academico"`.
+  - `PGVectorStore.search(query, k, sector_gics=None, solo_activos=True)`: evaluar si
+    filtro va en la query pgvector (IVFFlat soporta WHERE) o post-filtrado en Python.
+
+### Tareas — Parte B: Implementación
+- [ ] **T13.1** Migraciones BD + constantes: `sector_gics`, `activo` en `DocumentoLocal`;
+      `PAPER_ACADEMICO` en `TipoDocumento`. Tests de migración.
+- [ ] **T13.2** `PdfIngestor.ingest_batched()`: añadir `sector_gics: str | None` a firma;
+      propagar a `metadatos` de cada chunk.
+- [ ] **T13.3** `PGVectorStore.search()` con filtros: `sector_gics` + `solo_activos`.
+      Actualizar todos los callers (use cases N1/N2). Tests unitarios con mocks.
+- [ ] **T13.4** Panel "Repositorio" en app.py (nueva pestaña):
+      subida PDF + metadatos (sector GICS, tipo, año, autor, empresa opcional);
+      listado con toggle activo/inactivo y borrado con confirmación.
+- [ ] **T13.5** Script `scripts/ingest_batch.py`: lee `indice.csv`, procesa cada PDF con
+      `PdfIngestor`, loguea resultados. Para carga masiva inicial de los 26+ docs.
+- [ ] **T13.6** Generalizar `_run_pdf` en `generate_informe.py` (DT-017): de PDF
+      hardcodeado a "cargar documentos activos del sector GICS del informe".
+- [ ] **T13.7** Evaluación: con 2–3 empresas, comparar nº de fuentes sectoriales citadas
+      vs. línea base sin corpus. Reportar en FASE13_HALLAZGOS.md.
+- [ ] **T13.8** *(Opcional)* Estudiar RAG de `~/Test/RepositorioRN`: documentar si hay
+      chunking, reranking o filtros aprovechables. Registrar en ADR si cambia diseño.
 
 ### Entregables
-- Corpus sectorial ingestado y consultable, con mapeo sector→GICS.
-- Retrieval con prioridad sectorial + filtro por `sector_codigo`.
-- Estudio del RAG del otro proyecto (doc/ADR) con elementos incorporados.
-- `_run_pdf` generalizado (sin hardcodes).
-- `docs/decisions/FASE13_HALLAZGOS.md` + posible ADR-012 (retrieval sectorial).
+- `DocumentoLocal` con `sector_gics` y `activo`; migración idempotente.
+- `PdfIngestor` y `PGVectorStore` con filtrado sectorial.
+- Panel Streamlit "Repositorio": subir, listar, activar/desactivar, borrar.
+- Script `ingest_batch.py` para carga masiva con CSV.
+- `_run_pdf` generalizado (DT-017 cerrado).
+- `docs/decisions/FASE13_HALLAZGOS.md` + ADR-012 (filtrado sectorial).
 
 ### Criterios de aceptación
-1. Un informe de una empresa de sector X prioriza chunks del dossier de sector X (test/log).
-2. Los 26 PDFs (o el subconjunto disponible) están ingestados con metadata correcta.
-3. Comparación con línea base: mejora medible en cobertura de evidencia (T13.7).
-4. `_run_pdf` ya no depende de un nombre de archivo hardcodeado.
+1. Un informe de sector X prioriza chunks de documentos con `sector_gics=X` (test/log).
+2. Desactivar un documento excluye sus chunks del siguiente informe (test o demo).
+3. Los 26+ PDFs ingestados con metadata correcta (verificar n_chunks en panel).
+4. `_run_pdf` ya no hardcodea nombre de archivo.
 5. Gate ruff + pytest verde. Tablero, deuda técnica y ADR actualizados.
 
 ### Riesgos
-- Volumen: 26 PDFs pueden ser muchas páginas → ingesta por lotes y tiempos (RN-010). Puede
-  requerir una corrida de ingesta larga fuera del pipeline de informe.
-- El RAG del otro proyecto puede asumir infra distinta; incorporar solo lo compatible con
-  ADR-001/005 (RAG propio pgvector local).
-- Calidad heterogénea de los PDFs (OCR, tablas) → validar extracción de texto.
+- Volumen de PDFs: ingesta larga (~5–30 min para 26 docs). Ejecutar script fuera del
+  pipeline de informe con nohup o tmux.
+- Calidad de extracción de texto en PDFs con tablas/OCR → validar muestra antes de ingestar todo.
+- Filtro sectorial en pgvector: benchmarkear JOIN vs. JSONB vs. columna TEXT antes de decidir.
 
 ### PROMPT DE ARRANQUE — Fase 13
 ```text
-Estás ejecutando la FASE 13 (Repositorio Sectorial RAG — 26 sectores) del roadmap del
-sistema de Informes de Inteligencia Competitiva. Trabaja según CLAUDE.md y PRIME DIRECTIVE.
+Estás ejecutando la FASE 13 (Repositorio Sectorial RAG) del sistema de Informes de IC.
+Trabaja según CLAUDE.md y PRIME_DIRECTIVE.md.
 
-Antes de empezar, necesito de mí (el usuario) dos datos si no están en el roadmap: la ruta de
-los 26 PDFs sectoriales y la ruta del proyecto RAG del equipo a estudiar. Pídemelos si faltan.
+ANTES DE EMPEZAR — pídeme al usuario:
+1. La ruta de la carpeta con los PDFs sectoriales (ej. ~/documentos_sectoriales/)
+2. Si existe, la ruta del CSV de índice (archivo, sector_gics, tipo, autor, año, empresa)
+   Si no existe, lo crearemos juntos en el PASO A3.
+3. Si quieres que revise el RAG del equipo en ~/Test/RepositorioRN (opcional).
 
-PASO 1 — LEE:
-- docs/architecture/ROADMAP_FASE9+.md → sección "FASE 13"
-- docs/decisions/FASE12_HALLAZGOS.md
-- docs/architecture/ADR-001, ADR-003, ADR-005
-- docs/business-rules/REGLAS_NEGOCIO.md (RN-004, RN-010)
-- src/ic/infrastructure/sources/pdf_ingestor.py
-- src/ic/infrastructure/retrieval/ (pgvector_store, chunker, embedder)
-- src/ic/data/repositories/embedding_repo.py (search_similar)
-- src/ic/shared/constants/gics_groups.py
-- src/ic/domain/use_cases/generate_informe.py (_run_pdf, _run_n1/_run_n2)
-- (externo) el proyecto RAG del equipo y la carpeta de los 26 PDFs
+DECISIONES YA TOMADAS (no re-discutir, vienen del cierre de Fase 11):
+- Tipos: PDFs sectoriales + papers académicos (mismo flujo de ingesta).
+- Metadatos: sector_gics + empresa_nombre opcional. Retrieval filtra por sector_gics.
+- Ingesta: UI Streamlit (panel "Repositorio") + script CLI para lote inicial.
+- Ciclo de vida: activo:bool en DocumentoLocal. Toggle en UI sin borrar chunks.
 
-PASO 2 — Estudia el RAG del otro proyecto (T13.1) y documenta qué incorporar.
+PASO 0 — Ramas:
+  git log --oneline -5  (confirma merge de Fase 12)
+  git checkout develop && git checkout -b feature/fase13-rag-sectorial
 
-PASO 3 — Entra en Plan Mode. Propón: mapeo sector→GICS, esquema de metadata sectorial,
-estrategia de ingesta, retrieval con prioridad sectorial, y generalización de _run_pdf.
-Considera ADR-012. Espera aprobación.
+PASO 1 — Gate de entrada:
+  uv run ruff check src/ tests/ -q && uv run pytest -m "not slow" -q
 
-PASO 4 — Ejecuta T13.2–T13.7. Ingesta el corpus (puede ser una corrida larga separada).
+PASO 2 — LEE el esquema actual (OBLIGATORIO antes de planificar):
+  - docs/architecture/ROADMAP_FASE9+.md → sección "FASE 13" (decisiones ya tomadas + tareas)
+  - src/ic/data/models/documento_local.py (DocumentoLocal — base)
+  - src/ic/data/models/embedding_vectorial.py (EmbeddingVectorial)
+  - src/ic/shared/constants/__init__.py (TipoDocumento, FuenteTipo)
+  - src/ic/infrastructure/sources/pdf_ingestor.py (ingest_batched firma actual)
+  - src/ic/infrastructure/retrieval/pgvector_store.py (search — sin filtros hoy)
+  - src/ic/data/repositories/embedding_repo.py (search_similar)
+  - src/ic/shared/constants/gics_groups.py
+  - src/ic/presentation/app.py (pestaña Historial — patrón UI a replicar)
+  - src/ic/domain/use_cases/generate_informe.py (_run_pdf hardcodeado — DT-017)
 
-PASO 5 — Gate: ruff limpio + pytest -m "not slow" verde. Corre la evaluación T13.7 y reporta
-la mejora frente a la línea base.
+PASO 3 — Entra en Plan Mode (PARTE A — solo diseño, sin código):
+  Propón T13.A: cambios al esquema (sector_gics, activo, PAPER_ACADEMICO),
+  estrategia de filtrado en pgvector (columna vs. JSONB — justificar con query plan),
+  y firma nueva de PGVectorStore.search(). Incluye ADR-012 como entregable.
+  Espera aprobación.
 
-PASO 6 — Documenta en docs/decisions/FASE13_HALLAZGOS.md y, si aplica, ADR-012.
+PASO 4 — Ejecuta T13.1–T13.7 en orden (Parte B). Gate ruff+pytest tras cada tarea.
+  Nota: T13.5 (ingest_batch.py) puede requerir una corrida larga fuera del pipeline;
+  usar nohup o tmux si hay muchos docs.
 
-PASO 7 — Actualiza ROADMAP_FASE9+.md: tablero §4 (Fase 13), deuda técnica §5 (DT-011,
-DT-017), lista de ADR, changelog §8. Marca tareas T13.x. Si surgen nuevas fases, añádelas.
+PASO 5 — Gate final + evaluación T13.7: comparar cobertura de fuentes vs. línea base.
 
-Confirma el mensaje de commit conmigo. Pregunta si algo no está claro.
+PASO 6 — Documenta en docs/decisions/FASE13_HALLAZGOS.md + ADR-012.
+
+PASO 7 — Actualiza ROADMAP_FASE9+.md: tablero §4 (Fase 13), deuda §5 (DT-011, DT-017,
+DT-019), lista de ADR, changelog §8. Marca tareas T13.x.
+
+PASO 8 — Confirma el commit conmigo (Conventional Commits). Commitea y mergea a
+`develop` con --no-ff.
+
+Pregunta si algo no está claro antes de empezar.
 ```
 
 ---
