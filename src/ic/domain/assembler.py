@@ -3,10 +3,16 @@ from datetime import date
 from ic.infrastructure.docx_builder import DocxBuilder
 from ic.shared.types import InformePiloto
 
+_DEFAULT_DISCLAIMER = (
+    "Informe generado automáticamente por IA. "
+    "Los contenidos deben ser verificados por un analista antes de su uso."
+)
+
 
 class PilotAssembler:
-    def __init__(self, builder: DocxBuilder) -> None:
+    def __init__(self, builder: DocxBuilder, disclaimer: str = _DEFAULT_DISCLAIMER) -> None:
         self._builder = builder
+        self._disclaimer = disclaimer
 
     def assemble(self, informe: InformePiloto, output_path: str) -> str:
         b = self._builder
@@ -60,10 +66,8 @@ class PilotAssembler:
             b.add_paragraph(ref.apa_string)
 
         b.add_paragraph("")
-        b.add_paragraph(
-            "Informe generado automáticamente — piloto NOEL. "
-            "Los contenidos son generados por IA y deben ser verificados por un analista."
-        )
+        if self._disclaimer:
+            b.add_paragraph(self._disclaimer)
 
         b.save(output_path)
         return output_path

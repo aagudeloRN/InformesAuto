@@ -8,6 +8,7 @@ from ic.domain.chains.chain_04_tendencias import (
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.openalex_connector import OpenAlexConnector
 from ic.infrastructure.sources.web_connector import WebConnector
+from ic.shared.text_utils import has_cjk_characters
 from ic.shared.types import CapTendencias
 
 _MIN_CHUNKS = 3
@@ -79,6 +80,17 @@ class GenerateTendencias:
             "retrieval_sector": context,
             "fuentes_academicas": academic_context,
         })
+
+        if has_cjk_characters(texto):
+            return CapTendencias(
+                texto=build_absent_paragraph(
+                    "Cap 3 — Análisis Tendencial",
+                    "El modelo generó texto en un idioma incorrecto (no español)",
+                ),
+                n_chunks_usados=len(chunks),
+                retrieval_suficiente=False,
+                chunks_usados=chunks,
+            )
 
         return CapTendencias(
             texto=texto,

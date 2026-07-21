@@ -4,6 +4,7 @@ from ic.domain.absent_data import build_absent_paragraph, check_retrieval_suffic
 from ic.domain.chains.chain_03_benchmarking import format_chunks_as_context
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
+from ic.shared.text_utils import has_cjk_characters
 from ic.shared.types import CapBenchmarking
 
 _MIN_CHUNKS = 5
@@ -57,6 +58,17 @@ class GenerateBenchmarking:
             "descripcion_empresa": descripcion_empresa,
             "retrieval_competidores": context,
         })
+
+        if has_cjk_characters(texto):
+            return CapBenchmarking(
+                texto=build_absent_paragraph(
+                    "Cap 2 — Análisis Competitivo",
+                    "El modelo generó texto en un idioma incorrecto (no español)",
+                ),
+                n_chunks_usados=len(chunks),
+                retrieval_suficiente=False,
+                chunks_usados=chunks,
+            )
 
         return CapBenchmarking(
             texto=texto,

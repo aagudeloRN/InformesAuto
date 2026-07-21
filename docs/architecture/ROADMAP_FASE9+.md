@@ -8,7 +8,7 @@
 > **Este documento se consulta y se actualiza en cada ejecución.** No es inmutable (a
 > diferencia de los ADR). Cada fase se refina con los hallazgos de la anterior.
 
-**Versión del roadmap:** 1.2 · **Creado:** 2026-07-21 · **Última actualización:** 2026-07-21
+**Versión del roadmap:** 1.3 · **Creado:** 2026-07-21 · **Última actualización:** 2026-07-21
 
 ---
 
@@ -99,7 +99,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | Fase | Título | Estado | Fecha cierre | Commit(s) | Hallazgos |
 |------|--------|--------|--------------|-----------|-----------|
 | 9 | Estabilización y Gate de Calidad | ✅ | 2026-07-21 | `7188674`+ | `FASE9_HALLAZGOS.md` |
-| 10 | Fiabilidad del Contenido | ⬜ | — | — | `FASE10_HALLAZGOS.md` |
+| 10 | Fiabilidad del Contenido | ✅ | 2026-07-21 | pendiente merge | `FASE10_HALLAZGOS.md` |
 | 11 | Formato del Documento Final | ⬜ | — | — | `FASE11_HALLAZGOS.md` |
 | 12 | Optimización de Operación | ⬜ | — | — | `FASE12_HALLAZGOS.md` |
 | 13 | Repositorio Sectorial RAG | ⬜ | — | — | `FASE13_HALLAZGOS.md` |
@@ -117,14 +117,14 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 |----|-------------|---------------|--------|
 | DT-004 | `generate_informe.py` ≥ 300 líneas (347 L) | 12 | 🟡 separar en Fase 12 (T12.5) |
 | DT-005 | E2E Cap5 con servicios reales (`test_convergencia_e2e.py`) | 9 | ✅ 165.87 s, verde |
-| DT-009 | Gate ruff ✅; validación idioma (CJK) N1+ | 10 | 🟡 ruff cerrado, CJK→Fase 10 |
+| DT-009 | Gate ruff ✅; validación idioma (CJK) N1+ | 10 | ✅ CJK cerrado en todos los caps N1–N3 |
 | DT-010 | CostTracker para Ollama (tiempo como proxy de tokens) | 12 | ⬜ |
 | DT-011 | Ingesta de fuentes sectoriales / EMIS | 13 | ⬜ |
 | DT-012 | Multi-empresa / cola + historial paginado | 12 | ⬜ |
-| DT-015 | Citación APA 7 no fiel (sin sangría/cursiva) + sin cita inline trazable | 10 | ⬜ nuevo |
+| DT-015 | Citación APA 7 no fiel (sin sangría/cursiva) + sin cita inline trazable | 10 | ✅ APA 7 fiel (dispatch por tipo); cursiva→Fase 11; orphan checker operativo |
 | DT-016 | Formato .docx pobre (sin tablas/imágenes/TOC/portada) + salida única | 11 | ⬜ nuevo |
-| DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | ⬜ nuevo |
-| DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | 🟡 script listo |
+| DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | 🟡 footer ✅ parametrizable; PDF hardcodeado→Fase 13 |
+| DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | 🟡 script listo; settings.json actualizado en Fase 10 |
 
 ---
 
@@ -669,3 +669,4 @@ Se resuelven en la fase indicada (o antes si se puede).
 | 2026-07-21 | 1.0 | Creación del roadmap Fase 9–13 con prompts de arranque autocontenidos. |
 | 2026-07-21 | 1.1 | Resueltas Q1 (flujo GitHub PRIME DIRECTIVE + CI local), Q3 parcial (RAG del equipo en `~/Test/RepositorioRN`). Añadido paso de rama por fase; prompt Fase 9 actualizado. |
 | 2026-07-21 | 1.2 | Fase 9 cerrada: T9.1 ruff 0 errores ✅, T9.4 E2E 165.87 s ✅, T9.3 Makefile+ci.yml ✅, T9.2 check-ruff.sh ✅ (settings.json pendiente manual). DT-005 ✅, DT-018 🟡. |
+| 2026-07-21 | 1.3 | Fase 10 cerrada: T10.1 CJK en 6 use cases ✅, T10.2 orphan checker + contexto con meta ✅, T10.3/T10.4 APA 7 fiel ✅, T10.5 panel fiabilidad JSONB ✅, T10.6 disclaimer parametrizable ✅. 137 tests, DT-009/015/017(parcial) cerrados. |

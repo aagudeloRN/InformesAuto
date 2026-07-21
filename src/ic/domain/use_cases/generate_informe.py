@@ -282,7 +282,10 @@ class GenerateInforme:
         from ic.domain.assembler import PilotAssembler
         from ic.domain.chains.chain_08_resumen_ejecutivo import build_chain_08
         from ic.domain.use_cases.generate_resumen_ejecutivo import GenerateResumenEjecutivo
-        from ic.infrastructure.citation.apa_formatter import build_references_section
+        from ic.infrastructure.citation.apa_formatter import (
+            build_references_section,
+            find_orphan_citations,
+        )
         from ic.infrastructure.docx_builder import DocxBuilder
         from ic.shared.types import InformePiloto
 
@@ -316,13 +319,46 @@ class GenerateInforme:
                 todos_chunks += cap_obj.chunks_usados
         refs = build_references_section(todos_chunks)
 
+        texto_completo = " ".join(
+            c.texto
+            for c in [ctx.cap, ctx.cap_tend, ctx.cap_eco, ctx.cap_conv, ctx.cap_acc, ctx.resumen]
+            if c is not None
+        )
+        orphans = find_orphan_citations(texto_completo, refs)
+        if orphans:
+            logger.warning("Citas huérfanas detectadas (sin referencia): %s", orphans)
+
+        caps_fiabilidad = [
+            ("Cap 1 — Descripción", True),
+            ("Cap 2 — Benchmarking", ctx.cap.retrieval_suficiente),
+        ]
+        for nombre, obj in [
+            ("Cap 3 — Tendencias", ctx.cap_tend),
+            ("Cap 4 — Ecosistema", ctx.cap_eco),
+            ("Cap 5 — Convergencia", ctx.cap_conv),
+            ("Cap 6 — Accionables", ctx.cap_acc),
+            ("Resumen Ejecutivo", ctx.resumen),
+        ]:
+            if obj is not None:
+                caps_fiabilidad.append((nombre, obj.retrieval_suficiente))
+        metricas_fiabilidad = {
+            "n_caps_ok": sum(1 for _, ok in caps_fiabilidad if ok),
+            "n_caps_total": len(caps_fiabilidad),
+            "caps_ausencia": [n for n, ok in caps_fiabilidad if not ok],
+            "n_fuentes_total": len(refs),
+            "n_citas_huerfanas": len(orphans),
+        }
+
         informe = InformePiloto(
             empresa=ctx.empresa, gics=ctx.gics, cap_benchmarking=ctx.cap,
             cap_tendencias=ctx.cap_tend, cap_ecosistema=ctx.cap_eco,
             cap_convergencia=ctx.cap_conv, cap_accionables=ctx.cap_acc,
             resumen_ejecutivo=ctx.resumen, referencias=refs,
         )
-        assembler = PilotAssembler(DocxBuilder(ctx.settings.docx_template_path or None))
+        assembler = PilotAssembler(
+            DocxBuilder(ctx.settings.docx_template_path or None),
+            disclaimer=ctx.settings.informe_disclaimer,
+        )
         assembler.assemble(informe, ctx.output_path)
 
         tokens_in, tokens_out = ctx.tracker.total_tokens()
@@ -336,6 +372,7 @@ class GenerateInforme:
                     rec.id, ruta_docx=ctx.output_path, costo=ctx.tracker.total_cost(),
                     tiempo_s=time.time() - ctx.total_start,
                     tokens_in=tokens_in, tokens_out=tokens_out,
+                    metricas=metricas_fiabilidad,
                 )
         except Exception:
             logger.warning("No se pudo persistir historial", exc_info=True)

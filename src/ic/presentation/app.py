@@ -68,6 +68,19 @@ def _render_historial() -> None:
             )
             col3.metric("Tiempo", tiempo)
 
+            if metricas := informe.metricas_fiabilidad:
+                n_ok = metricas.get("n_caps_ok", "?")
+                n_total = metricas.get("n_caps_total", "?")
+                n_fuentes = metricas.get("n_fuentes_total", "?")
+                n_huerfanas = metricas.get("n_citas_huerfanas", 0)
+                col_f1, col_f2, col_f3 = st.columns(3)
+                col_f1.metric("Caps con evidencia", f"{n_ok}/{n_total}")
+                col_f2.metric("Fuentes citadas", n_fuentes)
+                col_f3.metric("Citas huérfanas", n_huerfanas)
+                ausencia = metricas.get("caps_ausencia", [])
+                if ausencia:
+                    st.caption(f"Sin evidencia suficiente: {', '.join(ausencia)}")
+
             if (
                 informe.estado == EstadoInforme.COMPLETADO
                 and informe.ruta_documento_final

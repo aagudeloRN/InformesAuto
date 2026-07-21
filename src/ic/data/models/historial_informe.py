@@ -39,16 +39,21 @@ class HistorialInforme(Base):
     tokens_in: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tokens_out: Mapped[int | None] = mapped_column(Integer, nullable=True)
     ruta_documento_final: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metricas_fiabilidad: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 def ensure_historial_columns(engine) -> None:
-    """Migración idempotente: agrega tokens_in/tokens_out si no existen."""
+    """Migración idempotente: agrega columnas nuevas si no existen."""
     from ic.shared.config import get_settings
     schema = get_settings().db_schema
     with engine.begin() as conn:
-        for col, tipo in [("tokens_in", "INTEGER"), ("tokens_out", "INTEGER")]:
+        for col, tipo in [
+            ("tokens_in", "INTEGER"),
+            ("tokens_out", "INTEGER"),
+            ("metricas_fiabilidad", "JSONB"),
+        ]:
             conn.execute(text(
                 f"ALTER TABLE {schema}.historial_informes ADD COLUMN IF NOT EXISTS {col} {tipo}"
             ))
