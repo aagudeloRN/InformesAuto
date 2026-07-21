@@ -100,7 +100,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 |------|--------|--------|--------------|-----------|-----------|
 | 9 | Estabilización y Gate de Calidad | ✅ | 2026-07-21 | `7188674`+ | `FASE9_HALLAZGOS.md` |
 | 10 | Fiabilidad del Contenido | ✅ | 2026-07-21 | `8f00f9d`+ | `FASE10_HALLAZGOS.md` |
-| 11 | Formato del Documento Final | ✅ | 2026-07-21 | pendiente merge | `FASE11_HALLAZGOS.md` |
+| 11 | Formato del Documento Final | ✅ | 2026-07-21 | `a581201`+ | `FASE11_HALLAZGOS.md` |
 | 12 | Optimización de Operación | ⬜ | — | — | `FASE12_HALLAZGOS.md` |
 | 13 | Repositorio Sectorial RAG | ⬜ | — | — | `FASE13_HALLAZGOS.md` |
 
