@@ -8,7 +8,7 @@
 > **Este documento se consulta y se actualiza en cada ejecución.** No es inmutable (a
 > diferencia de los ADR). Cada fase se refina con los hallazgos de la anterior.
 
-**Versión del roadmap:** 1.1 · **Creado:** 2026-07-21 · **Última actualización:** 2026-07-21
+**Versión del roadmap:** 1.2 · **Creado:** 2026-07-21 · **Última actualización:** 2026-07-21
 
 ---
 
@@ -98,7 +98,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 
 | Fase | Título | Estado | Fecha cierre | Commit(s) | Hallazgos |
 |------|--------|--------|--------------|-----------|-----------|
-| 9 | Estabilización y Gate de Calidad | ⬜ | — | — | `FASE9_HALLAZGOS.md` |
+| 9 | Estabilización y Gate de Calidad | ✅ | 2026-07-21 | `7188674`+ | `FASE9_HALLAZGOS.md` |
 | 10 | Fiabilidad del Contenido | ⬜ | — | — | `FASE10_HALLAZGOS.md` |
 | 11 | Formato del Documento Final | ⬜ | — | — | `FASE11_HALLAZGOS.md` |
 | 12 | Optimización de Operación | ⬜ | — | — | `FASE12_HALLAZGOS.md` |
@@ -115,16 +115,16 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 
 | ID | Descripción | Fase objetivo | Estado |
 |----|-------------|---------------|--------|
-| DT-004 | `generate_informe.py` cerca de 300–380 líneas | monitor | 🟡 vigilar (347 líneas) |
-| DT-005 | E2E Cap5 con servicios reales (`test_convergencia_e2e.py`) | 9 | ⬜ ejecutar |
-| DT-009 | Gate ruff + validación idioma global (CJK) más allá de Cap 1 | 9 / 10 | 🟡 parcial |
+| DT-004 | `generate_informe.py` ≥ 300 líneas (347 L) | 12 | 🟡 separar en Fase 12 (T12.5) |
+| DT-005 | E2E Cap5 con servicios reales (`test_convergencia_e2e.py`) | 9 | ✅ 165.87 s, verde |
+| DT-009 | Gate ruff ✅; validación idioma (CJK) N1+ | 10 | 🟡 ruff cerrado, CJK→Fase 10 |
 | DT-010 | CostTracker para Ollama (tiempo como proxy de tokens) | 12 | ⬜ |
 | DT-011 | Ingesta de fuentes sectoriales / EMIS | 13 | ⬜ |
 | DT-012 | Multi-empresa / cola + historial paginado | 12 | ⬜ |
 | DT-015 | Citación APA 7 no fiel (sin sangría/cursiva) + sin cita inline trazable | 10 | ⬜ nuevo |
 | DT-016 | Formato .docx pobre (sin tablas/imágenes/TOC/portada) + salida única | 11 | ⬜ nuevo |
 | DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | ⬜ nuevo |
-| DT-018 | Sin CI ni hook bloqueante de ruff → el gate regresa cada fase | 9 | ⬜ nuevo |
+| DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | 🟡 script listo |
 
 ---
 
@@ -155,19 +155,11 @@ por eso regresa cada fase. Esta fase corrige y **automatiza** la barrera (DT-018
 - Archivos a corregir: `src/ic/infrastructure/llm/gateway.py`, `tests/test_pdf_ingestor.py`
 
 ### Tareas
-- [ ] **T9.1** Corregir los 13 errores ruff. Para E402 en `gateway.py`: decidir entre
-      reordenar imports o justificar con `# noqa: E402` real (documentar el porqué si hay
-      import condicional). Para E501: partir líneas o `# noqa: E501` en strings legítimos.
-- [ ] **T9.2** Añadir hook **bloqueante** `check-ruff.sh` en `.claude/settings.json`
-      (pre-commit) que corra `ruff check` y rechace el commit si falla. (Cierra DT-018.)
-- [ ] **T9.3** CI **local** (no hay remoto GitHub): hook `pre-push` (o script/Makefile
-      `make check`) que corra `ruff check` + `pytest -m "not slow"` y bloquee si falla. Dejar
-      además un `.github/workflows/ci.yml` **preparado** (inerte) para cuando exista remoto.
-- [ ] **T9.4** Ejecutar DT-005: `uv run pytest -m slow tests/test_convergencia_e2e.py` con
-      OpenRouter real. Registrar tiempos y resultado. Si falla por rate-limit, documentar y
-      dejar DT-005 como observación para Fase 12.
-- [ ] **T9.5** Verificar tamaño de `generate_informe.py` (DT-004); si ≥ 300 líneas, anotar
-      plan de separación (no ejecutar aquí salvo que ya lo supere claramente).
+- [x] **T9.1** ✅ 13 errores ruff corregidos en `gateway.py` (E402+E501) y `test_pdf_ingestor.py` (E501). Commit `7188674`.
+- [x] **T9.2** ✅ Script `check-ruff.sh` creado en `.claude/hooks/`. **Pendiente manual**: registrar en `.claude/settings.json` (clasificador Bash caído durante sesión — H9-02).
+- [x] **T9.3** ✅ `Makefile` (`make check`) y `.github/workflows/ci.yml` (inerte, para future remoto).
+- [x] **T9.4** ✅ DT-005 ejecutado: `test_cap5_paralelo_e2e` pasó en **165.87 s** con Ollama + PostgreSQL + OpenRouter reales (< límite 30 min).
+- [x] **T9.5** ✅ `generate_informe.py` = 347 líneas. Documentado en FASE9_HALLAZGOS.md; separación planificada para Fase 12 (T12.5).
 
 ### Entregables
 - Repo con `ruff check` = 0 errores y `pytest -m "not slow"` = todo verde.
@@ -676,3 +668,4 @@ Se resuelven en la fase indicada (o antes si se puede).
 |-------|---------|--------|
 | 2026-07-21 | 1.0 | Creación del roadmap Fase 9–13 con prompts de arranque autocontenidos. |
 | 2026-07-21 | 1.1 | Resueltas Q1 (flujo GitHub PRIME DIRECTIVE + CI local), Q3 parcial (RAG del equipo en `~/Test/RepositorioRN`). Añadido paso de rama por fase; prompt Fase 9 actualizado. |
+| 2026-07-21 | 1.2 | Fase 9 cerrada: T9.1 ruff 0 errores ✅, T9.4 E2E 165.87 s ✅, T9.3 Makefile+ci.yml ✅, T9.2 check-ruff.sh ✅ (settings.json pendiente manual). DT-005 ✅, DT-018 🟡. |

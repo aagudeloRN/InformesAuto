@@ -37,7 +37,10 @@ def test_ingest_batched_skips_if_document_already_indexed(fake_settings):
         patch("ic.infrastructure.sources.pdf_ingestor._ensure_metadatos_column"),
         patch("ic.infrastructure.sources.pdf_ingestor.PdfReader") as mock_reader_cls,
         patch("ic.infrastructure.sources.pdf_ingestor.SessionLocal"),
-        patch("ic.infrastructure.sources.pdf_ingestor._document_already_ingested", return_value=True),
+        patch(
+            "ic.infrastructure.sources.pdf_ingestor._document_already_ingested",
+            return_value=True,
+        ),
         patch("ic.infrastructure.sources.pdf_ingestor.Embedder") as mock_embedder_cls,
         patch("ic.infrastructure.sources.pdf_ingestor._release_vram") as mock_release,
     ):
@@ -58,7 +61,10 @@ def test_ingest_batched_skips_duplicate_chunks(fake_settings):
         patch("ic.infrastructure.sources.pdf_ingestor._ensure_metadatos_column"),
         patch("ic.infrastructure.sources.pdf_ingestor.PdfReader") as mock_reader_cls,
         patch("ic.infrastructure.sources.pdf_ingestor.SessionLocal") as mock_session_cls,
-        patch("ic.infrastructure.sources.pdf_ingestor._document_already_ingested", return_value=False),
+        patch(
+            "ic.infrastructure.sources.pdf_ingestor._document_already_ingested",
+            return_value=False,
+        ),
         patch("ic.infrastructure.sources.pdf_ingestor.Embedder") as mock_embedder_cls,
         patch("ic.infrastructure.sources.pdf_ingestor._chunk_exists", return_value=True),
         patch("ic.infrastructure.sources.pdf_ingestor._release_vram"),
@@ -85,7 +91,10 @@ def test_ingest_batched_calls_keep_alive_after_each_batch(fake_settings):
         patch("ic.infrastructure.sources.pdf_ingestor._ensure_metadatos_column"),
         patch("ic.infrastructure.sources.pdf_ingestor.PdfReader") as mock_reader_cls,
         patch("ic.infrastructure.sources.pdf_ingestor.SessionLocal") as mock_session_cls,
-        patch("ic.infrastructure.sources.pdf_ingestor._document_already_ingested", return_value=False),
+        patch(
+            "ic.infrastructure.sources.pdf_ingestor._document_already_ingested",
+            return_value=False,
+        ),
         patch("ic.infrastructure.sources.pdf_ingestor.Embedder") as mock_embedder_cls,
         patch("ic.infrastructure.sources.pdf_ingestor._chunk_exists", return_value=False),
         patch("ic.infrastructure.sources.pdf_ingestor._release_vram") as mock_release,
@@ -121,7 +130,10 @@ def test_ingest_batched_two_batches_calls_release_twice(fake_settings):
         patch("ic.infrastructure.sources.pdf_ingestor._ensure_metadatos_column"),
         patch("ic.infrastructure.sources.pdf_ingestor.PdfReader") as mock_reader_cls,
         patch("ic.infrastructure.sources.pdf_ingestor.SessionLocal") as mock_session_cls,
-        patch("ic.infrastructure.sources.pdf_ingestor._document_already_ingested", return_value=False),
+        patch(
+            "ic.infrastructure.sources.pdf_ingestor._document_already_ingested",
+            return_value=False,
+        ),
         patch("ic.infrastructure.sources.pdf_ingestor.Embedder") as mock_embedder_cls,
         patch("ic.infrastructure.sources.pdf_ingestor._chunk_exists", return_value=False),
         patch("ic.infrastructure.sources.pdf_ingestor._release_vram") as mock_release,
