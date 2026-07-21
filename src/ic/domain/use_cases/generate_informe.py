@@ -33,6 +33,7 @@ class InformeResult:
     tokens_out: int
     tiempo_total_s: float
     cost_records: list
+    ruta_pdf: str | None = None
 
 
 @dataclass
@@ -286,7 +287,6 @@ class GenerateInforme:
             build_references_section,
             find_orphan_citations,
         )
-        from ic.infrastructure.docx_builder import DocxBuilder
         from ic.shared.types import InformePiloto
 
         ctx.step_fn(9, "Resumen Ejecutivo")
@@ -355,11 +355,27 @@ class GenerateInforme:
             cap_convergencia=ctx.cap_conv, cap_accionables=ctx.cap_acc,
             resumen_ejecutivo=ctx.resumen, referencias=refs,
         )
-        assembler = PilotAssembler(
-            DocxBuilder(ctx.settings.docx_template_path or None),
-            disclaimer=ctx.settings.informe_disclaimer,
-        )
-        assembler.assemble(informe, ctx.output_path)
+
+        from ic.infrastructure.charts.radar_chart import generate_placeholder_radar
+        from ic.infrastructure.render.docx_renderer import DocxRenderer
+        from ic.infrastructure.render.pdf_renderer import convert_docx_to_pdf
+
+        chart_path = ctx.output_path.replace(".docx", "_radar.png")
+        try:
+            generate_placeholder_radar(chart_path, ctx.params.empresa)
+        except Exception:
+            logger.warning("No se pudo generar radar chart", exc_info=True)
+            chart_path = None
+
+        assembler = PilotAssembler(disclaimer=ctx.settings.informe_disclaimer)
+        report_doc = assembler.build(informe, figura_benchmarking=chart_path)
+        DocxRenderer(ctx.settings.docx_template_path or None).render(report_doc, ctx.output_path)
+
+        ruta_pdf: str | None = None
+        try:
+            ruta_pdf = convert_docx_to_pdf(ctx.output_path)
+        except Exception:
+            logger.warning("No se pudo generar PDF", exc_info=True)
 
         tokens_in, tokens_out = ctx.tracker.total_tokens()
         try:
@@ -381,4 +397,5 @@ class GenerateInforme:
             ruta_docx=ctx.output_path, n_referencias=len(refs),
             costo_usd=ctx.tracker.total_cost(), tokens_in=tokens_in, tokens_out=tokens_out,
             tiempo_total_s=time.time() - ctx.total_start, cost_records=ctx.tracker.records(),
+            ruta_pdf=ruta_pdf,
         )

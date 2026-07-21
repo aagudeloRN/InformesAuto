@@ -1,6 +1,16 @@
 from datetime import date
 
-from ic.infrastructure.docx_builder import DocxBuilder
+from ic.domain.markdown_parser import parse_markdown
+from ic.domain.report_model import (
+    Callout,
+    CitationBlock,
+    FigureBlock,
+    Heading,
+    PageBreak,
+    Paragraph,
+    ReportDocument,
+    Toc,
+)
 from ic.shared.types import InformePiloto
 
 _DEFAULT_DISCLAIMER = (
@@ -8,66 +18,91 @@ _DEFAULT_DISCLAIMER = (
     "Los contenidos deben ser verificados por un analista antes de su uso."
 )
 
+_ABSENT_MSG = (
+    "Información no disponible: el sistema no recuperó fuentes suficientes para este capítulo. "
+    "Se recomienda ingresar documentos adicionales o ampliar la consulta web."
+)
+
 
 class PilotAssembler:
-    def __init__(self, builder: DocxBuilder, disclaimer: str = _DEFAULT_DISCLAIMER) -> None:
-        self._builder = builder
+    def __init__(self, disclaimer: str = _DEFAULT_DISCLAIMER) -> None:
         self._disclaimer = disclaimer
 
-    def assemble(self, informe: InformePiloto, output_path: str) -> str:
-        b = self._builder
-        empresa_nombre = informe.empresa.nombre_empresa
-        fecha = date.today().strftime("%d de %B de %Y")
-
-        b.add_heading(f"Informe de Inteligencia Competitiva — {empresa_nombre}", level=1)
-        b.add_paragraph(f"Fecha de generación: {fecha}")
-        b.add_paragraph("")
+    def build(
+        self,
+        informe: InformePiloto,
+        figura_benchmarking: str | None = None,
+    ) -> ReportDocument:
+        blocks = [Toc()]
 
         if informe.resumen_ejecutivo is not None:
-            b.add_heading("Resumen Ejecutivo", level=2)
-            b.add_markdown_section(informe.resumen_ejecutivo.texto)
-            b.add_paragraph("")
+            blocks.append(Heading("Resumen Ejecutivo", level=2))
+            blocks.extend(parse_markdown(informe.resumen_ejecutivo.texto))
+            blocks.append(PageBreak())
 
-        b.add_heading("Capítulo 1. Descripción de la Empresa", level=2)
-        b.add_markdown_section(informe.empresa.texto)
-        b.add_paragraph("")
+        blocks.append(Heading("Capítulo 1. Descripción de la Empresa", level=2))
+        blocks.extend(parse_markdown(informe.empresa.texto))
+        blocks.append(Paragraph(""))
 
-        b.add_heading("Clasificación GICS", level=3)
-        b.add_paragraph(f"Grupo GICS: {informe.gics.grupo_gics}")
-        b.add_markdown_section(informe.gics.justificacion)
-        b.add_paragraph("")
+        blocks.append(Heading("Clasificación GICS", level=3))
+        blocks.append(Paragraph(f"Grupo GICS: {informe.gics.grupo_gics}"))
+        blocks.extend(parse_markdown(informe.gics.justificacion))
+        blocks.append(Paragraph(""))
 
-        b.add_heading("Capítulo 2. Análisis Competitivo", level=2)
-        b.add_markdown_section(informe.cap_benchmarking.texto)
-        b.add_paragraph("")
+        blocks.append(Heading("Capítulo 2. Análisis Competitivo", level=2))
+        if informe.cap_benchmarking.retrieval_suficiente:
+            blocks.extend(parse_markdown(informe.cap_benchmarking.texto))
+        else:
+            blocks.append(Callout(_ABSENT_MSG, kind="absent_data"))
+        if figura_benchmarking:
+            blocks.append(FigureBlock(
+                image_path=figura_benchmarking,
+                alt="Radar de benchmarking competidores Cap 2",
+                caption="Figura 1. Posicionamiento relativo de competidores clave",
+            ))
+        blocks.append(Paragraph(""))
 
-        if informe.cap_tendencias is not None:
-            b.add_heading("Capítulo 3. Análisis Sectorial Tendencial", level=2)
-            b.add_markdown_section(informe.cap_tendencias.texto)
-            b.add_paragraph("")
-
-        if informe.cap_ecosistema is not None:
-            b.add_heading("Capítulo 4. Ecosistema Empresarial", level=2)
-            b.add_markdown_section(informe.cap_ecosistema.texto)
-            b.add_paragraph("")
-
-        if informe.cap_convergencia is not None:
-            b.add_heading("Capítulo 5. Convergencia Empresarial", level=2)
-            b.add_markdown_section(informe.cap_convergencia.texto)
-            b.add_paragraph("")
+        _OPTIONAL_CAPS = [
+            ("Capítulo 3. Análisis Sectorial Tendencial", informe.cap_tendencias),
+            ("Capítulo 4. Ecosistema Empresarial", informe.cap_ecosistema),
+            ("Capítulo 5. Convergencia Empresarial", informe.cap_convergencia),
+        ]
+        for titulo, cap in _OPTIONAL_CAPS:
+            if cap is not None:
+                blocks.append(Heading(titulo, level=2))
+                if cap.retrieval_suficiente:
+                    blocks.extend(parse_markdown(cap.texto))
+                else:
+                    blocks.append(Callout(_ABSENT_MSG, kind="absent_data"))
+                blocks.append(Paragraph(""))
 
         if informe.cap_accionables is not None:
-            b.add_heading("Capítulo 6. Accionables Estratégicos", level=2)
-            b.add_markdown_section(informe.cap_accionables.texto)
-            b.add_paragraph("")
+            blocks.append(Heading("Capítulo 6. Accionables Estratégicos", level=2))
+            blocks.append(Callout(
+                "Los accionables siguientes requieren validación del equipo directivo "
+                "antes de implementación.",
+                kind="actionable",
+            ))
+            if informe.cap_accionables.retrieval_suficiente:
+                blocks.extend(parse_markdown(informe.cap_accionables.texto))
+            else:
+                blocks.append(Callout(_ABSENT_MSG, kind="absent_data"))
+            blocks.append(Paragraph(""))
 
-        b.add_heading("Referencias", level=2)
+        blocks.append(PageBreak())
+        blocks.append(Heading("Referencias", level=2))
         for ref in informe.referencias:
-            b.add_paragraph(ref.apa_string)
+            blocks.append(CitationBlock(ref.apa_string))
 
-        b.add_paragraph("")
         if self._disclaimer:
-            b.add_paragraph(self._disclaimer)
+            blocks.append(Paragraph(""))
+            blocks.append(Paragraph(self._disclaimer, style="Caption"))
 
-        b.save(output_path)
-        return output_path
+        empresa_nombre = informe.empresa.nombre_empresa
+        return ReportDocument(
+            title=f"Informe de Inteligencia Competitiva — {empresa_nombre}",
+            company=empresa_nombre,
+            date=date.today().strftime("%d de %B de %Y"),
+            blocks=blocks,
+            disclaimer=self._disclaimer,
+        )

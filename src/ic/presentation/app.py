@@ -227,9 +227,10 @@ with tab_gen:
         st.success(f"✅ Informe generado: `{result.ruta_docx}`")
 
         docx_path = Path(result.ruta_docx)
+        col_docx, col_pdf = st.columns(2)
         if docx_path.exists():
             with open(docx_path, "rb") as f:
-                st.download_button(
+                col_docx.download_button(
                     label="⬇️ Descargar informe .docx",
                     data=f,
                     file_name=docx_path.name,
@@ -240,7 +241,17 @@ with tab_gen:
                     use_container_width=True,
                 )
         else:
-            st.warning(f"El archivo no se encontró en `{result.ruta_docx}`.")
+            col_docx.warning(f"El archivo no se encontró en `{result.ruta_docx}`.")
+
+        if result.ruta_pdf and Path(result.ruta_pdf).exists():
+            with open(result.ruta_pdf, "rb") as f:
+                col_pdf.download_button(
+                    label="⬇️ Descargar informe .pdf",
+                    data=f,
+                    file_name=Path(result.ruta_pdf).name,
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
 
         with st.expander("📊 Resumen de ejecución"):
             col_t, col_c, col_r = st.columns(3)
