@@ -7,7 +7,6 @@ ejecución del concern de presentación (CLI, Streamlit, tests).
 import logging
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -111,7 +110,7 @@ class GenerateInforme:
         api_llm_synth = (
             build_api_llm(s, tier="synth", cost_tracker=tracker) if s.openrouter_api_key else None
         )
-        llm = build_llm(s)
+        llm = build_llm(s, cost_tracker=tracker)
         cap1_llms = [m for m in [api_llm, api_llm_alt, llm] if m is not None]
         slug = params.empresa.replace(" ", "_").replace(".", "").lower()
         output_path = params.output_path or f"./output/{slug}_informe.docx"
@@ -148,63 +147,8 @@ class GenerateInforme:
         )
 
     def _run_n1(self, ctx: _PipelineContext) -> None:
-        from ic.data.database import SessionLocal
-        from ic.data.repositories.embedding_repo import EmbeddingRepository
-        from ic.domain.chains.chain_03_benchmarking import build_chain_03
-        from ic.domain.chains.chain_04_tendencias import build_chain_04
-        from ic.domain.chains.chain_05_ecosistema import build_chain_05
-        from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
-        from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
-        from ic.domain.use_cases.generate_tendencias import GenerateTendencias
-        from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
-        from ic.infrastructure.sources.openalex_connector import OpenAlexConnector
-
-        ctx.step_fn(3, "N1 — Caps 2/3/4 en paralelo")
-        e, g, s = ctx.params.empresa, ctx.gics.grupo_gics, ctx.settings
-
-        def _store(fn):
-            with SessionLocal() as db:
-                return fn(PGVectorStore(ctx.embedder, EmbeddingRepository(db), s))
-
-        def _fn_cap2(store):
-            return GenerateBenchmarking(
-                chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=ctx.web
-            ).execute(nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g)
-
-        def _fn_cap3(store):
-            if ctx.api_llm is None:
-                return None
-            return GenerateTendencias(
-                chain=build_chain_04(ctx.api_llm), store=store,
-                web_connector=ctx.web, openalex_connector=OpenAlexConnector(s),
-            ).execute(nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g)
-
-        def _fn_cap4(store):
-            if ctx.api_llm is None:
-                return None
-            return GenerateEcosistema(
-                chain=build_chain_05(ctx.api_llm), store=store, web_connector=ctx.web,
-            ).execute(nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g)
-
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            f2 = pool.submit(_store, _fn_cap2)
-            f3 = pool.submit(_store, _fn_cap3)
-            f4 = pool.submit(_store, _fn_cap4)
-        ctx.cap, ctx.cap_tend, ctx.cap_eco = f2.result(), f3.result(), f4.result()
-
-        ctx.step_fn(4, "Párrafos introductorios N1")
-        if ctx.intro_chain is not None:
-            for cap_obj, titulo in [
-                (ctx.cap, "Análisis Competitivo"),
-                (ctx.cap_tend, "Análisis Sectorial Tendencial"),
-                (ctx.cap_eco, "Ecosistema Empresarial"),
-            ]:
-                if cap_obj is not None and cap_obj.retrieval_suficiente:
-                    intro = ctx.intro_chain.invoke({
-                        "titulo": titulo, "empresa": ctx.params.empresa,
-                        "resumen_cap": cap_obj.texto[:500],
-                    })
-                    cap_obj.texto = intro + "\n\n" + cap_obj.texto
+        from ic.domain.use_cases.generate_n1 import run_n1_parallel
+        run_n1_parallel(ctx)
 
     def _run_pdf(self, ctx: _PipelineContext) -> None:
         from ic.infrastructure.sources.pdf_ingestor import PdfIngestor
@@ -347,6 +291,7 @@ class GenerateInforme:
             "caps_ausencia": [n for n, ok in caps_fiabilidad if not ok],
             "n_fuentes_total": len(refs),
             "n_citas_huerfanas": len(orphans),
+            "tiempo_ollama_total_s": round(ctx.tracker.total_ollama_time_s(), 2),
         }
 
         informe = InformePiloto(

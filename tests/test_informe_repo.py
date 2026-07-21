@@ -39,3 +39,19 @@ class TestListRecientes:
         assert len(result) == 1
         assert result[0][0] is inf
         assert result[0][1] == "Noel S.A.S."
+
+    def test_list_recientes_aplica_offset(self):
+        db = MagicMock()
+        db.execute.return_value.all.return_value = []
+        repo = InformeRepository(db)
+        repo.list_recientes(limit=10, offset=10)
+        call_args = str(db.execute.call_args[0][0]).upper()
+        assert "OFFSET" in call_args
+
+    def test_list_recientes_aplica_filtro_empresa(self):
+        db = MagicMock()
+        db.execute.return_value.all.return_value = []
+        repo = InformeRepository(db)
+        repo.list_recientes(empresa_filter="Noel")
+        call_args = str(db.execute.call_args[0][0]).upper()
+        assert "ILIKE" in call_args or "LIKE" in call_args

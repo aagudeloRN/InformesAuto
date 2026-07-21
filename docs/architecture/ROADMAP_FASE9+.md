@@ -101,7 +101,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 9 | Estabilización y Gate de Calidad | ✅ | 2026-07-21 | `7188674`+ | `FASE9_HALLAZGOS.md` |
 | 10 | Fiabilidad del Contenido | ✅ | 2026-07-21 | `8f00f9d`+ | `FASE10_HALLAZGOS.md` |
 | 11 | Formato del Documento Final | ✅ | 2026-07-21 | `a581201`+ | `FASE11_HALLAZGOS.md` |
-| 12 | Optimización de Operación | ⬜ | — | — | `FASE12_HALLAZGOS.md` |
+| 12 | Optimización de Operación | ✅ | 2026-07-21 | TBD | `FASE12_HALLAZGOS.md` |
 | 13 | Repositorio Sectorial RAG | ⬜ | — | — | `FASE13_HALLAZGOS.md` |
 
 > Cada fase, al cerrar, actualiza su fila (estado ✅, fecha, hash de commit) y marca sus
@@ -115,12 +115,12 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 
 | ID | Descripción | Fase objetivo | Estado |
 |----|-------------|---------------|--------|
-| DT-004 | `generate_informe.py` ≥ 300 líneas (~400 L) | 12 | 🟡 separar en Fase 12 (T12.5) |
+| DT-004 | `generate_informe.py` ≥ 300 líneas (~400 L) | 12 | ✅ 345 L — N1 extraído a `generate_n1.py` |
 | DT-005 | E2E Cap5 con servicios reales (`test_convergencia_e2e.py`) | 9 | ✅ 165.87 s, verde |
 | DT-009 | Gate ruff ✅; validación idioma (CJK) N1+ | 10 | ✅ CJK cerrado en todos los caps N1–N3 |
-| DT-010 | CostTracker para Ollama (tiempo como proxy de tokens) | 12 | ⬜ |
+| DT-010 | CostTracker para Ollama (tiempo como proxy de tokens) | 12 | ✅ tokens reales + tiempo en `CallRecord.tiempo_ollama_s` |
 | DT-011 | Ingesta de fuentes sectoriales / EMIS | 13 | ⬜ |
-| DT-012 | Multi-empresa / cola + historial paginado | 12 | ⬜ |
+| DT-012 | Multi-empresa / cola + historial paginado | 12 | ✅ paginación PAGE_SIZE=10 + filtro ILIKE + CSV export |
 | DT-015 | Citación APA 7 no fiel (sin sangría/cursiva) + sin cita inline trazable | 10 | ✅ APA 7 fiel (dispatch por tipo); cursiva→Fase 11; orphan checker operativo |
 | DT-016 | Formato .docx pobre (sin tablas/imágenes/TOC/portada) + salida única | 11 | ✅ Cerrado — portada, TOC, tablas, figuras, PDF vía LibreOffice |
 | DT-019 | Datos estructurados del LLM para radar chart real (actualmente placeholder) | 12 | ⬜ nuevo |
@@ -463,14 +463,14 @@ cola/multi-empresa.
 
 ### Tareas
 - [ ] **T12.1** Caché de retrieval: cachear resultados web/OpenAlex por `(query, ttl)` en BD
-      (tabla en `informes_ic`) para no re-consultar en cada corrida.
+      (tabla en `informes_ic`) para no re-consultar en cada corrida. → Pospuesto a Fase 14.
 - [ ] **T12.2** Resiliencia free-tier: timeouts/paralelismo por tier configurables; backoff
-      explícito ante 429/rate-limit; métrica de latencia por cap.
-- [ ] **T12.3** DT-010: registrar tiempo (y/o tokens estimados) como proxy de costo para
-      llamadas Ollama en `HistorialInforme`.
-- [ ] **T12.4** DT-012: cola / multi-empresa en la UI + historial paginado.
-- [ ] **T12.5** *(si abierto de Fase 9)* separar `_run_n1` a módulo propio si `generate_informe.py`
-      superó 300 líneas (DT-004).
+      explícito ante 429/rate-limit; métrica de latencia por cap. → Pospuesto a Fase 14.
+- [x] **T12.3** ✅ DT-010: `CostTracker.add_ollama_call()` + `tiempo_ollama_s` en `CallRecord`;
+      tokens reales desde respuesta Ollama (`prompt_eval_count`, `eval_count`, `total_duration`).
+- [x] **T12.4** ✅ DT-012: historial paginado (PAGE_SIZE=10, offset), filtro ILIKE por empresa
+      y exportación CSV desde la UI.
+- [x] **T12.5** ✅ DT-004: `_run_n1` extraído a `generate_n1.py`; `generate_informe.py` = 345 L.
 
 ### Entregables
 - Caché de retrieval operativa + tests.
@@ -709,3 +709,4 @@ Se resuelven en la fase indicada (o antes si se puede).
 | 2026-07-21 | 1.2 | Fase 9 cerrada: T9.1 ruff 0 errores ✅, T9.4 E2E 165.87 s ✅, T9.3 Makefile+ci.yml ✅, T9.2 check-ruff.sh ✅ (settings.json pendiente manual). DT-005 ✅, DT-018 🟡. |
 | 2026-07-21 | 1.3 | Fase 10 cerrada: T10.1 CJK en 6 use cases ✅, T10.2 orphan checker + contexto con meta ✅, T10.3/T10.4 APA 7 fiel ✅, T10.5 panel fiabilidad JSONB ✅, T10.6 disclaimer parametrizable ✅. 137 tests, DT-009/015/017(parcial) cerrados. |
 | 2026-07-21 | 1.4 | Fase 11 cerrada: T11.1 report_model ✅, T11.2 docx_renderer+assembler refactor ✅, T11.3 markdown_parser+TableBlock ✅, T11.4 radar chart ✅, T11.5 PDF LibreOffice ✅, T11.7 callouts ✅. 162 tests fast, ADR-011 creado, DT-016 cerrado, DT-019 nuevo. Q2 resuelta. |
+| 2026-07-21 | 1.5 | Fase 12 cerrada: T12.3 DT-004 ✅ (generate_n1.py, 345 L), T12.4 DT-010 ✅ (tokens reales Ollama + tiempo_ollama_s), T12.5 DT-012 ✅ (paginación+filtro+CSV). 168 tests fast. T12.1/T12.2 (caché/resiliencia) pospuestos a Fase 14. |

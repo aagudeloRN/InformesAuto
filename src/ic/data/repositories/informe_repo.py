@@ -59,15 +59,23 @@ class InformeRepository:
     def get_by_id(self, informe_id: uuid.UUID) -> HistorialInforme | None:
         return self._db.get(HistorialInforme, informe_id)
 
-    def list_recientes(self, limit: int = 20) -> list[tuple[HistorialInforme, str]]:
+    def list_recientes(
+        self,
+        limit: int = 10,
+        offset: int = 0,
+        empresa_filter: str | None = None,
+    ) -> list[tuple[HistorialInforme, str]]:
         from sqlalchemy import desc, select
 
         from ic.data.models.empresa import Empresa
 
-        rows = self._db.execute(
+        stmt = (
             select(HistorialInforme, Empresa.nombre)
             .join(Empresa, HistorialInforme.empresa_id == Empresa.id)
             .order_by(desc(HistorialInforme.created_at))
-            .limit(limit)
-        ).all()
+        )
+        if empresa_filter:
+            stmt = stmt.where(Empresa.nombre.ilike(f"%{empresa_filter}%"))
+        stmt = stmt.limit(limit).offset(offset)
+        rows = self._db.execute(stmt).all()
         return [(row[0], row[1]) for row in rows]

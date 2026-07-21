@@ -37,6 +37,7 @@ class CallRecord:
     tokens_in: int
     tokens_out: int
     costo_usd: float
+    tiempo_ollama_s: float = 0.0
 
 
 class CostTracker:
@@ -60,6 +61,19 @@ class CostTracker:
             CallRecord(modelo="local", tokens_in=tokens_in, tokens_out=tokens_out, costo_usd=0.0)
         )
 
+    def add_ollama_call(
+        self, modelo: str, tiempo_s: float, tokens_in: int = 0, tokens_out: int = 0
+    ) -> CallRecord:
+        record = CallRecord(
+            modelo=modelo, tokens_in=tokens_in, tokens_out=tokens_out,
+            costo_usd=0.0, tiempo_ollama_s=tiempo_s,
+        )
+        self._calls.append(record)
+        return record
+
+    def total_ollama_time_s(self) -> float:
+        return sum(r.tiempo_ollama_s for r in self._calls)
+
     def within_budget(self) -> bool:
         return self.total_cost() <= self._budget_limit
 
@@ -81,6 +95,9 @@ class OllamaGatewayLLM(BaseChatModel):
     model: str
     max_retries: int = 3
     timeout: int = 120
+    cost_tracker: CostTracker | None = None
+
+    model_config = {"arbitrary_types_allowed": True}
 
     @property
     def _llm_type(self) -> str:
@@ -101,16 +118,27 @@ class OllamaGatewayLLM(BaseChatModel):
             wait=wait_exponential(min=1, max=10),
             reraise=True,
         )
-        def _call() -> str:
+        def _call() -> dict:
             resp = httpx.post(
                 f"{self.base_url}/api/chat",
                 json={"model": self.model, "messages": ollama_msgs, "stream": False, "keep_alive": 0},  # noqa: E501
                 timeout=self.timeout,
             )
             resp.raise_for_status()
-            return resp.json()["message"]["content"]
+            return resp.json()
 
-        content = _call()
+        data = _call()
+        content = data["message"]["content"]
+
+        if self.cost_tracker is not None:
+            tiempo_s = data.get("total_duration", 0) / 1e9
+            tokens_in = data.get("prompt_eval_count", 0)
+            tokens_out = data.get("eval_count", 0)
+            self.cost_tracker.add_ollama_call(
+                modelo=self.model, tiempo_s=tiempo_s,
+                tokens_in=tokens_in, tokens_out=tokens_out,
+            )
+
         return ChatResult(generations=[ChatGeneration(message=AIMessage(content=content))])
 
     def _stream(
@@ -278,13 +306,16 @@ class OpenRouterGatewayLLM(BaseChatModel):
                         yield chunk
 
 
-def build_llm(settings: Settings) -> OllamaGatewayLLM:
+def build_llm(
+    settings: Settings, cost_tracker: CostTracker | None = None
+) -> OllamaGatewayLLM:
     """Construye el LLM local (Ollama). Usar para embeddings, Cap 1 y GICS."""
     return OllamaGatewayLLM(
         base_url=settings.ollama_base_url,
         model=settings.llm_local_analytic_model,
         max_retries=settings.llm_circuit_breaker_max_retries,
         timeout=settings.llm_local_timeout,
+        cost_tracker=cost_tracker,
     )
 
 
