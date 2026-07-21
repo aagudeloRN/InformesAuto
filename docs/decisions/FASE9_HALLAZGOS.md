@@ -1,7 +1,7 @@
 # Hallazgos Técnicos — Fase 9
 
 **Fecha:** 2026-07-21
-**Commits:** `7188674` (T9.1 ruff fixes) + commit final pendiente (T9.2/T9.3/docs)
+**Commits:** `7188674` (T9.1 ruff fixes) · `320b367` (T9.2–T9.5, docs) · merge `71101ec` → `develop`
 **Tests fast:** 101 passed, 2 skipped
 
 ---
