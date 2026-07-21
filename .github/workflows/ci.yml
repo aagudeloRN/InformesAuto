@@ -1,0 +1,13 @@
+# INERTE — activar cuando exista remoto GitHub (eliminar `if: false` en el job).
+# CI local: usar `make check` (ruff + pytest -m "not slow").
+name: CI
+on: [push, pull_request]
+jobs:
+  lint-and-test:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv run ruff check src/ tests/
+      - run: uv run pytest -m "not slow" -q
