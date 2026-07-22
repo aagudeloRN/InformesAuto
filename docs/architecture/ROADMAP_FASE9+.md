@@ -105,6 +105,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 13 | Repositorio Sectorial RAG | ✅ | 2026-07-22 | `62fe327` | `FASE13_HALLAZGOS.md` |
 | 14 | Calidad de Retrieval y Evaluación | ✅ | 2026-07-22 | `1fbe8a1` | `FASE14_HALLAZGOS.md` |
 | 15 | Resiliencia y Costo | ✅ | 2026-07-22 | `a367b57`+ | `FASE15_HALLAZGOS.md` |
+| 16 | Presentación del Contenido | ⬜ | — | — | — |
 
 > Cada fase, al cerrar, actualiza su fila (estado ✅, fecha, hash de commit) y marca sus
 > tareas en la sección correspondiente.
@@ -1004,6 +1005,175 @@ informe E2E y confirma tiempo total reducido y supervivencia a rate-limits.
 
 ---
 
+# FASE 16 — Presentación del Contenido
+
+**Prioridad:** P1 · **Estado:** ⬜ Pendiente · **Deuda:** DT-019, DT-024 + cableado E2E Fase 15
+
+### Objetivo
+
+Cerrar la brecha entre el pipeline funcional y un **entregable visualmente profesional**: radar
+chart alimentado por datos reales del LLM, estilo tipográfico correcto en el .docx y tablas Word
+para las fichas de competidores. También incorpora el **cableado E2E de Fase 15** (caché de
+retrieval y ResilientChatModel) que quedó pendiente.
+
+### Contexto / por qué
+
+- **DT-019:** El radar chart en Cap 2 usa datos placeholder generados aleatoriamente
+  (`generate_placeholder_radar`). Para que sea útil, los scores deben provenir del análisis
+  real del LLM sobre los competidores identificados.
+- **DT-024:** `docx_renderer.py` aplica estilos de título/párrafo pero no fija el estilo
+  Normal del documento (fuente, tamaño, interlineado, espaciado, viudas/huérfanas). El
+  documento resultante hereda los defaults de Word/LibreOffice en lugar de la tipografía
+  corporativa acordada.
+- **Cableado Fase 15 (pendiente):** `generate_n1.py` y `generate_informe.py` construyen
+  `WebConnector`/`OpenAlexConnector` directos (sin caché) y los tiers LLM se instancian
+  individualmente (sin fallback resiliente). Las clases `CachedWebConnector`,
+  `CachedOpenAlexConnector` y `build_resilient_api_llm` existen pero no están conectadas
+  al pipeline E2E.
+
+### Tareas
+
+- **T16.0 — Cableado E2E de Fase 15 (prerequisito)**
+  Conectar en el pipeline lo implementado en Fase 15 pero no cableado:
+  - `generate_n1.py` y `generate_informe.py`: sustituir `WebConnector`/`OpenAlexConnector`
+    por `CachedWebConnector`/`CachedOpenAlexConnector` (inyectados vía `SessionLocal`).
+  - `generate_informe._setup_infra`: reemplazar los tres `build_api_llm(tier=...)` individuales
+    por `build_resilient_api_llm(settings, cost_tracker=tracker)`.
+  - Correr `uv run python scripts/eval_retrieval.py --bench --warm` con Ollama activo y
+    añadir la tabla antes/después a `docs/decisions/FASE15_HALLAZGOS.md §2`.
+  - ÉXITO: test de integración demuestra que dos corridas idénticas no llaman dos veces
+    al connector real (mock del connector: 0 llamadas en la segunda corrida).
+
+- **T16.1 — Datos reales del LLM para el radar chart (DT-019)**
+  Añadir en `chain_03_benchmarking.py` un bloque de instrucción para que el LLM emita, al
+  final de su respuesta, una sección JSON estructurada con los scores de cada competidor en
+  las 5 dimensiones estándar (Innovación, Inversión, Presencia global, Sostenibilidad,
+  Digital). Extraer ese JSON en el use case y pasarlo a `generate_radar_chart(data, labels,
+  output_path)`. Si el JSON no es parseable, hacer fallback a `generate_placeholder_radar`
+  con log de advertencia.
+  - ÉXITO: en una corrida E2E la imagen del radar refleja datos distintos de los defaults;
+    el fallback funciona cuando el LLM no emite JSON (test con mock).
+
+- **T16.2 — Estilo Normal del .docx (DT-024)**
+  En `DocxRenderer` (o en la plantilla `docx_template_path`), fijar el estilo Normal del
+  documento: Source Sans Pro 11 pt · justificado · interlineado múltiple 1,16 · espacio
+  después 8 pt · control de viudas/huérfanas activado. Verificar que se aplique en los
+  párrafos de cuerpo generados. Si Source Sans Pro no está disponible en el entorno, usar
+  Calibri como fallback documentado.
+  - ÉXITO: test de sanidad abre el .docx y verifica las propiedades del estilo Normal
+    (fuente, tamaño, interlineado).
+
+- **T16.3 — Tablas Word para fichas de competidores**
+  El Cap 2 produce fichas de competidores en markdown (tablas de 8 campos). El
+  `markdown_parser` actual genera `TableBlock` pero la cadena de renderizado puede
+  ignorarlas si no están en el formato esperado. Verificar el flujo completo y asegurar
+  que cada ficha se renderice como tabla Word nativa (no como texto plano).
+  - ÉXITO: el .docx de un informe E2E contiene ≥1 tabla Word con columnas visibles.
+
+### Criterios de cierre
+
+- Gate verde: `ruff 0` + `pytest -m "not slow"`.
+- `--bench --warm` ejecutado y tabla antes/después en `FASE15_HALLAZGOS.md`.
+- Radar chart con datos reales en un informe E2E (verificado visualmente).
+- Estilo Normal correcto en el .docx + test de sanidad verde.
+- Fichas de competidores como tablas Word visibles.
+- `docs/decisions/FASE16_HALLAZGOS.md` creado.
+- Tablero §4 y deuda §5 actualizados.
+
+### PROMPT DE ARRANQUE — Fase 16
+
+```text
+# ROL Y MISIÓN
+Eres el ingeniero a cargo de la FASE 16 (Presentación del Contenido) del sistema de
+Informes de Inteligencia Competitiva. Tu misión: (a) cablear en el pipeline E2E el caché de
+retrieval y ResilientChatModel implementados en Fase 15, y (b) mejorar el entregable visual:
+radar chart con datos reales, estilo Normal correcto en .docx y tablas Word para fichas de
+competidores. Trabajas según CLAUDE.md y docs/architecture/PRIME_DIRECTIVE.md.
+
+# MÉTODO DE TRABAJO (obligatorio)
+Dos partes: PARTE A (Plan Mode — leer → proponer → esperar aprobación) → PARTE B (ejecución).
+El plan es la especificación. Cambios atómicos. Tests en el mismo commit que el código.
+
+# RESTRICCIONES DURAS
+- Modelos y parámetros solo en .env (nunca hardcodear nombres ni valores mágicos en código).
+- Dependency Agnosticism: domain/ NO importa SQLAlchemy/httpx/matplotlib/Streamlit.
+- No re-litigar ADR-006 (keep_alive:0 default), ADR-012 (filtrado sectorial), ADR-013
+  (persistencia web solo-citado). Se construye SOBRE ellos.
+- El fallback a placeholder en T16.1 es obligatorio: si el LLM no emite JSON parseable, el
+  informe sigue generándose (no abortar).
+
+# ESTADO DE ENTRADA (Fase 15 cerrada)
+Branch develop (merge 46f5748). 262 tests fast, ruff 0.
+Implementado en Fase 15 pero NO cableado en el pipeline E2E:
+  - CachedWebConnector / CachedOpenAlexConnector (src/ic/infrastructure/sources/cached_connector.py)
+  - build_resilient_api_llm() (src/ic/infrastructure/llm/gateway.py)
+  - Medición real --bench --warm pendiente (FASE15_HALLAZGOS.md §2 tiene solo estimados teóricos)
+Radar chart: generate_placeholder_radar() en generate_informe.py:333 (datos hardcodeados).
+Estilo Normal: no fijado en DocxRenderer (DT-024).
+
+# PASO 0 — GATE DE ENTRADA
+uv run ruff check src/ tests/ -q && uv run pytest -m "not slow" -q  → 0 errores / verde.
+
+# PASO 1 — LECTURA OBLIGATORIA (antes de planificar)
+docs/decisions/FASE15_HALLAZGOS.md (§8 recomendaciones — cableado pendiente) ·
+docs/architecture/ADR-014-cache-retrieval-batch-keep-alive.md ·
+src/ic/infrastructure/sources/cached_connector.py ·
+src/ic/infrastructure/llm/gateway.py (build_resilient_api_llm, ResilientChatModel) ·
+src/ic/domain/use_cases/generate_informe.py (líneas 94–130 _setup_infra; 327–335 radar) ·
+src/ic/domain/use_cases/generate_n1.py (cómo construye WebConnector/OpenAlexConnector) ·
+src/ic/infrastructure/charts/radar_chart.py (generate_radar_chart, generate_placeholder_radar) ·
+src/ic/domain/chains/chain_03_benchmarking.py (prompt actual — dónde insertar JSON de scores) ·
+src/ic/infrastructure/render/docx_renderer.py (DocxRenderer.render — estilos actuales) ·
+docs/architecture/ROADMAP_FASE9+.md → sección FASE 16 (tareas T16.0–T16.3, criterios).
+
+# PASO 2 — PLAN MODE (Parte A)
+Diseña las tareas EN ORDEN, cada una con su criterio de éxito:
+
+T16.0 — Cableado E2E de Fase 15 (PREREQUISITO).
+  - generate_n1.py y generate_informe.py: inyectar CachedWebConnector/CachedOpenAlexConnector.
+  - generate_informe._setup_infra: reemplazar tiers individuales por build_resilient_api_llm.
+  - Ejecutar --bench --warm con Ollama activo y actualizar FASE15_HALLAZGOS.md §2 con datos reales.
+  ÉXITO: segunda corrida idéntica no llama al connector real (test con mock 0 llamadas).
+
+T16.1 (DT-019) — Datos reales del LLM para radar chart.
+  - Añadir instrucción JSON al final del prompt de chain_03 (scores 5 dimensiones × N competidores).
+  - Extraer JSON en generate_informe.py; llamar generate_radar_chart con datos reales.
+  - Fallback a generate_placeholder_radar si parse falla (log WARNING, no abort).
+  ÉXITO: radar en E2E usa datos del LLM; test del fallback verde.
+
+T16.2 (DT-024) — Estilo Normal del .docx.
+  - DocxRenderer: fijar fuente (Source Sans Pro o Calibri), 11 pt, justificado,
+    interlineado múltiple 1,16, espacio después 8 pt, viudas/huérfanas activo.
+  ÉXITO: test abre .docx y verifica propiedades del estilo Normal.
+
+T16.3 — Tablas Word para fichas de competidores.
+  - Verificar que el markdown_parser detecte las tablas del Cap 2 y el renderer las emita
+    como tablas Word nativas.
+  ÉXITO: .docx E2E contiene ≥1 tabla Word con columnas visibles (assert en test).
+
+Espera aprobación antes de escribir código.
+
+# PASO 3 — EJECUCIÓN (Parte B)
+Implementa T16.0→T16.3 en orden. Después de T16.0 ejecutar --bench --warm y añadir tabla
+a FASE15_HALLAZGOS.md (actualizar con datos reales).
+
+# CRITERIOS DE ÉXITO GLOBALES (Definition of Done)
+1. Gate verde: ruff 0 + pytest -m "not slow". Cobertura domain/ ≥ 80%.
+2. Segunda corrida del pipeline no llama a WebConnector/OpenAlexConnector (caché activo).
+3. Rate-limit simulado → pipeline no aborta (ResilientChatModel fallback activo).
+4. Radar chart en E2E con datos LLM reales (no placeholder).
+5. Estilo Normal verificado en .docx (test de sanidad).
+6. ≥1 tabla Word de ficha de competidor en el .docx E2E.
+
+# PASO 4 — DOCUMENTACIÓN (obligatoria al cierre)
+- docs/decisions/FASE16_HALLAZGOS.md: logros, retos, recomendaciones.
+- FASE15_HALLAZGOS.md §2: actualizar con medición real --bench --warm.
+- ROADMAP_FASE9+.md: tablero §4 (Fase 16 ✅ + hash), deuda §5 (DT-019/024), changelog §8.
+- Confirma el commit conmigo antes de mergear a develop.
+```
+
+---
+
 ## 7. Decisiones abiertas / preguntas al humano
 
 Se resuelven en la fase indicada (o antes si se puede).
@@ -1036,6 +1206,7 @@ ciclo de vida del corpus).
 | 2026-07-21 | 1.3 | Fase 10 cerrada: T10.1 CJK en 6 use cases ✅, T10.2 orphan checker + contexto con meta ✅, T10.3/T10.4 APA 7 fiel ✅, T10.5 panel fiabilidad JSONB ✅, T10.6 disclaimer parametrizable ✅. 137 tests, DT-009/015/017(parcial) cerrados. |
 | 2026-07-21 | 1.4 | Fase 11 cerrada: T11.1 report_model ✅, T11.2 docx_renderer+assembler refactor ✅, T11.3 markdown_parser+TableBlock ✅, T11.4 radar chart ✅, T11.5 PDF LibreOffice ✅, T11.7 callouts ✅. 162 tests fast, ADR-011 creado, DT-016 cerrado, DT-019 nuevo. Q2 resuelta. |
 | 2026-07-21 | 1.5 | Fase 12 cerrada: T12.3 DT-004 ✅ (generate_n1.py, 345 L), T12.4 DT-010 ✅ (tokens reales Ollama + tiempo_ollama_s), T12.5 DT-012 ✅ (paginación+filtro+CSV). 168 tests fast. T12.1/T12.2 (caché/resiliencia) pospuestos a Fase 14. |
+| 2026-07-22 | 2.1 | Fase 16 planificada: T16.0 cableado E2E (CachedConnector+ResilientChatModel), T16.1 radar real (DT-019), T16.2 estilo Normal .docx (DT-024), T16.3 tablas Word fichas competidores. Sección FASE 16 y fila tablero §4 añadidas al roadmap. |
 | 2026-07-22 | 2.0 | Fase 15 cerrada: T15.1 batch_mode() Embedder (keep_alive de lote + flag --warm) ✅; T15.2 CachedWebConnector/OpenAlexConnector + tabla retrieval_cache ✅; T15.3 is_rate_limit_error + ResilientChatModel (free→free_alt→synth→paid) + timeouts por tier (DT-021 ✅); T15.4 eval_gate.py + fase15_budget.json ✅; T15.5 purge scoping + nota /api/generate ✅. 262 tests fast, ruff 0. Pendiente cablear caché+resiliencia en pipeline E2E (ver §8 recomendaciones FASE15_HALLAZGOS). |
 | 2026-07-22 | 1.9 | Fase 14 cerrada (`1fbe8a1`): T14.1 harness de evaluación + gold set (línea base filtered ya óptima: precision 1.0/contam 0.0/hit 1.0) ✅; T14.2 MMR portado **medido y revertido** (degrada con evidencia mono-documento; λ=1.0 por defecto) ✅; T14.3 chunk_size 1000/200 (retrieval-neutral, se mantiene por eficiencia: 998 vs 1746 chunks) ✅; T14.4 índice **descartado** (SQL 15ms, embed domina 99%) ✅; T14.5 persistencia web "solo lo citado" (ADR-013) + purga backlog 1202→0 → evidencia sectorial 3.20→3.68 ✅; T14.6 CIIU→GICS (`ciiu_gics.py`) ✅. DT-020/022/023 cerradas. 223 tests fast, E2E Comfama verificado. FASE14_HALLAZGOS + ADR-013 + addendum ADR-012. |
 | 2026-07-22 | 1.7 | Fase 13 cerrada (`62fe327`). Roadmap reordenado (deuda técnica primero, decisión del usuario): Fase 14 Calidad de Retrieval (DT-022/020/023, detallada + prompt de arranque), Fase 15 Resiliencia y Costo (DT-021+T12.1/2), Fase 16 Presentación (DT-019+tablas), luego cron/multi-tenant/API. |
