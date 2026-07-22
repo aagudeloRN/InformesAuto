@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, call, patch
-
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # Helper
@@ -62,8 +60,8 @@ def test_cache_get_fresh_miss():
 
 def test_cache_get_fresh_hit():
     """Devuelve el payload cuando la entrada existe y no expiró."""
-    from ic.data.repositories.retrieval_cache_repo import RetrievalCacheRepository
     from ic.data.models.retrieval_cache import RetrievalCache
+    from ic.data.repositories.retrieval_cache_repo import RetrievalCacheRepository
 
     row = MagicMock(spec=RetrievalCache)
     row.payload = [{"url": "http://x.com"}]
@@ -92,8 +90,8 @@ def test_cache_upsert_insert_when_missing():
 
 def test_cache_upsert_update_when_existing():
     """Cuando ya existe entrada, upsert actualiza sin hacer INSERT."""
-    from ic.data.repositories.retrieval_cache_repo import RetrievalCacheRepository
     from ic.data.models.retrieval_cache import RetrievalCache
+    from ic.data.repositories.retrieval_cache_repo import RetrievalCacheRepository
 
     existing = MagicMock(spec=RetrievalCache)
     db = MagicMock()
@@ -123,8 +121,8 @@ def _make_cached_web(connector, db=None, ttl=168):
 
 def test_cached_web_miss_then_hit():
     """Primera búsqueda llama al connector; la segunda (idéntica) es cache hit."""
-    from ic.infrastructure.sources.cached_connector import CachedWebConnector
     from ic.data.repositories.retrieval_cache_repo import RetrievalCacheRepository
+    from ic.infrastructure.sources.cached_connector import CachedWebConnector
 
     connector = MagicMock()
     connector.search.return_value = [_make_web_result()]
@@ -153,8 +151,8 @@ def test_cached_web_miss_then_hit():
 
 def test_cached_web_force_ddg_bypasses_cache():
     """force_ddg=True no consulta ni guarda en caché."""
-    from ic.infrastructure.sources.cached_connector import CachedWebConnector
     from ic.data.repositories.retrieval_cache_repo import RetrievalCacheRepository
+    from ic.infrastructure.sources.cached_connector import CachedWebConnector
 
     connector = MagicMock()
     connector.search.return_value = [_make_web_result("http://ddg.com")]
@@ -177,8 +175,8 @@ def test_cached_web_force_ddg_bypasses_cache():
 
 def test_cached_openalex_miss_then_hit():
     """Primera búsqueda a OpenAlex llama al connector; la segunda es cache hit."""
-    from ic.infrastructure.sources.cached_connector import CachedOpenAlexConnector
     from ic.data.repositories.retrieval_cache_repo import RetrievalCacheRepository
+    from ic.infrastructure.sources.cached_connector import CachedOpenAlexConnector
 
     connector = MagicMock()
     connector.search.return_value = [_make_web_result("https://openalex.org/W1")]
@@ -196,7 +194,7 @@ def test_cached_openalex_miss_then_hit():
         return_value=repo,
     ):
         cached = CachedOpenAlexConnector(connector=connector, db=db, settings=_make_settings())
-        r1 = cached.search("machine learning Colombia")
+        cached.search("machine learning Colombia")
         r2 = cached.search("machine learning Colombia")
 
     assert connector.search.call_count == 1
