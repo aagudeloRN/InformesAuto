@@ -134,6 +134,9 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-022 | Reranking/afinado de retrieval: MMR completo + evaluación, `chunk_size` 500→1000, índice parcial/GIN sobre `metadatos->>'sector_gics'` | 14 | ✅ harness T14.1 (métricas propias); MMR medido y **revertido** (degrada mono-doc); `chunk_size` 1000/200 (neutral, se mantiene por eficiencia); índice **descartado** (SQL 15ms). Ver `FASE14_HALLAZGOS.md` + addendum ADR-012 |
 | DT-023 | Clasificación GICS: `chain_02_gics` no emite el código (mitigado por `extract_gics_code`). Usar `Comparacion_GICS_CIIU.csv` (CIIU→GICS) para acotar/validar candidatos y endurecer el prompt para emitir "(GICS XXXX)" | 14 | ✅ `ciiu_gics.py` (CIIU→Sección→candidatos); `ClassifyGICS` acota+valida/corrige; `chain_02` endurecido; fallback por nombre conservado; ≥5 CIIU probados |
 | DT-024 | Estilo Normal del documento no fijado: objetivo Source Sans Pro 11 pt, justificado, interlineado 1,16, espacio después 8 pt, control de viudas/huérfanas | 16 | ✅ `_apply_normal_style()` en `docx_renderer`; Calibri 11 pt (Source Sans Pro como mejora futura) |
+| DT-025 | Medición real de latencia `--bench --warm`: los números en `FASE15_HALLAZGOS.md §2` son estimados teóricos (Ollama no disponible en sesión de Fase 15/16) | 17 | ⬜ ejecutar `scripts/eval_retrieval.py --bench --warm` con Ollama activo y actualizar §2 |
+| DT-026 | Hit-rate de caché no instrumentado: `CachedWebConnector`/`CachedOpenAlexConnector` no emiten métricas de hits/misses en el log del informe | 17 | ⬜ añadir contador hits/misses + emitirlo en log de cierre del pipeline |
+| DT-027 | Hit-rate del bloque `radar_json` desconocido: no se sabe qué % de corridas con modelos free-tier emiten el JSON parseable. Si < 50%, considerar cadena dedicada de extracción de scores | 17 | ⬜ medir en primeras 5 corridas E2E reales; ajustar si tasa es baja |
 
 ---
 
