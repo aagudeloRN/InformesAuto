@@ -1,0 +1,30 @@
+{
+  "descripcion": "Gold set de evaluacion de retrieval (T14.1). Un query por sector GICS del corpus de 25 informes sectoriales de Ruta N. 'relevante' = chunk con metadatos.sector_gics == sector_esperado y tipo_fuente=informe_compilado. Versionado; deterministico.",
+  "queries": [
+    {"sector_esperado": "1010", "query": "Energia: tendencias de mercado, competidores y ecosistema en Colombia y Latinoamerica"},
+    {"sector_esperado": "1510", "query": "Materiales: quimicos industriales, metales y mineria, tendencias y actores del sector"},
+    {"sector_esperado": "2010", "query": "Bienes de capital: maquinaria industrial, construccion e ingenieria, dinamica competitiva"},
+    {"sector_esperado": "2020", "query": "Servicios comerciales y profesionales: consultoria, BPO y gestion, tendencias del sector"},
+    {"sector_esperado": "2030", "query": "Transporte y logistica: carga, aerolineas e infraestructura, competidores regionales"},
+    {"sector_esperado": "2510", "query": "Automoviles y componentes: fabricantes, autopartes y movilidad, tendencias del sector"},
+    {"sector_esperado": "2520", "query": "Bienes de consumo duraderos y prendas de vestir: electronica, textiles y calzado"},
+    {"sector_esperado": "2530", "query": "Servicios al consumidor: hoteleria, restaurantes y entretenimiento vivencial, competidores"},
+    {"sector_esperado": "2550", "query": "Distribucion y venta minorista discrecional: retail especializado y grandes almacenes"},
+    {"sector_esperado": "3010", "query": "Distribucion y venta minorista de productos basicos: supermercados y farmacias"},
+    {"sector_esperado": "3020", "query": "Alimentos, bebidas y tabaco: agroindustria, lacteos y bebidas, actores del sector"},
+    {"sector_esperado": "3030", "query": "Productos para el hogar y personales: cosmeticos, limpieza y cuidado personal"},
+    {"sector_esperado": "3510", "query": "Equipos y servicios de atencion medica: dispositivos medicos, hospitales y planes de salud"},
+    {"sector_esperado": "3520", "query": "Productos farmaceuticos, biotecnologia y ciencias de la vida: I+D y medicamentos"},
+    {"sector_esperado": "4010", "query": "Bancos: banca corporativa y minorista, tendencias competitivas del sector financiero"},
+    {"sector_esperado": "4020", "query": "Servicios financieros: pagos, gestion de activos y fintech, dinamica del sector"},
+    {"sector_esperado": "4030", "query": "Seguros: polizas de vida, salud y propiedad, competidores y tendencias del sector"},
+    {"sector_esperado": "6010", "query": "Fideicomisos de inversion inmobiliaria REITs: activos inmobiliarios y rentas"},
+    {"sector_esperado": "6020", "query": "Gestion y desarrollo inmobiliario: promotoras y brokers, tendencias del sector"},
+    {"sector_esperado": "4530", "query": "Semiconductores y equipos semiconductores: microchips y manufactura de chips"},
+    {"sector_esperado": "4520", "query": "Tecnologia, hardware y equipos: dispositivos electronicos, computadoras y comunicaciones"},
+    {"sector_esperado": "4510", "query": "Software y servicios: desarrollo de software, consultoria TI e infraestructura de internet"},
+    {"sector_esperado": "5020", "query": "Medios y entretenimiento: contenido, publicidad, videojuegos y plataformas digitales"},
+    {"sector_esperado": "5010", "query": "Servicios de telecomunicaciones: operadores moviles, fibra y banda ancha"},
+    {"sector_esperado": "5510", "query": "Servicios publicos: generacion y distribucion de electricidad, gas, agua y renovables"}
+  ]
+}

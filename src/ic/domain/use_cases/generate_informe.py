@@ -41,6 +41,7 @@ class _PipelineContext:
     settings: Any
     step_fn: Any
     total_start: float
+    session_id: str = ""
     llm: Any = None
     api_llm: Any = None
     api_llm_alt: Any = None
@@ -84,6 +85,7 @@ class GenerateInforme:
                 on_step(n, self.TOTAL_PASOS, label)
 
         ctx = self._setup_infra(params, _step, time.time())
+        self._sweep_stale_web(ctx)
         self._run_n0(ctx)
         self._run_n1(ctx)
         self._run_n2(ctx)
@@ -114,14 +116,50 @@ class GenerateInforme:
         slug = params.empresa.replace(" ", "_").replace(".", "").lower()
         output_path = params.output_path or f"./output/{slug}_informe.docx"
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        import uuid
         return _PipelineContext(
             params=params, settings=s, step_fn=step_fn, total_start=total_start,
+            session_id=uuid.uuid4().hex,
             llm=llm, api_llm=api_llm, api_llm_alt=api_llm_alt, api_llm_synth=api_llm_synth,
             cap1_llms=cap1_llms, embedder=Embedder(s), web=WebConnector(s),
             tracker=tracker,
             intro_chain=build_chain_intro(api_llm) if api_llm else None,
             output_path=output_path,
         )
+
+    def _sweep_stale_web(self, ctx: _PipelineContext) -> None:
+        """Barre chunks web huérfanos de corridas previas (crash) antes de empezar (T14.5)."""
+        from ic.data.database import SessionLocal
+        from ic.data.repositories.embedding_repo import EmbeddingRepository
+
+        try:
+            with SessionLocal() as db:
+                n = EmbeddingRepository(db).sweep_stale_web_sessions(ctx.session_id)
+                if n:
+                    logger.info("Barrido de %d chunks web huérfanos de sesiones previas", n)
+        except Exception:
+            logger.warning("No se pudo barrer chunks web huérfanos", exc_info=True)
+
+    def _promote_cited_web(self, ctx: _PipelineContext, chunks_usados: list) -> None:
+        """Promueve solo los chunks web citados; borra el resto de la sesión (T14.5)."""
+        from ic.data.database import SessionLocal
+        from ic.data.repositories.embedding_repo import EmbeddingRepository
+
+        cited_ids = [
+            c.chunk_id for c in chunks_usados
+            if getattr(c, "fuente_tipo", None) == "web" and getattr(c, "chunk_id", None)
+        ]
+        try:
+            with SessionLocal() as db:
+                borrados, promovidos = EmbeddingRepository(db).promote_cited_web(
+                    ctx.session_id, cited_ids
+                )
+                logger.info(
+                    "Persistencia web: %d chunks promovidos (citados), %d descartados",
+                    promovidos, borrados,
+                )
+        except Exception:
+            logger.warning("No se pudo promover/purgar chunks web de la sesión", exc_info=True)
 
     def _run_n0(self, ctx: _PipelineContext) -> None:
         from ic.domain.chains.chain_01_descripcion import build_chain_01
@@ -143,6 +181,7 @@ class GenerateInforme:
         ctx.step_fn(2, "GICS — Clasificación de sector")
         ctx.gics = ClassifyGICS(chain=build_chain_02(ctx.api_llm or ctx.llm)).execute(
             nombre_empresa=ctx.params.empresa, descripcion_empresa=ctx.empresa.texto,
+            ciiu=ctx.params.ciiu,
         )
 
     def _run_n1(self, ctx: _PipelineContext) -> None:
@@ -164,6 +203,7 @@ class GenerateInforme:
         g_code = extract_gics_code(g)
         with SessionLocal() as db_n2:
             store_n2 = PGVectorStore(ctx.embedder, EmbeddingRepository(db_n2), ctx.settings)
+            store_n2.session_id = ctx.session_id
 
             ctx.step_fn(6, "Cap 5 — Convergencia Empresarial")
             if ctx.api_llm_synth is not None:
@@ -241,6 +281,10 @@ class GenerateInforme:
             if cap_obj and cap_obj.chunks_usados:
                 todos_chunks += cap_obj.chunks_usados
         refs = build_references_section(todos_chunks)
+
+        # Persistencia web "solo lo citado" (T14.5, DT-020): de los chunks web de esta sesión,
+        # se promueven los efectivamente usados y se borra el resto de la búsqueda.
+        self._promote_cited_web(ctx, todos_chunks)
 
         texto_completo = " ".join(
             c.texto

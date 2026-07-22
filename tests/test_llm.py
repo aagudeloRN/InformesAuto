@@ -143,6 +143,7 @@ def test_chain_02_gics_noel():
     result = chain.invoke({
         "nombre_empresa": "Noel S.A.S.",
         "descripcion_empresa": _NOEL_DESC,
+        "pistas": "",
     })
     assert isinstance(result, str)
     assert len(result) > 0

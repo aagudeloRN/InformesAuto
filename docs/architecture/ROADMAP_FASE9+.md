@@ -103,6 +103,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 11 | Formato del Documento Final | ✅ | 2026-07-21 | `a581201`+ | `FASE11_HALLAZGOS.md` |
 | 12 | Optimización de Operación | ✅ | 2026-07-21 | `8f6e8f5`+ | `FASE12_HALLAZGOS.md` |
 | 13 | Repositorio Sectorial RAG | ✅ | 2026-07-22 | `62fe327` | `FASE13_HALLAZGOS.md` |
+| 14 | Calidad de Retrieval y Evaluación | 🟡 | 2026-07-22 | _(commit pendiente)_ | `FASE14_HALLAZGOS.md` |
 
 > Cada fase, al cerrar, actualiza su fila (estado ✅, fecha, hash de commit) y marca sus
 > tareas en la sección correspondiente.
@@ -126,10 +127,10 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-019 | Datos estructurados del LLM para radar chart real (actualmente placeholder) | 16 | ⬜ (presentación) |
 | DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | ✅ footer parametrizable + `_run_pdf` retirado (corpus vía UI/lote, ADR-012) |
 | DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | 🟡 script listo; settings.json actualizado en Fase 10 |
-| DT-020 | Persistencia web indiscriminada: se ingesta todo lo buscado (usado o no). Objetivo: persistir **solo lo citado** (`chunks_usados`) + purgar el backlog no usado (~2024 chunks) | 14 | ⬜ nuevo (Fase 13) |
+| DT-020 | Persistencia web indiscriminada: se ingesta todo lo buscado (usado o no). Objetivo: persistir **solo lo citado** (`chunks_usados`) + purgar el backlog no usado | 14 | ✅ ADR-013: session ingest + `promote_cited_web` + `sweep_stale` + purga única (backlog 1202→0); la purga subió la evidencia sectorial 3.20→3.68 chunks/consulta |
 | DT-021 | Resiliencia OpenRouter free: rate-limits transitorios (`ResourceExhausted 32/32`) sin backoff/reintento dedicado | 15 | ⬜ nuevo (Fase 13); ligado a T12.1/T12.2 pospuestos |
 | DT-022 | Reranking/afinado de retrieval: MMR completo + evaluación (RAGAS), `chunk_size` 500→1000, índice parcial/GIN sobre `metadatos->>'sector_gics'` | 14 | ⬜ nuevo (Fase 13) |
-| DT-023 | Clasificación GICS: `chain_02_gics` no emite el código (mitigado por `extract_gics_code`). Usar `Comparacion_GICS_CIIU.csv` (CIIU→GICS) para acotar/validar candidatos y endurecer el prompt para emitir "(GICS XXXX)" | 14 | ⬜ nuevo (Fase 13) |
+| DT-023 | Clasificación GICS: `chain_02_gics` no emite el código (mitigado por `extract_gics_code`). Usar `Comparacion_GICS_CIIU.csv` (CIIU→GICS) para acotar/validar candidatos y endurecer el prompt para emitir "(GICS XXXX)" | 14 | ✅ `ciiu_gics.py` (CIIU→Sección→candidatos); `ClassifyGICS` acota+valida/corrige; `chain_02` endurecido; fallback por nombre conservado; ≥5 CIIU probados |
 | DT-024 | Estilo Normal del documento no fijado: objetivo Source Sans Pro 11 pt, justificado, interlineado 1,16, espacio después 8 pt, control de viudas/huérfanas | 16 | ⬜ nuevo (Fase 13) |
 
 ---
@@ -700,7 +701,12 @@ Orden acordado con el usuario: absorber la deuda técnica descubierta antes de f
 
 # FASE 14 — Calidad de Retrieval y Evaluación
 
-**Prioridad:** P1 · **Estado:** ⬜ Pendiente · **Deuda:** DT-022, DT-020, DT-023
+**Prioridad:** P1 · **Estado:** 🟡 En curso (2026-07-22) · **Deuda:** DT-022, DT-020, DT-023
+
+> **Cierre T14.x:** T14.1 ✅ harness+gold set · T14.2 ✅ MMR medido y **revertido** (λ=1.0
+> default; degrada con evidencia mono-documento) · T14.3 🟡 chunk_size (en medición) ·
+> T14.4 ✅ índice **descartado** (SQL 15ms) · T14.5 ✅ persistencia web "solo lo citado"
+> (ADR-013) + purga 1202→0 · T14.6 ✅ CIIU→GICS. Ver `FASE14_HALLAZGOS.md`.
 
 ### Objetivo
 Elevar la calidad y el rigor del retrieval RAG con evidencia medible. Fase 13 dejó tres
@@ -883,6 +889,6 @@ ciclo de vida del corpus).
 | 2026-07-21 | 1.3 | Fase 10 cerrada: T10.1 CJK en 6 use cases ✅, T10.2 orphan checker + contexto con meta ✅, T10.3/T10.4 APA 7 fiel ✅, T10.5 panel fiabilidad JSONB ✅, T10.6 disclaimer parametrizable ✅. 137 tests, DT-009/015/017(parcial) cerrados. |
 | 2026-07-21 | 1.4 | Fase 11 cerrada: T11.1 report_model ✅, T11.2 docx_renderer+assembler refactor ✅, T11.3 markdown_parser+TableBlock ✅, T11.4 radar chart ✅, T11.5 PDF LibreOffice ✅, T11.7 callouts ✅. 162 tests fast, ADR-011 creado, DT-016 cerrado, DT-019 nuevo. Q2 resuelta. |
 | 2026-07-21 | 1.5 | Fase 12 cerrada: T12.3 DT-004 ✅ (generate_n1.py, 345 L), T12.4 DT-010 ✅ (tokens reales Ollama + tiempo_ollama_s), T12.5 DT-012 ✅ (paginación+filtro+CSV). 168 tests fast. T12.1/T12.2 (caché/resiliencia) pospuestos a Fase 14. |
-| 2026-07-22 | 1.8 | Insumos del usuario integrados: (1) tabla `Comparacion_GICS_CIIU.csv` (CIIU→GICS) → T14.6 para acotar/validar clasificación; (2) política de persistencia web "solo lo citado" + purga del backlog → T14.5 (DT-020); (3) estilo Normal del documento (Source Sans Pro 11/justificado/1,16/8pt/viudas) → Fase 16 (DT-024). Prompt de arranque de Fase 14 actualizado. |
+| 2026-07-22 | 1.9 | Fase 14 (en curso): T14.1 harness de evaluación + gold set (línea base filtered ya óptima: precision 1.0/contam 0.0/hit 1.0) ✅; T14.2 MMR portado **medido y revertido** (degrada con evidencia mono-documento; λ=1.0 por defecto) ✅; T14.4 índice **descartado** (SQL 15ms, embed domina 99%) ✅; T14.5 persistencia web "solo lo citado" (ADR-013) + purga backlog 1202→0 → evidencia sectorial 3.20→3.68 ✅; T14.6 CIIU→GICS (`ciiu_gics.py`) ✅. DT-020/022/023. FASE14_HALLAZGOS + ADR-013. T14.3 (chunk_size) en medición. |
 | 2026-07-22 | 1.7 | Fase 13 cerrada (`62fe327`). Roadmap reordenado (deuda técnica primero, decisión del usuario): Fase 14 Calidad de Retrieval (DT-022/020/023, detallada + prompt de arranque), Fase 15 Resiliencia y Costo (DT-021+T12.1/2), Fase 16 Presentación (DT-019+tablas), luego cron/multi-tenant/API. |
 | 2026-07-22 | 1.6 | Fase 13 en curso: T13.1 esquema (sector_gics/activo + PAPER_ACADEMICO) ✅, T13.2 PdfIngestor (documento_id + fuente_tipo pdf) ✅, T13.3 filtrado sectorial + cap por doc ✅, T13.4 panel Repositorio + DocumentoRepository ✅, T13.5 lote 25 PDFs ingestado (1746 chunks, 0 errores) ✅, T13.6 `_run_pdf` retirado (DT-017) ✅, T13.7 APA informe_compilado + evaluación 3 empresas ✅ (Fase 13: 3/0 sect/cross vs base 0-1/2-4; añadida reserva sectorial tras hallazgo de backlog web), T13.8 ADR-012 + hallazgos RepositorioRN ✅. 179 tests fast. DT-011/DT-017 cerrados. |

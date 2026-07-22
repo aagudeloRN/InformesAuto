@@ -89,3 +89,24 @@ corpus se ingesta **una vez** por el panel Repositorio o `scripts/ingest_batch.p
   escala). Si el corpus crece mucho, evaluar índice parcial/GIN e `hnsw.iterative_scan`.
 - **Migración:** `ensure_documento_columns()` es idempotente (`ADD COLUMN IF NOT EXISTS`) y
   refresca el `CHECK` de `tipo` para admitir `PAPER_ACADEMICO`.
+
+---
+
+## Addendum Fase 14 (2026-07-22) — decisiones medidas sobre el retrieval
+
+Evaluadas con el harness T14.1 (`scripts/eval_retrieval.py`). Detalle en `FASE14_HALLAZGOS.md`.
+
+- **MMR completo:** portado (`infrastructure/retrieval/mmr.py`, parametrizable por
+  `rag_mmr_lambda`) pero **desactivado por defecto (λ=1.0)**. Degrada el retrieval en este
+  corpus: la evidencia sectorial está concentrada en un único documento por sector, y la
+  penalización por documento repetido empuja esa evidencia hacia abajo. El **cap por documento**
+  (§2) sigue siendo el mecanismo de diversidad. MMR queda como palanca para corpus futuros
+  multi-documento por sector.
+- **`chunk_size` 1000 / overlap 200** (antes 500/50): **retrieval-neutral** (precision 1.0,
+  contaminación 0.0, hit 1.0 sin cambio) con ~57% de los chunks (998 vs 1746). Se adopta por
+  eficiencia, no por calidad.
+- **Índice parcial/GIN sobre `metadatos->>'sector_gics'`:** **no se añade.** La latencia SQL
+  aislada del embedding es ~14–15 ms a esta escala (el embedding local domina el ~99% del
+  tiempo). Se mantiene la recomendación de §2: índice opcional solo si el corpus crece.
+- **Reserva de cupos (§2):** los cupos reservados usan orden por score puro (MMR no se aplica en
+  la búsqueda estricta), garantizando que afloren los chunks sectoriales de mayor similitud.

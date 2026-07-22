@@ -22,8 +22,10 @@ _SYSTEM_PROMPT_02_TEMPLATE = (
     "- Si la empresa es ambigua, elegir el grupo más probable por core business.\n"
     "- Usar la descripción de la empresa como única fuente; no añadir conocimiento externo.\n"
     "- Formato de salida obligatorio (sin variaciones):\n"
-    "    Grupo Industrial: [nombre exacto del grupo]\n"
+    "    Grupo Industrial: [nombre exacto del grupo] (GICS XXXX)\n"
     "    Justificación: [máximo 3 líneas]\n"
+    "- El nombre DEBE ir seguido de su código entre paréntesis tal como aparece arriba, "
+    "p.ej. 'Servicios al consumidor (GICS 2530)'.\n"
     "- Respuesta 100 % en español latino neutro.\n"
     "- Sin meta-comentarios sobre el proceso."
 )
@@ -35,9 +37,10 @@ USER_PROMPT_02 = (
     "en el system prompt.\n\n"
     "NOMBRE DE LA EMPRESA: {nombre_empresa}\n\n"
     "DESCRIPCIÓN DE LA EMPRESA:\n"
-    "{descripcion_empresa}\n\n"
+    "{descripcion_empresa}\n"
+    "{pistas}\n"
     "Responde únicamente con:\n"
-    "Grupo Industrial: [nombre]\n"
+    "Grupo Industrial: [nombre] (GICS XXXX)\n"
     "Justificación: [máximo 3 líneas explicando por qué ese grupo, basándote en el core business]"
 )
 

@@ -1,0 +1,255 @@
+{
+  "mode": "filtered",
+  "chunk_size": 500,
+  "overlap": 50,
+  "config": {
+    "rag_top_k": 10,
+    "rag_similarity_threshold": 0.7,
+    "rag_max_chunks_per_doc": 4,
+    "rag_sector_reserve": 3,
+    "rag_sector_reserve_threshold": 0.5,
+    "rag_mmr_lambda": 0.7
+  },
+  "aggregate": {
+    "n_queries": 25,
+    "precision": 1.0,
+    "contamination": 0.0,
+    "hit_rate": 1.0,
+    "avg_correct_chunks": 3.08,
+    "mean_score": 0.764
+  },
+  "per_query": [
+    {
+      "sector": "1010",
+      "query": "Energia: tendencias de mercado, competidores y ecosistema en Colombia y Latinoamerica",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7889
+    },
+    {
+      "sector": "1510",
+      "query": "Materiales: quimicos industriales, metales y mineria, tendencias y actores del sector",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7814
+    },
+    {
+      "sector": "2010",
+      "query": "Bienes de capital: maquinaria industrial, construccion e ingenieria, dinamica competitiva",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.729
+    },
+    {
+      "sector": "2020",
+      "query": "Servicios comerciales y profesionales: consultoria, BPO y gestion, tendencias del sector",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7943
+    },
+    {
+      "sector": "2030",
+      "query": "Transporte y logistica: carga, aerolineas e infraestructura, competidores regionales",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7721
+    },
+    {
+      "sector": "2510",
+      "query": "Automoviles y componentes: fabricantes, autopartes y movilidad, tendencias del sector",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7732
+    },
+    {
+      "sector": "2520",
+      "query": "Bienes de consumo duraderos y prendas de vestir: electronica, textiles y calzado",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7707
+    },
+    {
+      "sector": "2530",
+      "query": "Servicios al consumidor: hoteleria, restaurantes y entretenimiento vivencial, competidores",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.753
+    },
+    {
+      "sector": "2550",
+      "query": "Distribucion y venta minorista discrecional: retail especializado y grandes almacenes",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 4,
+      "mean_score": 0.748
+    },
+    {
+      "sector": "3010",
+      "query": "Distribucion y venta minorista de productos basicos: supermercados y farmacias",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7656
+    },
+    {
+      "sector": "3020",
+      "query": "Alimentos, bebidas y tabaco: agroindustria, lacteos y bebidas, actores del sector",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7218
+    },
+    {
+      "sector": "3030",
+      "query": "Productos para el hogar y personales: cosmeticos, limpieza y cuidado personal",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7448
+    },
+    {
+      "sector": "3510",
+      "query": "Equipos y servicios de atencion medica: dispositivos medicos, hospitales y planes de salud",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7932
+    },
+    {
+      "sector": "3520",
+      "query": "Productos farmaceuticos, biotecnologia y ciencias de la vida: I+D y medicamentos",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7377
+    },
+    {
+      "sector": "4010",
+      "query": "Bancos: banca corporativa y minorista, tendencias competitivas del sector financiero",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.747
+    },
+    {
+      "sector": "4020",
+      "query": "Servicios financieros: pagos, gestion de activos y fintech, dinamica del sector",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7897
+    },
+    {
+      "sector": "4030",
+      "query": "Seguros: polizas de vida, salud y propiedad, competidores y tendencias del sector",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7391
+    },
+    {
+      "sector": "6010",
+      "query": "Fideicomisos de inversion inmobiliaria REITs: activos inmobiliarios y rentas",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7593
+    },
+    {
+      "sector": "6020",
+      "query": "Gestion y desarrollo inmobiliario: promotoras y brokers, tendencias del sector",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7815
+    },
+    {
+      "sector": "4530",
+      "query": "Semiconductores y equipos semiconductores: microchips y manufactura de chips",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 4,
+      "mean_score": 0.747
+    },
+    {
+      "sector": "4520",
+      "query": "Tecnologia, hardware y equipos: dispositivos electronicos, computadoras y comunicaciones",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7743
+    },
+    {
+      "sector": "4510",
+      "query": "Software y servicios: desarrollo de software, consultoria TI e infraestructura de internet",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7815
+    },
+    {
+      "sector": "5020",
+      "query": "Medios y entretenimiento: contenido, publicidad, videojuegos y plataformas digitales",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7791
+    },
+    {
+      "sector": "5010",
+      "query": "Servicios de telecomunicaciones: operadores moviles, fibra y banda ancha",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7844
+    },
+    {
+      "sector": "5510",
+      "query": "Servicios publicos: generacion y distribucion de electricidad, gas, agua y renovables",
+      "precision": 1.0,
+      "contamination": 0.0,
+      "hit": 1.0,
+      "n_correct": 3,
+      "mean_score": 0.7444
+    }
+  ],
+  "latency_ms": {
+    "mean": 1325.4
+  },
+  "latency_sql_ms": {
+    "mean": 14.3,
+    "max": 16.284
+  }
+}
