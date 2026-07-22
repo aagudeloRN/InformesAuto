@@ -28,6 +28,11 @@ from ic.domain.report_model import (
 
 _INLINE_RE = re.compile(r"(\*\*.+?\*\*|\*.+?\*)")
 
+# Fuente del estilo Normal (T17.4, DT-024). Source Sans Pro no está empaquetado en Ubuntu
+# 24.04; Open Sans es el sustituto humanista-sans instalado (fonts-open-sans). Fuente de
+# verdad única: el test de estilo importa esta constante.
+NORMAL_FONT_NAME = "Open Sans"
+
 
 class DocxRenderer:
     def __init__(self, template_path: str | None = None) -> None:
@@ -56,10 +61,10 @@ class DocxRenderer:
 # ---------------------------------------------------------------------------
 
 def _apply_normal_style(doc: Document) -> None:
-    """Fija el estilo Normal: Calibri 11 pt, justificado, interlineado 1,16x, espacio 8 pt."""
+    """Fija el estilo Normal: Open Sans 11 pt, justificado, interlineado 1,16x, espacio 8 pt."""
     style = doc.styles["Normal"]
     font = style.font
-    font.name = "Calibri"  # Source Sans Pro como mejora futura si se instala en el servidor
+    font.name = NORMAL_FONT_NAME  # T17.4: Open Sans (sustituto de Source Sans Pro, DT-024)
     font.size = Pt(11)
     pf = style.paragraph_format
     pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
