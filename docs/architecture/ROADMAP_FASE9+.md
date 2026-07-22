@@ -102,7 +102,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 10 | Fiabilidad del Contenido | ✅ | 2026-07-21 | `8f00f9d`+ | `FASE10_HALLAZGOS.md` |
 | 11 | Formato del Documento Final | ✅ | 2026-07-21 | `a581201`+ | `FASE11_HALLAZGOS.md` |
 | 12 | Optimización de Operación | ✅ | 2026-07-21 | `8f6e8f5`+ | `FASE12_HALLAZGOS.md` |
-| 13 | Repositorio Sectorial RAG | 🟡 | — | `feature/fase13-rag-sectorial` | `FASE13_HALLAZGOS.md` |
+| 13 | Repositorio Sectorial RAG | ✅ | 2026-07-22 | `62fe327` | `FASE13_HALLAZGOS.md` |
 
 > Cada fase, al cerrar, actualiza su fila (estado ✅, fecha, hash de commit) y marca sus
 > tareas en la sección correspondiente.
@@ -126,6 +126,10 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-019 | Datos estructurados del LLM para radar chart real (actualmente placeholder) | 12 | ⬜ nuevo |
 | DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | ✅ footer parametrizable + `_run_pdf` retirado (corpus vía UI/lote, ADR-012) |
 | DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | 🟡 script listo; settings.json actualizado en Fase 10 |
+| DT-020 | Backlog de chunks web sin ciclo de vida (2024 acumulados) compite con el corpus sectorial; sin TTL/frescura ni limpieza | 14 | ⬜ nuevo (Fase 13) |
+| DT-021 | Resiliencia OpenRouter free: rate-limits transitorios (`ResourceExhausted 32/32`) sin backoff/reintento dedicado | 14 | ⬜ nuevo (Fase 13); ligado a T12.1/T12.2 pospuestos |
+| DT-022 | Reranking/afinado de retrieval: MMR completo + evaluación (RAGAS), `chunk_size` 500→1000, índice parcial/GIN sobre `metadatos->>'sector_gics'` | 14 | ⬜ nuevo (Fase 13) |
+| DT-023 | `chain_02_gics` no emite el código GICS en su salida; mitigado por `extract_gics_code` (fallback por nombre). Endurecer el prompt para emitir "(GICS XXXX)" | 14 | ⬜ nuevo (Fase 13) |
 
 ---
 
