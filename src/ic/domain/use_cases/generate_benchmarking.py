@@ -1,3 +1,9 @@
+from __future__ import annotations
+
+import json
+import logging
+import re
+
 from langchain_core.runnables import Runnable
 
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
@@ -7,7 +13,30 @@ from ic.infrastructure.sources.web_connector import WebConnector
 from ic.shared.text_utils import has_cjk_characters
 from ic.shared.types import CapBenchmarking
 
+logger = logging.getLogger(__name__)
+
 _MIN_CHUNKS = 5
+
+# Bloque JSON de scores del radar emitido al final de la respuesta del LLM (T16.1)
+_RADAR_RE = re.compile(r"```radar_json\s*(.*?)```", re.DOTALL)
+
+
+def _extract_radar(texto: str) -> tuple[str, dict | None]:
+    """Extrae el bloque radar_json del texto del LLM y devuelve (texto_limpio, datos).
+
+    Si el bloque no existe o es inválido, devuelve (texto_original, None).
+    """
+    m = _RADAR_RE.search(texto)
+    if not m:
+        return texto, None
+    raw_json = m.group(1).strip()
+    clean = texto[: m.start()].rstrip()
+    try:
+        data = json.loads(raw_json)
+        return clean, data
+    except json.JSONDecodeError:
+        logger.warning("radar_json no parseable — fallback a placeholder. Raw: %r", raw_json[:120])
+        return clean, None
 
 
 class GenerateBenchmarking:
@@ -56,12 +85,12 @@ class GenerateBenchmarking:
             )
 
         context = format_chunks_as_context(chunks)
-        texto = self._chain.invoke({
+        texto_raw = self._chain.invoke({
             "descripcion_empresa": descripcion_empresa,
             "retrieval_competidores": context,
         })
 
-        if has_cjk_characters(texto):
+        if has_cjk_characters(texto_raw):
             return CapBenchmarking(
                 texto=build_absent_paragraph(
                     "Cap 2 — Análisis Competitivo",
@@ -72,9 +101,13 @@ class GenerateBenchmarking:
                 chunks_usados=chunks,
             )
 
+        # T16.1: extraer bloque radar_json; si parseable, adjuntar en radar_data
+        texto, radar_data = _extract_radar(texto_raw)
+
         return CapBenchmarking(
             texto=texto,
             n_chunks_usados=len(chunks),
             retrieval_suficiente=True,
             chunks_usados=chunks,
+            radar_data=radar_data,
         )
