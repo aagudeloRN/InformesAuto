@@ -74,21 +74,35 @@ class EmbeddingRepository:
         self._db.commit()
         return int(n)
 
-    def purge_unused_web_backlog(self) -> int:
-        """Purga ÚNICA del backlog web histórico no usado (T14.5, DT-020).
+    def purge_unused_web_backlog(self, limit_ids: list[str] | None = None) -> int:
+        """Purga el backlog web no usado (T14.5, DT-020).
 
-        Borra los chunks web "legacy": sin `session_id` (no están en una corrida en curso) y
-        sin `promoted` (nunca fueron citados bajo la nueva política). No toca chunks promovidos
-        ni en-sesión. Devuelve el nº de chunks borrados.
+        Solo borra los chunks web "legacy": sin `session_id` y sin `promoted`.
+        No toca chunks promovidos ni en-sesión.
+
+        limit_ids (T15.5): si se pasa, restringe la purga a esos IDs concretos.
+        Útil en tests para borrar únicamente los chunks que el test insertó, sin
+        afectar el resto de la BD.
         """
         emb = EmbeddingVectorial.__table__.fullname
-        n = self._db.execute(
-            text(
-                f"DELETE FROM {emb} WHERE fuente_tipo = 'web' "
-                "AND metadatos->>'session_id' IS NULL "
-                "AND metadatos->>'promoted' IS NULL"
-            )
-        ).rowcount
+        if limit_ids:
+            n = self._db.execute(
+                text(
+                    f"DELETE FROM {emb} WHERE fuente_tipo = 'web' "
+                    "AND metadatos->>'session_id' IS NULL "
+                    "AND metadatos->>'promoted' IS NULL "
+                    "AND id = ANY(CAST(:ids AS uuid[]))"
+                ),
+                {"ids": limit_ids},
+            ).rowcount
+        else:
+            n = self._db.execute(
+                text(
+                    f"DELETE FROM {emb} WHERE fuente_tipo = 'web' "
+                    "AND metadatos->>'session_id' IS NULL "
+                    "AND metadatos->>'promoted' IS NULL"
+                )
+            ).rowcount
         self._db.commit()
         return int(n)
 
