@@ -43,21 +43,22 @@ uv run python scripts/eval_retrieval.py --bench              # cold (default)
 uv run python scripts/eval_retrieval.py --bench --warm       # warm (batch_mode)
 ```
 
-### Reducción de latencia esperada (estimación teórica)
+### Medición real (E2E post-Fase 16 — 2026-07-22)
 
-| Modo | 1ª consulta | 2ª–25ª consulta | Total 25 consultas |
-|------|------------|-----------------|---------------------|
-| Cold (default, keep_alive:0) | ~1300 ms | ~1300 ms cada una | ~32.5 s |
-| **Warm (batch_mode, 5m)** | ~1300 ms | **~15–30 ms** (SQL puro) | **~1.7–2.0 s** |
+| Modo | media | p50 | p95 | Total 25 consultas (est.) |
+|------|-------|-----|-----|---------------------------|
+| Cold (keep_alive:0) | 1527.8 ms | 1479.5 ms | 1889.4 ms | ~38.2 s |
+| **Warm (batch_mode)** | **158.3 ms** | **86.3 ms** | **123.4 ms** | **~4.0 s** |
 
-> **Nota (Fase 16):** La medición real con `--bench --warm` no pudo ejecutarse en la sesión
-> de Fase 16 (Ollama y modelos no disponibles). Los números anteriores siguen siendo
-> estimaciones teóricas. Para obtener datos reales, ejecutar con Ollama activo:
-> ```bash
-> uv run python scripts/eval_retrieval.py --bench              # cold
-> uv run python scripts/eval_retrieval.py --bench --warm       # warm
-> ```
-> y actualizar esta tabla con los resultados.
+**Factor de mejora real: 9.6× en media, 17.1× en p50.**
+
+Comandos ejecutados (con Ollama activo, `qwen3:8b` + `nomic-embed-text:latest`):
+```bash
+uv run python scripts/eval_retrieval.py --bench              # cold
+uv run python scripts/eval_retrieval.py --bench --warm       # warm
+```
+
+Score medio sectorial: 0.7578 · hit-rate: 1.0 · precision: 1.0 · contaminación: 0.0
 
 La reducción es estructuralmente segura: el modelo se descarga al salir del bloque.
 
