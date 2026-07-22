@@ -1,0 +1,9 @@
+{
+  "_comment": "Presupuesto de latencia/costo para el gate T15.4. Fuente: Fase 14 §4/§5.",
+  "max_latency_ms": 3000,
+  "max_latency_sql_ms": 50,
+  "max_cost_usd": 0.0,
+  "min_precision": 0.95,
+  "max_contamination": 0.05,
+  "min_hit_rate": 0.95
+}
