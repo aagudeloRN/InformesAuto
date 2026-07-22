@@ -33,10 +33,144 @@ st.set_page_config(
 st.title("📊 Informes de Inteligencia Competitiva")
 st.caption("Sistema automatizado de generación de informes — Ruta N")
 
-tab_gen, tab_hist = st.tabs(["Generar Informe", "Historial"])
+tab_gen, tab_hist, tab_repo = st.tabs(["Generar Informe", "Historial", "Repositorio"])
 
 
 _PAGE_SIZE = 10
+
+
+def _render_repositorio() -> None:
+    st.subheader("Repositorio de documentos sectoriales")
+    st.caption(
+        "Corpus permanente por sector GICS. Los documentos activos alimentan el retrieval "
+        "de los informes; desactivar excluye sus chunks sin borrarlos."
+    )
+
+    from ic.shared.constants import TipoDocumento
+    from ic.shared.constants.gics_groups import gics_options
+
+    opciones = gics_options()  # [(código, nombre)]
+    etiqueta_por_codigo = {c: f"{c} — {n}" for c, n in opciones}
+
+    # ── Subida ──────────────────────────────────────────────────────────────
+    with st.expander("➕ Subir documento", expanded=False):
+        with st.form("repo_upload_form"):
+            archivo = st.file_uploader("Archivo PDF", type=["pdf"])
+            sector_code = st.selectbox(
+                "Sector GICS *",
+                options=[c for c, _ in opciones],
+                format_func=lambda c: etiqueta_por_codigo.get(c, c),
+            )
+            col_a, col_b = st.columns(2)
+            tipo_doc = col_a.selectbox(
+                "Tipo",
+                options=[TipoDocumento.PDF_SECTORIAL.value, TipoDocumento.PAPER_ACADEMICO.value],
+            )
+            año_doc = col_b.number_input("Año", min_value=1990, max_value=2100, value=2026)
+            autor_doc = st.text_input("Autor", value="Ruta N")
+            titulo_doc = st.text_input(
+                "Título", placeholder="Ej: Informe sectorial: Servicios al consumidor"
+            )
+            subir = st.form_submit_button("📥 Ingerir documento", use_container_width=True)
+
+        if subir:
+            if archivo is None:
+                st.error("Debes seleccionar un archivo PDF.")
+            else:
+                import tempfile
+
+                from ic.shared.config import get_settings
+
+                settings = get_settings()
+                tmp_dir = Path(tempfile.mkdtemp())
+                tmp_path = tmp_dir / archivo.name
+                tmp_path.write_bytes(archivo.getbuffer())
+                with st.spinner(f"Ingiriendo '{archivo.name}'…"):
+                    try:
+                        from ic.infrastructure.sources.pdf_ingestor import PdfIngestor
+
+                        n = PdfIngestor(settings).ingest_batched(
+                            pdf_path=str(tmp_path),
+                            titulo=titulo_doc.strip() or None,
+                            autor=autor_doc.strip() or None,
+                            año=int(año_doc),
+                            sector_gics=sector_code,
+                            tipo=tipo_doc,
+                        )
+                        st.success(
+                            f"✅ '{archivo.name}': {n} chunks ingestados (sector {sector_code})."
+                        )
+                    except Exception as exc:
+                        st.error(f"Error al ingerir: {exc}")
+
+    # ── Listado ─────────────────────────────────────────────────────────────
+    st.markdown("### Documentos indexados")
+    try:
+        from ic.data.database import SessionLocal
+        from ic.data.repositories.documento_repo import DocumentoRepository
+
+        with SessionLocal() as db:
+            docs = DocumentoRepository(db).list_all()
+            filas = [
+                {
+                    "id": str(d.id),
+                    "nombre": d.nombre_archivo,
+                    "tipo": d.tipo,
+                    "sector": d.sector_gics or "—",
+                    "activo": bool(d.activo),
+                    "año": (d.metadatos or {}).get("año", "—"),
+                    "n_chunks": (d.metadatos or {}).get("n_chunks", "—"),
+                    "fecha": d.created_at.strftime("%Y-%m-%d %H:%M") if d.created_at else "—",
+                }
+                for d in docs
+            ]
+    except Exception as e:
+        st.error(f"No se pudo consultar el repositorio: {e}")
+        return
+
+    if not filas:
+        st.info("Aún no hay documentos en el repositorio.")
+        return
+
+    for fila in filas:
+        estado = "🟢" if fila["activo"] else "⚪"
+        with st.expander(f"{estado} {fila['nombre']} — sector {fila['sector']}"):
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Tipo", fila["tipo"])
+            c2.metric("Año", str(fila["año"]))
+            c3.metric("Chunks", str(fila["n_chunks"]))
+            c4.metric("Ingesta", fila["fecha"])
+
+            col_t, col_d = st.columns(2)
+            nuevo_estado = not fila["activo"]
+            if col_t.button(
+                "Desactivar" if fila["activo"] else "Activar",
+                key=f"toggle_{fila['id']}",
+                use_container_width=True,
+            ):
+                import uuid as _uuid
+
+                with SessionLocal() as db:
+                    DocumentoRepository(db).set_activo(_uuid.UUID(fila["id"]), nuevo_estado)
+                st.rerun()
+
+            confirm_key = f"confirm_del_{fila['id']}"
+            if col_d.button("🗑️ Borrar", key=f"del_{fila['id']}", use_container_width=True):
+                st.session_state[confirm_key] = True
+            if st.session_state.get(confirm_key):
+                st.warning("Esto borrará el documento y todos sus chunks. ¿Confirmas?")
+                cc1, cc2 = st.columns(2)
+                if cc1.button("Sí, borrar", key=f"yes_{fila['id']}"):
+                    import uuid as _uuid
+
+                    with SessionLocal() as db:
+                        n = DocumentoRepository(db).delete_with_chunks(_uuid.UUID(fila["id"]))
+                    st.session_state.pop(confirm_key, None)
+                    st.success(f"Borrado: {n} chunks eliminados.")
+                    st.rerun()
+                if cc2.button("Cancelar", key=f"no_{fila['id']}"):
+                    st.session_state.pop(confirm_key, None)
+                    st.rerun()
 
 
 def _render_historial() -> None:
@@ -182,6 +316,9 @@ def _check_services(settings) -> tuple[bool, bool]:
 
 with tab_hist:
     _render_historial()
+
+with tab_repo:
+    _render_repositorio()
 
 # ── Formulario ─────────────────────────────────────────────────────────────
 with tab_gen:

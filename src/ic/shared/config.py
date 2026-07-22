@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     # Retrieval (ADR-001)
     rag_similarity_threshold: float = 0.7
     rag_top_k: int = 10
+    # Cap por documento: evita que un informe sectorial grande monopolice el contexto
+    # (diversidad de fuentes — hallazgo RepositorioRN MMR, ADR-012)
+    rag_max_chunks_per_doc: int = 4
+    # Cupos reservados para chunks del corpus sectorial estricto (mismo GICS) cuando hay
+    # match de sector: garantiza que la evidencia sectorial aflore pese al backlog web (ADR-012)
+    rag_sector_reserve: int = 3
+    # Umbral relajado solo para los cupos reservados: el corpus sectorial es on-topic por
+    # construcción; su vocabulario a veces embebe por debajo del umbral general (ADR-012)
+    rag_sector_reserve_threshold: float = 0.5
 
     # Fuentes automáticas (ADR-003)
     openalex_email: str = ""

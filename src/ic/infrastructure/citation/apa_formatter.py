@@ -13,6 +13,7 @@ class CitationMetadata:
     autor: str | None
     url: str | None
     fecha_acceso: str | None
+    tipo_fuente: str | None = None
 
 
 def _domain_from_url(url: str | None) -> str:
@@ -33,6 +34,7 @@ def extract_citation_metadata(chunk: ChunkResult) -> CitationMetadata:
         autor=meta.get("autor"),
         url=chunk.fuente_url,
         fecha_acceso=meta.get("fecha_acceso"),
+        tipo_fuente=meta.get("tipo_fuente"),
     )
 
 
@@ -79,7 +81,13 @@ def _apa_report(meta: CitationMetadata) -> str:
     distinto = meta.fuente_nombre and meta.fuente_nombre != nombre
     fuente_part = f" {meta.fuente_nombre}." if distinto else "."
     url_part = f" {meta.url}" if meta.url else ""
-    return f"{nombre}. ({meta.año}). {titulo_md} [Informe].{fuente_part}{url_part}"
+    # Informes compilados de Ruta N: se aclara que agregan múltiples fuentes (ADR-012)
+    etiqueta = (
+        " [Informe compilado de múltiples fuentes]"
+        if meta.tipo_fuente == "informe_compilado"
+        else " [Informe]"
+    )
+    return f"{nombre}. ({meta.año}). {titulo_md}{etiqueta}.{fuente_part}{url_part}"
 
 
 def format_reference(meta: CitationMetadata, fuente_tipo: str = "web") -> Referencia:

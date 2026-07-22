@@ -15,7 +15,7 @@ from pypdf import PdfReader
 from sqlalchemy import text
 
 from ic.data.database import SessionLocal, engine
-from ic.data.models.documento_local import DocumentoLocal
+from ic.data.models.documento_local import DocumentoLocal, ensure_documento_columns
 from ic.data.models.embedding_vectorial import EmbeddingVectorial
 from ic.data.repositories.embedding_repo import EmbeddingRepository
 from ic.infrastructure.retrieval import chunker as chunker_mod
@@ -27,12 +27,8 @@ logger = logging.getLogger(__name__)
 
 
 def _ensure_metadatos_column() -> None:
-    from ic.shared.config import get_settings
-    schema = get_settings().db_schema
-    with engine.begin() as conn:
-        conn.execute(text(
-            f"ALTER TABLE {schema}.documentos_locales ADD COLUMN IF NOT EXISTS metadatos JSONB"
-        ))
+    """Migración idempotente de columnas de DocumentoLocal (metadatos, sector_gics, activo)."""
+    ensure_documento_columns(engine)
 
 
 def _sha256_text(text: str) -> str:
@@ -81,6 +77,8 @@ class PdfIngestor:
         titulo: str | None = None,
         autor: str | None = None,
         año: int | None = None,
+        sector_gics: str | None = None,
+        tipo: str = TipoDocumento.PDF_SECTORIAL,
     ) -> int:
         _ensure_metadatos_column()
         schema = self._settings.db_schema
@@ -107,6 +105,31 @@ class PdfIngestor:
             "autor": autor_final,
             "fecha_acceso": None,
         }
+        if sector_gics:
+            metadatos_base["sector_gics"] = sector_gics
+        # Los informes sectoriales de Ruta N son compilaciones de múltiples fuentes (ADR-012)
+        if tipo == TipoDocumento.PDF_SECTORIAL:
+            metadatos_base["tipo_fuente"] = "informe_compilado"
+
+        # Crear el DocumentoLocal PRIMERO para estampar documento_id en cada chunk
+        # (habilita filtrado por ciclo de vida activo/inactivo vía JOIN).
+        doc_id = uuid.uuid4()
+        try:
+            with SessionLocal() as db_doc:
+                db_doc.add(DocumentoLocal(
+                    id=doc_id,
+                    empresa_id=empresa_id,
+                    nombre_archivo=Path(pdf_path).name,
+                    ruta_archivo=os.path.abspath(pdf_path),
+                    tipo=tipo,
+                    sector_gics=sector_gics,
+                    estado_ingesta=EstadoIngesta.PENDIENTE,
+                    metadatos=metadatos_base,
+                ))
+                db_doc.commit()
+        except Exception:
+            logger.warning("No se pudo registrar DocumentoLocal", exc_info=True)
+            doc_id = None
 
         # Evita OOM: desaloja el LLM generativo (qwen3:8b) antes de cargar nomic-embed-text
         _release_vram(self._settings.ollama_base_url, self._settings.llm_local_analytic_model)
@@ -143,8 +166,9 @@ class PdfIngestor:
                     repo = EmbeddingRepository(db)
                     orm_objects = [
                         EmbeddingVectorial(
-                            fuente_tipo="pdf_manual",
+                            fuente_tipo="pdf",
                             fuente_url=os.path.abspath(pdf_path),
+                            documento_id=doc_id,
                             empresa_id=empresa_id,
                             chunk_texto=new_chunks[j],
                             chunk_index=total_inserted + j,
@@ -163,21 +187,16 @@ class PdfIngestor:
                 len(new_chunks), len(chunks) - len(new_chunks),
             )
 
-        if total_inserted > 0:
+        if doc_id is not None:
             try:
                 with SessionLocal() as db:
-                    doc = DocumentoLocal(
-                        empresa_id=empresa_id,
-                        nombre_archivo=Path(pdf_path).name,
-                        ruta_archivo=os.path.abspath(pdf_path),
-                        tipo=TipoDocumento.PDF_SECTORIAL,
-                        estado_ingesta=EstadoIngesta.PROCESADO,
-                        metadatos={**metadatos_base, "n_chunks": total_inserted},
-                    )
-                    db.add(doc)
-                    db.commit()
+                    doc = db.get(DocumentoLocal, doc_id)
+                    if doc is not None:
+                        doc.estado_ingesta = EstadoIngesta.PROCESADO
+                        doc.metadatos = {**metadatos_base, "n_chunks": total_inserted}
+                        db.commit()
             except Exception:
-                logger.warning("No se pudo registrar DocumentoLocal", exc_info=True)
+                logger.warning("No se pudo actualizar DocumentoLocal", exc_info=True)
 
         logger.info(
             "PDF '%s': %d chunks ingestados en %d lotes",

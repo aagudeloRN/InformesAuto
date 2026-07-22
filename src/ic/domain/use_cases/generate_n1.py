@@ -25,9 +25,11 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.domain.use_cases.generate_tendencias import GenerateTendencias
     from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
     from ic.infrastructure.sources.openalex_connector import OpenAlexConnector
+    from ic.shared.constants.gics_groups import extract_gics_code
 
     ctx.step_fn(3, "N1 — Caps 2/3/4 en paralelo")
     e, g, s = ctx.params.empresa, ctx.gics.grupo_gics, ctx.settings
+    g_code = extract_gics_code(g)
 
     def _store(fn):
         with SessionLocal() as db:
@@ -36,7 +38,10 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     def _fn_cap2(store):
         return GenerateBenchmarking(
             chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=ctx.web
-        ).execute(nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g)
+        ).execute(
+            nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
+            sector_gics_code=g_code,
+        )
 
     def _fn_cap3(store):
         if ctx.api_llm is None:
@@ -44,14 +49,20 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         return GenerateTendencias(
             chain=build_chain_04(ctx.api_llm), store=store,
             web_connector=ctx.web, openalex_connector=OpenAlexConnector(s),
-        ).execute(nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g)
+        ).execute(
+            nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
+            sector_gics_code=g_code,
+        )
 
     def _fn_cap4(store):
         if ctx.api_llm is None:
             return None
         return GenerateEcosistema(
             chain=build_chain_05(ctx.api_llm), store=store, web_connector=ctx.web,
-        ).execute(nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g)
+        ).execute(
+            nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
+            sector_gics_code=g_code,
+        )
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         f2 = pool.submit(_store, _fn_cap2)

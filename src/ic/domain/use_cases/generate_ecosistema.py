@@ -29,6 +29,7 @@ class GenerateEcosistema:
         nombre_empresa: str,
         descripcion_empresa: str,
         sector_gics: str,
+        sector_gics_code: str | None = None,
     ) -> CapEcosistema:
         sector_query = f"{sector_gics} {nombre_empresa}"
 
@@ -47,7 +48,10 @@ class GenerateEcosistema:
                     urls=[r.url for r in results],
                 )
 
-        chunks = self._store.search(f"{sector_query} ecosistema proveedores clientes alianzas")
+        chunks = self._store.search(
+            f"{sector_query} ecosistema proveedores clientes alianzas",
+            sector_gics=sector_gics_code,
+        )
 
         if not check_retrieval_sufficient(chunks, min_chunks=_MIN_CHUNKS):
             return CapEcosistema(

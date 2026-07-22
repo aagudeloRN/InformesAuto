@@ -37,6 +37,7 @@ class GenerateConvergencia:
         nombre_empresa: str,
         descripcion_empresa: str,
         sector_gics: str,
+        sector_gics_code: str | None = None,
     ) -> CapConvergencia:
         for q in [
             f"{sector_gics} sostenibilidad ambiental Colombia regulaciones",
@@ -51,13 +52,14 @@ class GenerateConvergencia:
                 )
 
         chunks_caps = self._store.search(
-            f"{sector_gics} {nombre_empresa} tendencias ecosistema benchmarking estrategia"
+            f"{sector_gics} {nombre_empresa} tendencias ecosistema benchmarking estrategia",
+            sector_gics=sector_gics_code,
         )
         query_territorial = (
             f"{sector_gics} {nombre_empresa} "
             "sostenibilidad transformación digital desarrollo económico Medellín"
         )
-        chunks_territorial = self._store.search(query_territorial)
+        chunks_territorial = self._store.search(query_territorial, sector_gics=sector_gics_code)
 
         seen: set[str] = set()
         unique_chunks: list[ChunkResult] = []
