@@ -126,10 +126,11 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-019 | Datos estructurados del LLM para radar chart real (actualmente placeholder) | 16 | ⬜ (presentación) |
 | DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | ✅ footer parametrizable + `_run_pdf` retirado (corpus vía UI/lote, ADR-012) |
 | DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | 🟡 script listo; settings.json actualizado en Fase 10 |
-| DT-020 | Backlog de chunks web sin ciclo de vida (2024 acumulados) compite con el corpus sectorial; sin TTL/frescura ni limpieza | 14 | ⬜ nuevo (Fase 13) |
+| DT-020 | Persistencia web indiscriminada: se ingesta todo lo buscado (usado o no). Objetivo: persistir **solo lo citado** (`chunks_usados`) + purgar el backlog no usado (~2024 chunks) | 14 | ⬜ nuevo (Fase 13) |
 | DT-021 | Resiliencia OpenRouter free: rate-limits transitorios (`ResourceExhausted 32/32`) sin backoff/reintento dedicado | 15 | ⬜ nuevo (Fase 13); ligado a T12.1/T12.2 pospuestos |
 | DT-022 | Reranking/afinado de retrieval: MMR completo + evaluación (RAGAS), `chunk_size` 500→1000, índice parcial/GIN sobre `metadatos->>'sector_gics'` | 14 | ⬜ nuevo (Fase 13) |
-| DT-023 | `chain_02_gics` no emite el código GICS en su salida; mitigado por `extract_gics_code` (fallback por nombre). Endurecer el prompt para emitir "(GICS XXXX)" | 14 | ⬜ nuevo (Fase 13) |
+| DT-023 | Clasificación GICS: `chain_02_gics` no emite el código (mitigado por `extract_gics_code`). Usar `Comparacion_GICS_CIIU.csv` (CIIU→GICS) para acotar/validar candidatos y endurecer el prompt para emitir "(GICS XXXX)" | 14 | ⬜ nuevo (Fase 13) |
+| DT-024 | Estilo Normal del documento no fijado: objetivo Source Sans Pro 11 pt, justificado, interlineado 1,16, espacio después 8 pt, control de viudas/huérfanas | 16 | ⬜ nuevo (Fase 13) |
 
 ---
 
@@ -685,8 +686,12 @@ Orden acordado con el usuario: absorber la deuda técnica descubierta antes de f
   endurecer prompt GICS. **Detallada abajo con prompt de arranque.**
 - **Fase 15** — Resiliencia y Costo (DT-021 + T12.1/T12.2). Caché de LLM, circuit
   breaker/backoff para rate-limits OpenRouter, control de presupuesto.
-- **Fase 16** — Presentación del contenido (DT-019 + tablas). Radar con datos reales del LLM,
-  tablas de benchmarking en Word, pulido de formato .docx/.pdf.
+- **Fase 16** — Presentación del contenido (DT-019 + DT-024 + tablas). Radar con datos reales
+  del LLM, tablas de benchmarking en Word, pulido de formato .docx/.pdf. **Criterio de
+  aceptación del estilo Normal** (DT-024): Source Sans Pro 11 pt · justificado · interlineado
+  múltiple 1,16 líneas · espacio después 8 pt · control de líneas viudas/huérfanas · estilo
+  visible en la galería. Implementación vía plantilla `docx_template_path` y/o estilos en
+  `infrastructure/render/docx_renderer.py` (ligado a DT-016).
 - **Fase 17** — Actualización programada del corpus sectorial (cron de re-ingesta y frescura).
 - **Fase 18** — Multi-tenant / control de acceso (si se ofrece a varias empresas).
 - **Fase 19** — Exportación a portal web / API (FastAPI) además de Streamlit.
@@ -698,10 +703,11 @@ Orden acordado con el usuario: absorber la deuda técnica descubierta antes de f
 **Prioridad:** P1 · **Estado:** ⬜ Pendiente · **Deuda:** DT-022, DT-020, DT-023
 
 ### Objetivo
-Elevar la calidad y el rigor del retrieval RAG con evidencia medible. Fase 13 dejó dos
+Elevar la calidad y el rigor del retrieval RAG con evidencia medible. Fase 13 dejó tres
 hallazgos concretos: (a) el backlog de chunks web sin ciclo de vida compite con el corpus
-sectorial, y (b) los scores sectoriales son bajos (~0.68–0.78) con `chunk_size=500`. Se
-introduce evaluación cuantitativa (RAGAS) para no optimizar a ciegas.
+sectorial, (b) los scores sectoriales son bajos (~0.68–0.78) con `chunk_size=500`, y (c) la
+clasificación GICS por LLM puede desviarse del sector real. Se introduce evaluación
+cuantitativa (RAGAS) para no optimizar a ciegas.
 
 ### Tareas
 - **T14.1 (DT-022) — Evaluación de retrieval.** Harness reproducible (RAGAS o métricas
@@ -713,26 +719,48 @@ introduce evaluación cuantitativa (RAGAS) para no optimizar a ciegas.
   medir impacto en scores y recall. Decidir con datos de T14.1.
 - **T14.4 (DT-022) — Índice parcial/GIN.** Evaluar `hnsw` + índice sobre
   `metadatos->>'sector_gics'`; medir latencia con el corpus completo.
-- **T14.5 (DT-020) — Ciclo de vida de chunks web.** TTL/frescura + dedup + limpieza del
-  backlog (2024 chunks). Evitar que el ruido web crezca sin control.
-- **T14.6 (DT-023) — Endurecer prompt GICS.** `chain_02_gics` debe emitir "(GICS XXXX)";
-  mantener el fallback por nombre de `extract_gics_code` como red de seguridad.
+- **T14.5 (DT-020) — Persistencia web "solo lo usado".** Rediseñar el flujo: los resultados
+  web dejan de persistirse **al buscar**; se usan para el retrieval de la corrida y, al
+  ensamblar, **solo se persisten los chunks web efectivamente citados** (presentes en
+  `chunks_usados`, los que alimentan `build_references_section`). **Purga única** del backlog
+  web histórico no usado (~2024 chunks). Referencia de borrado por lote:
+  `DocumentoRepository.delete_with_chunks`. Evita que el ruido web crezca sin control y
+  conserva solo la evidencia aplicada.
+- **T14.6 (DT-023) — CIIU→GICS para enfocar búsquedas y validar la clasificación.** Cargar
+  `documentos_sectoriales/Comparacion_GICS_CIIU.csv` (versionado en git; datos, no binario).
+  Añadir en `shared/` un mapeo CIIU numérico → Sección CIIU Rev4 (divisiones: 01-03=A, 05-09=B,
+  10-33=C, 35=D, 36-39=E, 41-43=F, 45-47=G, 49-53=H, 55-56=I, 58-63=J, 64-66=K, 68=L, 69-75=M,
+  77-82=N, 84=O, 85=P, 86-88=Q, 90-93=R, 94-96=S, 97-98=T, 99=U) → conjunto de **códigos GICS
+  candidatos** (resolviendo los nombres del CSV a códigos con matching tolerante, estilo
+  `extract_gics_code`). Usarlo para (a) **acotar** la clasificación del LLM a los candidatos
+  cuando se conoce el CIIU y (b) validar/corregir `sector_gics` antes del filtro. Mantener el
+  fallback por nombre y endurecer `chain_02_gics` para emitir "(GICS XXXX)".
+  > Nota: la tabla es gruesa y multivaluada (1 Sección → varios GICS). Ej.: Comfama CIIU 8430 →
+  > división 84 → Sección O → candidato "Servicios comerciales y profesionales".
 
 ### Criterios de cierre
 - Métricas de retrieval antes/después documentadas en `FASE14_HALLAZGOS.md` (mejora medible).
-- Gate verde (ruff 0 + `pytest -m "not slow"`); tests para MMR y ciclo de vida de chunks.
-- Decisiones de `chunk_size`/índice registradas (actualizar ADR-005/ADR-012 si aplica).
+- Gate verde (ruff 0 + `pytest -m "not slow"`); tests para MMR, persistencia "solo usado" y
+  el mapeo CIIU→GICS.
+- Decisiones de `chunk_size`/índice/persistencia registradas (actualizar ADR-005/ADR-012 si
+  aplica).
 
 ### Prompt de arranque — Fase 14
 > Estás ejecutando la FASE 14 (Calidad de Retrieval y Evaluación). Trabaja según CLAUDE.md y
 > PRIME_DIRECTIVE.md. Parte A (diseño en Plan Mode) → Parte B (ejecución).
 > Estado de entrada: Fase 13 cerrada (`62fe327`), corpus 25 docs/1746 chunks, 181 tests fast.
 > Lee: `FASE13_HALLAZGOS.md`, `ADR-012`, `~/Test/RepositorioRN/app/backend/services/rag/mmr.py`,
-> `src/ic/infrastructure/retrieval/*`, `src/ic/data/repositories/embedding_repo.py`.
+> `src/ic/infrastructure/retrieval/*`, `src/ic/data/repositories/embedding_repo.py`,
+> `src/ic/infrastructure/sources/web_connector.py`, los use cases N1/N2 (patrón
+> `self._store.ingest(..., fuente_tipo="web")`), `src/ic/domain/use_cases/generate_informe.py`
+> (`chunks_usados` → `build_references_section`), y `documentos_sectoriales/Comparacion_GICS_CIIU.csv`.
 > PASO 0 gate: `uv run ruff check src/ tests/ -q && uv run pytest -m "not slow" -q`.
-> Diseña T14.1 (harness de evaluación) PRIMERO — sin métricas no se optimiza. Luego MMR,
-> chunk_size, índice, ciclo de vida web, prompt GICS. Cada cambio se justifica con números.
+> Diseña T14.1 (harness de evaluación) PRIMERO — sin métricas no se optimiza. Luego: T14.2 MMR,
+> T14.3 chunk_size, T14.4 índice, **T14.5 persistencia web "solo lo citado" + purga del backlog
+> (~2024 chunks)**, **T14.6 mapeo CIIU→GICS (`Comparacion_GICS_CIIU.csv`) para acotar/validar la
+> clasificación y enfocar el filtro sectorial**. Cada cambio se justifica con números de T14.1.
 > No re-discutir decisiones cerradas de ADR-012 (filtrado sectorial, reserva de cupos).
+> Política acordada: la información web solo persiste si fue efectivamente citada en un informe.
 
 ---
 
@@ -768,5 +796,6 @@ ciclo de vida del corpus).
 | 2026-07-21 | 1.3 | Fase 10 cerrada: T10.1 CJK en 6 use cases ✅, T10.2 orphan checker + contexto con meta ✅, T10.3/T10.4 APA 7 fiel ✅, T10.5 panel fiabilidad JSONB ✅, T10.6 disclaimer parametrizable ✅. 137 tests, DT-009/015/017(parcial) cerrados. |
 | 2026-07-21 | 1.4 | Fase 11 cerrada: T11.1 report_model ✅, T11.2 docx_renderer+assembler refactor ✅, T11.3 markdown_parser+TableBlock ✅, T11.4 radar chart ✅, T11.5 PDF LibreOffice ✅, T11.7 callouts ✅. 162 tests fast, ADR-011 creado, DT-016 cerrado, DT-019 nuevo. Q2 resuelta. |
 | 2026-07-21 | 1.5 | Fase 12 cerrada: T12.3 DT-004 ✅ (generate_n1.py, 345 L), T12.4 DT-010 ✅ (tokens reales Ollama + tiempo_ollama_s), T12.5 DT-012 ✅ (paginación+filtro+CSV). 168 tests fast. T12.1/T12.2 (caché/resiliencia) pospuestos a Fase 14. |
+| 2026-07-22 | 1.8 | Insumos del usuario integrados: (1) tabla `Comparacion_GICS_CIIU.csv` (CIIU→GICS) → T14.6 para acotar/validar clasificación; (2) política de persistencia web "solo lo citado" + purga del backlog → T14.5 (DT-020); (3) estilo Normal del documento (Source Sans Pro 11/justificado/1,16/8pt/viudas) → Fase 16 (DT-024). Prompt de arranque de Fase 14 actualizado. |
 | 2026-07-22 | 1.7 | Fase 13 cerrada (`62fe327`). Roadmap reordenado (deuda técnica primero, decisión del usuario): Fase 14 Calidad de Retrieval (DT-022/020/023, detallada + prompt de arranque), Fase 15 Resiliencia y Costo (DT-021+T12.1/2), Fase 16 Presentación (DT-019+tablas), luego cron/multi-tenant/API. |
 | 2026-07-22 | 1.6 | Fase 13 en curso: T13.1 esquema (sector_gics/activo + PAPER_ACADEMICO) ✅, T13.2 PdfIngestor (documento_id + fuente_tipo pdf) ✅, T13.3 filtrado sectorial + cap por doc ✅, T13.4 panel Repositorio + DocumentoRepository ✅, T13.5 lote 25 PDFs ingestado (1746 chunks, 0 errores) ✅, T13.6 `_run_pdf` retirado (DT-017) ✅, T13.7 APA informe_compilado + evaluación 3 empresas ✅ (Fase 13: 3/0 sect/cross vs base 0-1/2-4; añadida reserva sectorial tras hallazgo de backlog web), T13.8 ADR-012 + hallazgos RepositorioRN ✅. 179 tests fast. DT-011/DT-017 cerrados. |
