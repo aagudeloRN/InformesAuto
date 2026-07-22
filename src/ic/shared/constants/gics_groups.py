@@ -1,3 +1,41 @@
+import re
+import unicodedata
+
+_GICS_CODE_RE = re.compile(r"\(GICS (\d{4})\)")
+
+
+def _normalize(texto: str) -> str:
+    """Minúsculas sin acentos, para comparar nombres de grupo de forma robusta."""
+    nfkd = unicodedata.normalize("NFKD", texto.lower())
+    return "".join(c for c in nfkd if not unicodedata.combining(c)).strip()
+
+
+def extract_gics_code(grupo_gics: str | None) -> str | None:
+    """Extrae el código GICS numérico (4 dígitos) del texto del grupo del LLM.
+
+    Estrategia en dos pasos (el clasificador a veces devuelve solo el nombre del grupo,
+    sin el "(GICS XXXX)"):
+    1. Regex `\\(GICS (\\d{4})\\)` sobre el texto.
+    2. Fallback: resolver el nombre del grupo contra los 25 grupos canónicos (se elige el
+       nombre canónico más largo contenido en el texto, evitando falsos positivos).
+
+    Devuelve el código como str (ej. "2530") o None si no se puede resolver.
+    """
+    if not grupo_gics:
+        return None
+    match = _GICS_CODE_RE.search(grupo_gics)
+    if match:
+        return match.group(1)
+    objetivo = _normalize(grupo_gics)
+    mejor: tuple[int, str] | None = None
+    for code, nombre in gics_options():
+        nombre_norm = _normalize(nombre)
+        if nombre_norm and nombre_norm in objetivo:
+            if mejor is None or len(nombre_norm) > mejor[0]:
+                mejor = (len(nombre_norm), code)
+    return mejor[1] if mejor else None
+
+
 GICS_GROUPS: list[str] = [
     "Grupo 1 — Energía (GICS 1010): Corporaciones de exploración, extracción, procesamiento y "
     "logística de recursos fósiles. Incluye servicios de equipos para pozos y empresas de "
@@ -71,3 +109,19 @@ GICS_GROUPS: list[str] = [
 
 def build_gics_prompt_block() -> str:
     return "\n\n".join(GICS_GROUPS)
+
+
+def gics_options() -> list[tuple[str, str]]:
+    """Devuelve (código, etiqueta) por grupo GICS para selectores de UI.
+
+    Ej: ("2530", "Servicios al consumidor"). La etiqueta es el nombre del grupo
+    (tras el guion largo, antes del paréntesis "(GICS ...)").
+    """
+    options: list[tuple[str, str]] = []
+    for grupo in GICS_GROUPS:
+        code = extract_gics_code(grupo)
+        if not code:
+            continue
+        nombre = grupo.split("—", 1)[-1].split("(GICS", 1)[0].strip()
+        options.append((code, nombre))
+    return options

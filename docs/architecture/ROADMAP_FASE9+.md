@@ -102,7 +102,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 10 | Fiabilidad del Contenido | ✅ | 2026-07-21 | `8f00f9d`+ | `FASE10_HALLAZGOS.md` |
 | 11 | Formato del Documento Final | ✅ | 2026-07-21 | `a581201`+ | `FASE11_HALLAZGOS.md` |
 | 12 | Optimización de Operación | ✅ | 2026-07-21 | `8f6e8f5`+ | `FASE12_HALLAZGOS.md` |
-| 13 | Repositorio Sectorial RAG | ⬜ | — | — | `FASE13_HALLAZGOS.md` |
+| 13 | Repositorio Sectorial RAG | 🟡 | — | `feature/fase13-rag-sectorial` | `FASE13_HALLAZGOS.md` |
 
 > Cada fase, al cerrar, actualiza su fila (estado ✅, fecha, hash de commit) y marca sus
 > tareas en la sección correspondiente.
@@ -119,12 +119,12 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-005 | E2E Cap5 con servicios reales (`test_convergencia_e2e.py`) | 9 | ✅ 165.87 s, verde |
 | DT-009 | Gate ruff ✅; validación idioma (CJK) N1+ | 10 | ✅ CJK cerrado en todos los caps N1–N3 |
 | DT-010 | CostTracker para Ollama (tiempo como proxy de tokens) | 12 | ✅ tokens reales + tiempo en `CallRecord.tiempo_ollama_s` |
-| DT-011 | Ingesta de fuentes sectoriales / EMIS | 13 | ⬜ |
+| DT-011 | Ingesta de fuentes sectoriales / EMIS | 13 | ✅ corpus GICS: panel Repositorio + `ingest_batch.py` + filtrado sectorial (ADR-012) |
 | DT-012 | Multi-empresa / cola + historial paginado | 12 | ✅ paginación PAGE_SIZE=10 + filtro ILIKE + CSV export |
 | DT-015 | Citación APA 7 no fiel (sin sangría/cursiva) + sin cita inline trazable | 10 | ✅ APA 7 fiel (dispatch por tipo); cursiva→Fase 11; orphan checker operativo |
 | DT-016 | Formato .docx pobre (sin tablas/imágenes/TOC/portada) + salida única | 11 | ✅ Cerrado — portada, TOC, tablas, figuras, PDF vía LibreOffice |
 | DT-019 | Datos estructurados del LLM para radar chart real (actualmente placeholder) | 12 | ⬜ nuevo |
-| DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | 🟡 footer ✅ parametrizable; PDF hardcodeado→Fase 13 |
+| DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | ✅ footer parametrizable + `_run_pdf` retirado (corpus vía UI/lote, ADR-012) |
 | DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | 🟡 script listo; settings.json actualizado en Fase 10 |
 
 ---
@@ -692,11 +692,16 @@ Se resuelven en la fase indicada (o antes si se puede).
   **solo local** (no hay remoto GitHub); se implementa como hook/script local en la Fase 9.
 - **Q2 (Fase 11) — Motor de PDF. ✅ RESUELTO (2026-07-21).** LibreOffice headless
   (`/usr/bin/soffice`). Documentado en ADR-011.
-- **Q3 (Fase 13) — Repositorio sectorial y RAG del equipo. 🟡 PARCIAL (2026-07-21).**
-  - Proyecto RAG del equipo a estudiar: **`~/Test/RepositorioRN`**.
-  - Carpeta con los PDFs sectoriales: **pendiente** (el usuario la colocará en el proyecto
-    cuando arranque la Fase 13).
-  - Equivalencia CIIU/GICS: **CSV pendiente** (el usuario lo aportará en la Fase 13).
+- **Q3 (Fase 13) — Repositorio sectorial y RAG del equipo. ✅ RESUELTO (2026-07-22).**
+  - Proyecto RAG del equipo estudiado (`~/Test/RepositorioRN`): se adopta cap por documento
+    (inspirado en su MMR). Ver `FASE13_HALLAZGOS.md` §3.
+  - PDFs sectoriales: `documentos_sectoriales/*.pdf` (25, gitignored); índice reconciliado en
+    `documentos_sectoriales/indice.csv`.
+  - Identificador sectorial canónico: **código GICS numérico** vía `extract_gics_code`
+    (ADR-012), en lugar de una tabla CIIU/GICS.
+
+**ADRs vigentes:** ADR-001 … ADR-011 + **ADR-012** (filtrado sectorial en el retrieval y
+ciclo de vida del corpus).
 
 ---
 
@@ -710,3 +715,4 @@ Se resuelven en la fase indicada (o antes si se puede).
 | 2026-07-21 | 1.3 | Fase 10 cerrada: T10.1 CJK en 6 use cases ✅, T10.2 orphan checker + contexto con meta ✅, T10.3/T10.4 APA 7 fiel ✅, T10.5 panel fiabilidad JSONB ✅, T10.6 disclaimer parametrizable ✅. 137 tests, DT-009/015/017(parcial) cerrados. |
 | 2026-07-21 | 1.4 | Fase 11 cerrada: T11.1 report_model ✅, T11.2 docx_renderer+assembler refactor ✅, T11.3 markdown_parser+TableBlock ✅, T11.4 radar chart ✅, T11.5 PDF LibreOffice ✅, T11.7 callouts ✅. 162 tests fast, ADR-011 creado, DT-016 cerrado, DT-019 nuevo. Q2 resuelta. |
 | 2026-07-21 | 1.5 | Fase 12 cerrada: T12.3 DT-004 ✅ (generate_n1.py, 345 L), T12.4 DT-010 ✅ (tokens reales Ollama + tiempo_ollama_s), T12.5 DT-012 ✅ (paginación+filtro+CSV). 168 tests fast. T12.1/T12.2 (caché/resiliencia) pospuestos a Fase 14. |
+| 2026-07-22 | 1.6 | Fase 13 en curso: T13.1 esquema (sector_gics/activo + PAPER_ACADEMICO) ✅, T13.2 PdfIngestor (documento_id + fuente_tipo pdf) ✅, T13.3 filtrado sectorial + cap por doc ✅, T13.4 panel Repositorio + DocumentoRepository ✅, T13.5 lote 25 PDFs ingestado (1746 chunks, 0 errores) ✅, T13.6 `_run_pdf` retirado (DT-017) ✅, T13.7 APA informe_compilado + evaluación 3 empresas ✅ (Fase 13: 3/0 sect/cross vs base 0-1/2-4; añadida reserva sectorial tras hallazgo de backlog web), T13.8 ADR-012 + hallazgos RepositorioRN ✅. 179 tests fast. DT-011/DT-017 cerrados. |

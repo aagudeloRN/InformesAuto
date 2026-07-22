@@ -10,6 +10,7 @@ class EstadoInforme(StrEnum):
 
 class TipoDocumento(StrEnum):
     PDF_SECTORIAL = "pdf_sectorial"
+    PAPER_ACADEMICO = "paper_academico"
     INFORME_EMIS = "informe_emis"
     OTRO = "otro"
 

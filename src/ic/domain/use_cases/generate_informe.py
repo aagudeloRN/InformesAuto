@@ -86,7 +86,6 @@ class GenerateInforme:
         ctx = self._setup_infra(params, _step, time.time())
         self._run_n0(ctx)
         self._run_n1(ctx)
-        self._run_pdf(ctx)
         self._run_n2(ctx)
         return self._run_n3(ctx)
 
@@ -150,30 +149,6 @@ class GenerateInforme:
         from ic.domain.use_cases.generate_n1 import run_n1_parallel
         run_n1_parallel(ctx)
 
-    def _run_pdf(self, ctx: _PipelineContext) -> None:
-        from ic.infrastructure.sources.pdf_ingestor import PdfIngestor
-
-        ctx.step_fn(5, "PDF Convergencia — ingesta condicional")
-        _PDF_NAME = "InformeConvergenciaLocal2026V3RvADAA.pdf"
-        pdf_path = None
-        candidate = Path(__file__).resolve()
-        for _ in range(6):
-            candidate = candidate.parent
-            if (candidate / _PDF_NAME).exists():
-                pdf_path = candidate / _PDF_NAME
-                break
-        if pdf_path is not None:
-            try:
-                PdfIngestor(ctx.settings).ingest_batched(
-                    pdf_path=str(pdf_path),
-                    titulo="Informe de Convergencia Local Medellín 2026",
-                    autor="Alcaldía de Medellín",
-                    año=2026,
-                )
-            except Exception as exc:
-                logger.warning("No se pudo ingestar PDF Convergencia", exc_info=True)
-                print(f"  ⚠️  PDF Convergencia omitido: {type(exc).__name__}: {exc}")
-
     def _run_n2(self, ctx: _PipelineContext) -> None:
         from ic.data.database import SessionLocal
         from ic.data.repositories.embedding_repo import EmbeddingRepository
@@ -183,8 +158,10 @@ class GenerateInforme:
         from ic.domain.use_cases.generate_accionables import GenerateAccionables
         from ic.domain.use_cases.generate_convergencia import GenerateConvergencia
         from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
+        from ic.shared.constants.gics_groups import extract_gics_code
 
         e, g = ctx.params.empresa, ctx.gics.grupo_gics
+        g_code = extract_gics_code(g)
         with SessionLocal() as db_n2:
             store_n2 = PGVectorStore(ctx.embedder, EmbeddingRepository(db_n2), ctx.settings)
 
@@ -195,7 +172,8 @@ class GenerateInforme:
                     chain_eje=build_chain_06a(ctx.api_llm) if ctx.api_llm else None,
                     store=store_n2, web_connector=ctx.web,
                 ).execute(
-                    nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g
+                    nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
+                    sector_gics_code=g_code,
                 )
 
             ctx.step_fn(7, "Cap 6 — Accionables Estratégicos")
@@ -203,7 +181,8 @@ class GenerateInforme:
                 ctx.cap_acc = GenerateAccionables(
                     chain=build_chain_07(ctx.api_llm), store=store_n2,
                 ).execute(
-                    nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g
+                    nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
+                    sector_gics_code=g_code,
                 )
 
         ctx.step_fn(8, "Párrafos introductorios N2")
