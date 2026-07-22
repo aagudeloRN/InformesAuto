@@ -43,15 +43,23 @@ uv run python scripts/eval_retrieval.py --bench              # cold (default)
 uv run python scripts/eval_retrieval.py --bench --warm       # warm (batch_mode)
 ```
 
-### Reducción de latencia esperada (estimación)
+### Reducción de latencia esperada (estimación teórica)
 
 | Modo | 1ª consulta | 2ª–25ª consulta | Total 25 consultas |
 |------|------------|-----------------|---------------------|
 | Cold (default, keep_alive:0) | ~1300 ms | ~1300 ms cada una | ~32.5 s |
 | **Warm (batch_mode, 5m)** | ~1300 ms | **~15–30 ms** (SQL puro) | **~1.7–2.0 s** |
 
-La medición real requiere Ollama en ejecución (`--bench --warm`). La reducción es
-estructuralmente segura: el modelo se descarga al salir del bloque.
+> **Nota (Fase 16):** La medición real con `--bench --warm` no pudo ejecutarse en la sesión
+> de Fase 16 (Ollama y modelos no disponibles). Los números anteriores siguen siendo
+> estimaciones teóricas. Para obtener datos reales, ejecutar con Ollama activo:
+> ```bash
+> uv run python scripts/eval_retrieval.py --bench              # cold
+> uv run python scripts/eval_retrieval.py --bench --warm       # warm
+> ```
+> y actualizar esta tabla con los resultados.
+
+La reducción es estructuralmente segura: el modelo se descarga al salir del bloque.
 
 **Reconciliación con ADR-006:** el lote es *explícito y acotado* (un context manager
 nombrado), no el default del sistema. `keep_alive:0` sigue siendo el comportamiento

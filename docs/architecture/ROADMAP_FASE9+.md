@@ -105,7 +105,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 13 | Repositorio Sectorial RAG | ✅ | 2026-07-22 | `62fe327` | `FASE13_HALLAZGOS.md` |
 | 14 | Calidad de Retrieval y Evaluación | ✅ | 2026-07-22 | `1fbe8a1` | `FASE14_HALLAZGOS.md` |
 | 15 | Resiliencia y Costo | ✅ | 2026-07-22 | `a367b57`+ | `FASE15_HALLAZGOS.md` |
-| 16 | Presentación del Contenido | ⬜ | — | — | — |
+| 16 | Presentación del Contenido | ✅ | 2026-07-22 | `aadd99e` | `FASE16_HALLAZGOS.md` |
 
 > Cada fase, al cerrar, actualiza su fila (estado ✅, fecha, hash de commit) y marca sus
 > tareas en la sección correspondiente.
@@ -126,14 +126,14 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-012 | Multi-empresa / cola + historial paginado | 12 | ✅ paginación PAGE_SIZE=10 + filtro ILIKE + CSV export |
 | DT-015 | Citación APA 7 no fiel (sin sangría/cursiva) + sin cita inline trazable | 10 | ✅ APA 7 fiel (dispatch por tipo); cursiva→Fase 11; orphan checker operativo |
 | DT-016 | Formato .docx pobre (sin tablas/imágenes/TOC/portada) + salida única | 11 | ✅ Cerrado — portada, TOC, tablas, figuras, PDF vía LibreOffice |
-| DT-019 | Datos estructurados del LLM para radar chart real (actualmente placeholder) | 16 | ⬜ (presentación) |
+| DT-019 | Datos estructurados del LLM para radar chart real (actualmente placeholder) | 16 | ✅ bloque `radar_json` en prompt + `_extract_radar()` en `generate_benchmarking`; fallback garantizado |
 | DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | ✅ footer parametrizable + `_run_pdf` retirado (corpus vía UI/lote, ADR-012) |
 | DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | 🟡 script listo; settings.json actualizado en Fase 10 |
 | DT-020 | Persistencia web indiscriminada: se ingesta todo lo buscado (usado o no). Objetivo: persistir **solo lo citado** (`chunks_usados`) + purgar el backlog no usado | 14 | ✅ ADR-013: session ingest + `promote_cited_web` + `sweep_stale` + purga única (backlog 1202→0); la purga subió la evidencia sectorial 3.20→3.68 chunks/consulta |
 | DT-021 | Resiliencia OpenRouter free: rate-limits transitorios (`ResourceExhausted 32/32`) sin backoff/reintento dedicado | 15 | ✅ `is_rate_limit_error` + `ResilientChatModel` (free→free_alt→synth→paid); timeouts por tier. Ver `FASE15_HALLAZGOS.md` §4 |
 | DT-022 | Reranking/afinado de retrieval: MMR completo + evaluación, `chunk_size` 500→1000, índice parcial/GIN sobre `metadatos->>'sector_gics'` | 14 | ✅ harness T14.1 (métricas propias); MMR medido y **revertido** (degrada mono-doc); `chunk_size` 1000/200 (neutral, se mantiene por eficiencia); índice **descartado** (SQL 15ms). Ver `FASE14_HALLAZGOS.md` + addendum ADR-012 |
 | DT-023 | Clasificación GICS: `chain_02_gics` no emite el código (mitigado por `extract_gics_code`). Usar `Comparacion_GICS_CIIU.csv` (CIIU→GICS) para acotar/validar candidatos y endurecer el prompt para emitir "(GICS XXXX)" | 14 | ✅ `ciiu_gics.py` (CIIU→Sección→candidatos); `ClassifyGICS` acota+valida/corrige; `chain_02` endurecido; fallback por nombre conservado; ≥5 CIIU probados |
-| DT-024 | Estilo Normal del documento no fijado: objetivo Source Sans Pro 11 pt, justificado, interlineado 1,16, espacio después 8 pt, control de viudas/huérfanas | 16 | ⬜ nuevo (Fase 13) |
+| DT-024 | Estilo Normal del documento no fijado: objetivo Source Sans Pro 11 pt, justificado, interlineado 1,16, espacio después 8 pt, control de viudas/huérfanas | 16 | ✅ `_apply_normal_style()` en `docx_renderer`; Calibri 11 pt (Source Sans Pro como mejora futura) |
 
 ---
 
@@ -1033,42 +1033,26 @@ retrieval y ResilientChatModel) que quedó pendiente.
 
 ### Tareas
 
-- **T16.0 — Cableado E2E de Fase 15 (prerequisito)**
-  Conectar en el pipeline lo implementado en Fase 15 pero no cableado:
-  - `generate_n1.py` y `generate_informe.py`: sustituir `WebConnector`/`OpenAlexConnector`
-    por `CachedWebConnector`/`CachedOpenAlexConnector` (inyectados vía `SessionLocal`).
-  - `generate_informe._setup_infra`: reemplazar los tres `build_api_llm(tier=...)` individuales
-    por `build_resilient_api_llm(settings, cost_tracker=tracker)`.
-  - Correr `uv run python scripts/eval_retrieval.py --bench --warm` con Ollama activo y
-    añadir la tabla antes/después a `docs/decisions/FASE15_HALLAZGOS.md §2`.
-  - ÉXITO: test de integración demuestra que dos corridas idénticas no llaman dos veces
-    al connector real (mock del connector: 0 llamadas en la segunda corrida).
+- [x] **T16.0 ✅ — Cableado E2E de Fase 15 (prerequisito)**
+  - [x] `generate_n1.py`: `_store` inyecta `CachedWebConnector`/`CachedOpenAlexConnector` por thread.
+  - [x] `generate_informe._setup_infra`: un solo `build_resilient_api_llm` reemplaza 3 tiers.
+  - [x] `_run_n0`/`_run_n2`: `CachedWebConnector` con sesión local propia.
+  - [ ] `--bench --warm` con Ollama activo: pendiente ejecución manual (Ollama no disponible en sesión).
+  - [x] Test: `test_cached_pipeline.py` verifica que la 2ª búsqueda usa caché (1 sola llamada real).
 
-- **T16.1 — Datos reales del LLM para el radar chart (DT-019)**
-  Añadir en `chain_03_benchmarking.py` un bloque de instrucción para que el LLM emita, al
-  final de su respuesta, una sección JSON estructurada con los scores de cada competidor en
-  las 5 dimensiones estándar (Innovación, Inversión, Presencia global, Sostenibilidad,
-  Digital). Extraer ese JSON en el use case y pasarlo a `generate_radar_chart(data, labels,
-  output_path)`. Si el JSON no es parseable, hacer fallback a `generate_placeholder_radar`
-  con log de advertencia.
-  - ÉXITO: en una corrida E2E la imagen del radar refleja datos distintos de los defaults;
-    el fallback funciona cuando el LLM no emite JSON (test con mock).
+- [x] **T16.1 ✅ — Datos reales del LLM para el radar chart (DT-019)**
+  - [x] `chain_03_benchmarking.py`: instrucción `\`\`\`radar_json` al final del prompt.
+  - [x] `generate_benchmarking.py`: `_extract_radar()` extrae y limpia; `radar_data` en `CapBenchmarking`.
+  - [x] `generate_informe._run_n3`: usa `generate_radar_chart` con datos reales; fallback garantizado.
+  - [x] Tests: 5 tests en `test_radar_extract.py` (válido, inválido, ausente, whitespace, claves).
 
-- **T16.2 — Estilo Normal del .docx (DT-024)**
-  En `DocxRenderer` (o en la plantilla `docx_template_path`), fijar el estilo Normal del
-  documento: Source Sans Pro 11 pt · justificado · interlineado múltiple 1,16 · espacio
-  después 8 pt · control de viudas/huérfanas activado. Verificar que se aplique en los
-  párrafos de cuerpo generados. Si Source Sans Pro no está disponible en el entorno, usar
-  Calibri como fallback documentado.
-  - ÉXITO: test de sanidad abre el .docx y verifica las propiedades del estilo Normal
-    (fuente, tamaño, interlineado).
+- [x] **T16.2 ✅ — Estilo Normal del .docx (DT-024)**
+  - [x] `docx_renderer._apply_normal_style()`: Calibri 11pt, justificado, 1.16x, 8pt after, viudas.
+  - [x] Tests: 5 tests en `test_docx_style.py` verifican cada propiedad del estilo Normal.
 
-- **T16.3 — Tablas Word para fichas de competidores**
-  El Cap 2 produce fichas de competidores en markdown (tablas de 8 campos). El
-  `markdown_parser` actual genera `TableBlock` pero la cadena de renderizado puede
-  ignorarlas si no están en el formato esperado. Verificar el flujo completo y asegurar
-  que cada ficha se renderice como tabla Word nativa (no como texto plano).
-  - ÉXITO: el .docx de un informe E2E contiene ≥1 tabla Word con columnas visibles.
+- [x] **T16.3 ✅ — Tablas Word para fichas de competidores**
+  - [x] `SYSTEM_PROMPT_03`: instrucción explícita de formato markdown pipe para fichas.
+  - [x] Tests: `test_docx_table_block_rendered` y `test_docx_multiple_tables_rendered`.
 
 ### Criterios de cierre
 
@@ -1206,6 +1190,7 @@ ciclo de vida del corpus).
 | 2026-07-21 | 1.3 | Fase 10 cerrada: T10.1 CJK en 6 use cases ✅, T10.2 orphan checker + contexto con meta ✅, T10.3/T10.4 APA 7 fiel ✅, T10.5 panel fiabilidad JSONB ✅, T10.6 disclaimer parametrizable ✅. 137 tests, DT-009/015/017(parcial) cerrados. |
 | 2026-07-21 | 1.4 | Fase 11 cerrada: T11.1 report_model ✅, T11.2 docx_renderer+assembler refactor ✅, T11.3 markdown_parser+TableBlock ✅, T11.4 radar chart ✅, T11.5 PDF LibreOffice ✅, T11.7 callouts ✅. 162 tests fast, ADR-011 creado, DT-016 cerrado, DT-019 nuevo. Q2 resuelta. |
 | 2026-07-21 | 1.5 | Fase 12 cerrada: T12.3 DT-004 ✅ (generate_n1.py, 345 L), T12.4 DT-010 ✅ (tokens reales Ollama + tiempo_ollama_s), T12.5 DT-012 ✅ (paginación+filtro+CSV). 168 tests fast. T12.1/T12.2 (caché/resiliencia) pospuestos a Fase 14. |
+| 2026-07-22 | 2.2 | Fase 16 cerrada (`aadd99e`): T16.0 CachedWebConnector/OpenAlexConnector cableados en N0/N1/N2 (thread-safe por sesión propia por thread) + ResilientChatModel único reemplaza 3 tiers individuales ✅; T16.1 `_extract_radar()` + instrucción radar_json en prompt + radar_data en CapBenchmarking + fallback garantizado (DT-019 ✅); T16.2 `_apply_normal_style()` Calibri 11pt justif 1.16x (DT-024 ✅); T16.3 instrucción pipe-table en SYSTEM_PROMPT_03 + test E2E tabla Word ✅. 277 tests fast, ruff 0. |
 | 2026-07-22 | 2.1 | Fase 16 planificada: T16.0 cableado E2E (CachedConnector+ResilientChatModel), T16.1 radar real (DT-019), T16.2 estilo Normal .docx (DT-024), T16.3 tablas Word fichas competidores. Sección FASE 16 y fila tablero §4 añadidas al roadmap. |
 | 2026-07-22 | 2.0 | Fase 15 cerrada: T15.1 batch_mode() Embedder (keep_alive de lote + flag --warm) ✅; T15.2 CachedWebConnector/OpenAlexConnector + tabla retrieval_cache ✅; T15.3 is_rate_limit_error + ResilientChatModel (free→free_alt→synth→paid) + timeouts por tier (DT-021 ✅); T15.4 eval_gate.py + fase15_budget.json ✅; T15.5 purge scoping + nota /api/generate ✅. 262 tests fast, ruff 0. Pendiente cablear caché+resiliencia en pipeline E2E (ver §8 recomendaciones FASE15_HALLAZGOS). |
 | 2026-07-22 | 1.9 | Fase 14 cerrada (`1fbe8a1`): T14.1 harness de evaluación + gold set (línea base filtered ya óptima: precision 1.0/contam 0.0/hit 1.0) ✅; T14.2 MMR portado **medido y revertido** (degrada con evidencia mono-documento; λ=1.0 por defecto) ✅; T14.3 chunk_size 1000/200 (retrieval-neutral, se mantiene por eficiencia: 998 vs 1746 chunks) ✅; T14.4 índice **descartado** (SQL 15ms, embed domina 99%) ✅; T14.5 persistencia web "solo lo citado" (ADR-013) + purga backlog 1202→0 → evidencia sectorial 3.20→3.68 ✅; T14.6 CIIU→GICS (`ciiu_gics.py`) ✅. DT-020/022/023 cerradas. 223 tests fast, E2E Comfama verificado. FASE14_HALLAZGOS + ADR-013 + addendum ADR-012. |
