@@ -746,21 +746,108 @@ cuantitativa (RAGAS) para no optimizar a ciegas.
   aplica).
 
 ### Prompt de arranque — Fase 14
-> Estás ejecutando la FASE 14 (Calidad de Retrieval y Evaluación). Trabaja según CLAUDE.md y
-> PRIME_DIRECTIVE.md. Parte A (diseño en Plan Mode) → Parte B (ejecución).
-> Estado de entrada: Fase 13 cerrada (`62fe327`), corpus 25 docs/1746 chunks, 181 tests fast.
-> Lee: `FASE13_HALLAZGOS.md`, `ADR-012`, `~/Test/RepositorioRN/app/backend/services/rag/mmr.py`,
-> `src/ic/infrastructure/retrieval/*`, `src/ic/data/repositories/embedding_repo.py`,
-> `src/ic/infrastructure/sources/web_connector.py`, los use cases N1/N2 (patrón
-> `self._store.ingest(..., fuente_tipo="web")`), `src/ic/domain/use_cases/generate_informe.py`
-> (`chunks_usados` → `build_references_section`), y `documentos_sectoriales/Comparacion_GICS_CIIU.csv`.
-> PASO 0 gate: `uv run ruff check src/ tests/ -q && uv run pytest -m "not slow" -q`.
-> Diseña T14.1 (harness de evaluación) PRIMERO — sin métricas no se optimiza. Luego: T14.2 MMR,
-> T14.3 chunk_size, T14.4 índice, **T14.5 persistencia web "solo lo citado" + purga del backlog
-> (~2024 chunks)**, **T14.6 mapeo CIIU→GICS (`Comparacion_GICS_CIIU.csv`) para acotar/validar la
-> clasificación y enfocar el filtro sectorial**. Cada cambio se justifica con números de T14.1.
-> No re-discutir decisiones cerradas de ADR-012 (filtrado sectorial, reserva de cupos).
-> Política acordada: la información web solo persiste si fue efectivamente citada en un informe.
+
+```
+# ROL Y MISIÓN
+Eres el ingeniero a cargo de la FASE 14 (Calidad de Retrieval y Evaluación) del sistema de
+Informes de Inteligencia Competitiva. Tu misión: elevar la calidad del retrieval RAG con
+evidencia MEDIBLE, no por intuición. Trabajas según CLAUDE.md y docs/architecture/PRIME_DIRECTIVE.md.
+
+# MÉTODO DE TRABAJO (obligatorio)
+Dos partes: PARTE A (diseño en Plan Mode, esperar aprobación) → PARTE B (ejecución).
+El plan es la especificación: si la realidad diverge del plan, DETENTE y vuelve a Plan Mode.
+Cambios atómicos (cada entrega compila y corre). Tests en el mismo PR que el código.
+
+# RESTRICCIONES DURAS (no negociables)
+- Modelos solo en .env (nunca hardcodear nombres). Sin secretos en git.
+- Dependency Agnosticism: domain NO importa SQLAlchemy ni Streamlit; todo acceso externo por
+  wrapper en infrastructure/.
+- NO re-discutir ADR-012 (filtrado sectorial, reserva de cupos, fallback por nombre). Se
+  construye SOBRE él.
+- Política de datos acordada: la información web solo persiste si fue EFECTIVAMENTE CITADA en
+  un informe. No re-litigar.
+
+# ESTADO DE ENTRADA (Fase 13 cerrada)
+Branch develop (merge 62fe327). Corpus: 25 docs / 1746 chunks (sector_gics +
+tipo_fuente=informe_compilado, activos). Backlog web: ~2024 chunks sin ciclo de vida.
+181 tests fast, ruff 0.
+
+# PASO 0 — GATE DE ENTRADA
+Ejecuta: uv run ruff check src/ tests/ -q && uv run pytest -m "not slow" -q
+Debe dar 0 errores / verde. Si no, arréglalo antes de continuar.
+
+# PASO 1 — LECTURA OBLIGATORIA (antes de planificar)
+docs/decisions/FASE13_HALLAZGOS.md · docs/architecture/ADR-012-filtrado-sectorial.md ·
+ROADMAP_FASE9+.md (sección FASE 14) · ~/Test/RepositorioRN/app/backend/services/rag/mmr.py ·
+src/ic/infrastructure/retrieval/{pgvector_store,embedder,chunker}.py ·
+src/ic/data/repositories/embedding_repo.py · src/ic/infrastructure/sources/web_connector.py ·
+use cases N1/N2 (patrón self._store.ingest(..., fuente_tipo="web") al buscar) ·
+src/ic/domain/use_cases/generate_informe.py (chunks_usados → build_references_section) ·
+documentos_sectoriales/Comparacion_GICS_CIIU.csv (Sección CIIU → GICS).
+
+# PASO 2 — PLAN MODE (Parte A). Diseña las tareas EN ORDEN, cada una con su criterio de éxito:
+
+T14.1 — Harness de evaluación (PRIMERO; sin métricas no se optimiza).
+  Entrega: script reproducible + set de consultas etiquetadas por sector (gold set) que
+  reporta context precision / context recall / cross-sector contamination por consulta.
+  ÉXITO: corre con un comando, fija la LÍNEA BASE actual en números, y es determinista.
+
+T14.2 — MMR completo (portar de RepositorioRN mmr.py), reemplazando el cap simple por doc.
+  ÉXITO: en el harness T14.1, mejora la diversidad de documentos SIN degradar precision/recall
+  frente a la línea base; parametrizable (mmr_lambda en config). Test unitario del reranking.
+
+T14.3 — chunk_size 500→1000 / overlap 200 (re-chunking del corpus).
+  ÉXITO: decisión basada en datos de T14.1 (recall/score antes vs después). Si no mejora, se
+  documenta y se revierte. Reproducible (re-ingesta idempotente).
+
+T14.4 — Índice parcial/GIN sobre metadatos->>'sector_gics' (evaluar hnsw + índice).
+  ÉXITO: latencia de búsqueda medida antes/después con el corpus completo; sin regresión de
+  resultados. Decisión registrada.
+
+T14.5 (DT-020) — Persistencia web "solo lo citado".
+  Rediseña: los resultados web NO se persisten al buscar; se usan para el retrieval de la
+  corrida y, al ensamblar, SOLO se persisten los chunks web presentes en chunks_usados. Purga
+  ÚNICA del backlog web histórico no usado (~2024 chunks).
+  ÉXITO: tras generar un informe, en BD solo quedan chunks web que fueron citados; el conteo de
+  chunks web no crece con búsquedas descartadas. Tests de la lógica de "promover solo lo usado"
+  y del borrado por lote. Referencia: DocumentoRepository.delete_with_chunks.
+
+T14.6 (DT-023) — CIIU→GICS para acotar/validar la clasificación.
+  Carga Comparacion_GICS_CIIU.csv; mapea CIIU numérico → Sección CIIU Rev4 → códigos GICS
+  candidatos (matching tolerante de nombres, estilo extract_gics_code). Úsalo para acotar la
+  clasificación del LLM cuando se conoce el CIIU y validar/corregir sector_gics antes del filtro.
+  Endurece chain_02_gics para emitir "(GICS XXXX)"; conserva el fallback por nombre.
+  ÉXITO: con CIIU conocido, sector_gics resuelto ∈ candidatos del CSV; test con ≥5 CIIU reales
+  (incl. Comfama 8430→Sección O). No rompe empresas sin CIIU.
+
+Espera aprobación del plan antes de escribir código.
+
+# PASO 3 — EJECUCIÓN (Parte B)
+Implementa T14.1→T14.6 en orden. CADA cambio de T14.2–T14.6 se justifica con números del
+harness T14.1 (antes/después). No optimizar a ciegas.
+
+# CRITERIOS DE ÉXITO GLOBALES (Definition of Done)
+1. Gate verde: ruff 0 + pytest -m "not slow". Cobertura de domain ≥ 80%.
+2. Mejora MEDIBLE del retrieval sobre la línea base T14.1 (precision/recall y/o menor
+   contaminación cross-sector), documentada con la tabla antes/después.
+3. Persistencia web: verificado en BD que solo persiste lo citado; backlog no usado purgado.
+4. CIIU→GICS operativo y probado; clasificación más robusta sin romper el flujo sin-CIIU.
+5. Tests nuevos para MMR, persistencia "solo usado" y mapeo CIIU→GICS.
+
+# PASO 4 — VERIFICACIÓN
+Corre el gate. Ejecuta el harness T14.1 y adjunta la tabla de métricas antes/después.
+Genera 1 informe E2E (empresa con CIIU conocido) y confirma: sector correcto filtrado, solo
+fuentes citadas persistidas.
+
+# PASO 5 — DOCUMENTACIÓN (obligatoria al cierre)
+Actualiza la documentación del proyecto con AVANCES, RETOS y RECOMENDACIONES:
+- docs/decisions/FASE14_HALLAZGOS.md: qué se logró (métricas antes/después), retos
+  encontrados y cómo se resolvieron, y recomendaciones/follow-ups para fases siguientes.
+- ROADMAP_FASE9+.md: tablero §4 (Fase 14 ✅ + hash), deuda §5 (DT-020/022/023 cerrados o
+  actualizados), changelog §8. Marca T14.x.
+- ADR nuevo/actualizado si cambió una decisión estructural (MMR, chunk_size, índice, persistencia).
+- Confirma el commit conmigo antes de mergear a develop.
+```
 
 ---
 
