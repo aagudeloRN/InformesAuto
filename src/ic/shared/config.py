@@ -57,6 +57,27 @@ class Settings(BaseSettings):
     # Se conserva parametrizable para corpus futuros con sectores multi-documento.
     rag_mmr_lambda: float = 1.0
 
+    # Embedding — keep_alive (Fase 15, T15.1, ADR-006)
+    # Default "0": libera VRAM inmediatamente (política ADR-006).
+    # batch_keep_alive "5m": keep_alive usado en batch_mode() para re-ingesta/harness/N1.
+    # batch_mode() descarga el modelo al cerrar → el lote es explícito y acotado, no el default.
+    embedder_keep_alive: str = "0"
+    embedder_batch_keep_alive: str = "5m"
+
+    # Caché de retrieval (Fase 15, T15.2)
+    retrieval_cache_ttl_hours: int = 168  # 7 días por defecto
+
+    # Timeouts por tier API (Fase 15, T15.3)
+    llm_api_timeout_free: int = 180
+    llm_api_timeout_free_alt: int = 180
+    llm_api_timeout_synth: int = 180
+    llm_api_timeout_paid: int = 120
+
+    # Gate de latencia/costo (Fase 15, T15.4)
+    eval_gate_max_latency_ms: float = 3000.0   # ms por consulta embed+SQL
+    eval_gate_max_latency_sql_ms: float = 50.0  # ms SQL puro
+    eval_gate_max_cost_usd: float = 0.0         # harness no gasta API
+
     # Fuentes automáticas (ADR-003)
     openalex_email: str = ""
     tavily_api_key: str = ""

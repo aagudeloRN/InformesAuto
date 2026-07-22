@@ -306,6 +306,91 @@ class OpenRouterGatewayLLM(BaseChatModel):
                         yield chunk
 
 
+_RATE_LIMIT_PATTERNS = ("rate limit", "resourceexhausted", "quota", "429", "too many requests")
+
+
+def is_rate_limit_error(exc: Exception) -> bool:
+    """Detecta errores de rate-limit/quota de OpenRouter (HTTP 429 o error en el body).
+
+    OpenRouter puede indicar rate-limit de dos formas:
+    1. HTTP 429 en el status (sí dispara raise_for_status).
+    2. HTTP 200 con {"error": {...}} en el body (no dispara raise_for_status — DT-021).
+    Ambos terminan como RuntimeError o HTTPStatusError con texto diagnóstico.
+    """
+    text = str(exc).lower()
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
+        return True
+    return any(p in text for p in _RATE_LIMIT_PATTERNS)
+
+
+class RateLimitError(RuntimeError):
+    """Excepción explícita de rate-limit para que ResilientChatModel la capture."""
+
+
+class ResilientChatModel(BaseChatModel):
+    """LLM con fallback automático de tier ante rate-limit de OpenRouter (DT-021, T15.3).
+
+    Recibe una lista ordenada de modelos (free→free_alt→synth→paid). Si el tier
+    actual lanza un error de rate-limit, cae al siguiente. Si todos fallan, re-raise
+    el último error. Todos los tiers NO-rate-limit (5xx, timeout) se propagan inmediatamente.
+    """
+
+    tiers: list[Any]  # list[OpenRouterGatewayLLM] — Any para inyectabilidad en tests
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    @property
+    def _llm_type(self) -> str:
+        return "resilient-openrouter"
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        last_exc: Exception | None = None
+        for i, tier_llm in enumerate(self.tiers):
+            try:
+                return tier_llm._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+            except Exception as exc:
+                if is_rate_limit_error(exc):
+                    logger.warning(
+                        "Rate-limit en tier %d (model=%s): %s. Intentando fallback.",
+                        i, tier_llm.model, exc,
+                    )
+                    last_exc = exc
+                    continue
+                raise  # error no-rate-limit → propagar inmediatamente
+        raise last_exc  # type: ignore[misc]
+
+    def _stream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> Iterator[ChatGenerationChunk]:
+        last_exc: Exception | None = None
+        for i, tier_llm in enumerate(self.tiers):
+            try:
+                yield from tier_llm._stream(
+                    messages, stop=stop, run_manager=run_manager, **kwargs
+                )
+                return
+            except Exception as exc:
+                if is_rate_limit_error(exc):
+                    logger.warning(
+                        "Rate-limit en tier %d (model=%s, stream): %s. Intentando fallback.",
+                        i, tier_llm.model, exc,
+                    )
+                    last_exc = exc
+                    continue
+                raise
+        raise last_exc  # type: ignore[misc]
+
+
 def build_llm(
     settings: Settings, cost_tracker: CostTracker | None = None
 ) -> OllamaGatewayLLM:
@@ -317,6 +402,14 @@ def build_llm(
         timeout=settings.llm_local_timeout,
         cost_tracker=cost_tracker,
     )
+
+
+_TIER_TIMEOUT_ATTR: dict[ModelTier, str] = {
+    "free": "llm_api_timeout_free",
+    "free_alt": "llm_api_timeout_free_alt",
+    "synth": "llm_api_timeout_synth",
+    "paid": "llm_api_timeout_paid",
+}
 
 
 def build_api_llm(
@@ -342,10 +435,38 @@ def build_api_llm(
             f"Modelo para tier='{tier}' no configurado en .env "
             f"(LLM_API_FREE_MODEL / LLM_API_SYNTH_MODEL / LLM_API_PAID_MODEL)"
         )
+    timeout_attr = _TIER_TIMEOUT_ATTR.get(tier, "llm_api_timeout_free")
+    timeout = getattr(settings, timeout_attr, 180)
     return OpenRouterGatewayLLM(
         base_url=settings.openrouter_base_url,
         model=model,
         api_key=settings.openrouter_api_key,
         max_retries=settings.llm_circuit_breaker_max_retries,
+        timeout=timeout,
         cost_tracker=cost_tracker,
     )
+
+
+def build_resilient_api_llm(
+    settings: Settings,
+    tiers: list[ModelTier] | None = None,
+    cost_tracker: CostTracker | None = None,
+) -> ResilientChatModel:
+    """Construye un LLM resiliente con fallback automático entre tiers (T15.3, DT-021).
+
+    Orden default: free → free_alt → synth → paid.
+    Solo incluye tiers con modelo configurado en .env.
+    """
+    tier_order: list[ModelTier] = tiers or ["free", "free_alt", "synth", "paid"]
+    built: list[OpenRouterGatewayLLM] = []
+    for t in tier_order:
+        try:
+            built.append(build_api_llm(settings, tier=t, cost_tracker=cost_tracker))
+        except ValueError:
+            pass  # tier no configurado → se omite silenciosamente
+    if not built:
+        raise ValueError(
+            "No hay ningún tier de API configurado en .env. "
+            "Configura al menos LLM_API_FREE_MODEL."
+        )
+    return ResilientChatModel(tiers=built)

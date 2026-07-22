@@ -94,6 +94,10 @@ def main() -> int:
         "--mmr-lambda", type=float, default=None,
         help="Override de rag_mmr_lambda (1.0 = sin MMR; 0.7 = MMR). Para A/B antes/después.",
     )
+    parser.add_argument(
+        "--warm", action="store_true",
+        help="Ejecutar en batch_mode (keep_alive positivo). Mide colapso de latencia en lotes.",
+    )
     args = parser.parse_args()
 
     gold = json.loads(Path(args.gold).read_text(encoding="utf-8"))
@@ -105,7 +109,8 @@ def main() -> int:
     per_query = []
     latencies: list[float] = []
     sql_latencies: list[float] = []
-    with SessionLocal() as db:
+
+    def _run_queries(db):
         repo = EmbeddingRepository(db)
         store = PGVectorStore(embedder, repo, settings)
         if args.mmr_lambda is not None:
@@ -120,12 +125,18 @@ def main() -> int:
             per_query.append(evaluate_query(query, sector, _to_retrieved(chunks)))
 
             if args.bench_sql:
-                # Aísla el SQL: embebe una vez y cronometra solo search_similar (sin Ollama).
                 qv = embedder.embed(query)
                 best = min(
                     _time_sql(repo, qv, settings, sector_arg) for _ in range(3)
                 )
                 sql_latencies.append(best)
+
+    with SessionLocal() as db:
+        if args.warm:
+            with embedder.batch_mode():
+                _run_queries(db)
+        else:
+            _run_queries(db)
 
     agg = aggregate(per_query)
 
@@ -142,7 +153,8 @@ def main() -> int:
         lat_sorted = sorted(latencies)
         p50 = lat_sorted[len(lat_sorted) // 2]
         p95 = lat_sorted[min(len(lat_sorted) - 1, int(len(lat_sorted) * 0.95))]
-        print("\n--- Latencia search() (embed + SQL) ---")
+        warm_tag = " [warm/batch]" if args.warm else " [cold/default]"
+        print(f"\n--- Latencia search() (embed + SQL){warm_tag} ---")
         print(f"  media={sum(latencies) / len(latencies) * 1000:.1f}ms  "
               f"p50={p50 * 1000:.1f}ms  p95={p95 * 1000:.1f}ms")
     if args.bench_sql and sql_latencies:
@@ -159,6 +171,7 @@ def main() -> int:
         _sig = inspect.signature(_chunker.chunk_text)
         snapshot = {
             "mode": args.mode,
+            "warm": args.warm,
             "chunk_size": _sig.parameters["chunk_size"].default,
             "overlap": _sig.parameters["overlap"].default,
             "config": {
