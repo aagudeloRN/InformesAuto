@@ -43,7 +43,13 @@ SYSTEM_PROMPT_03 = (
     "    * Cada párrafo: entre 80 y 150 palabras.\n"
     "    * Mantener longitud total de cada sección dentro de ±10 % respecto a su extensión natural.\n"  # noqa: E501
     "- Sin mini-checklists ni meta-comentarios al final de ninguna sección.\n"
-    "- Sin citaciones inline en la sección 2.2 (la síntesis es editorial; las citas van en 2.1)."
+    "- Sin citaciones inline en la sección 2.2 (la síntesis es editorial; las citas van en 2.1).\n"
+    "- FORMATO DE FICHAS (sección 2.1): cada ficha debe ser una tabla markdown con pipes. "
+    "Ejemplo de formato:\n"
+    "| Campo | Valor |\n"
+    "|-------|-------|\n"
+    "| Nombre + País | Nestlé — Suiza |\n"
+    "Usar exactamente este formato de tabla markdown para CADA competidor en 2.1."
 )
 
 USER_PROMPT_03 = (
@@ -75,7 +81,22 @@ USER_PROMPT_03 = (
     "## 2.5. Análisis de Brechas\n\n"
     "Responde estas dos preguntas en texto corrido (storytelling), sin viñetas:\n"
     "- ¿Qué oportunidades no están cubriendo los líderes globales?\n"
-    "- ¿Qué estrategias están usando las startups para ganar cuota de mercado?"
+    "- ¿Qué estrategias están usando las startups para ganar cuota de mercado?\n\n"
+    "## RADAR DE POSICIONAMIENTO (emitir AL FINAL, después de todo el texto anterior)\n\n"
+    "Basándote en el análisis de la sección 2.1, emite EXACTAMENTE el siguiente bloque JSON "
+    "(reemplaza los nombres y valores con los competidores reales analizados; scores de 1 a 5):\n\n"
+    "```radar_json\n"
+    '{{\n'
+    '  "dimensions": ["Innovación", "Inversión", "Presencia global", "Sostenibilidad", "Digital"],'
+    '\n'
+    '  "competidores": {{\n'
+    '    "Nombre Competidor 1": [4.5, 4.0, 5.0, 3.5, 4.0],\n'
+    '    "Nombre Competidor 2": [3.0, 3.5, 4.5, 3.0, 3.5]\n'
+    '  }}\n'
+    '}}\n'
+    "```\n\n"
+    "Incluye de 4 a 8 competidores clave de la sección 2.1. "
+    "No emitas ningún texto después del bloque ```radar_json```."
 )
 
 

@@ -8,6 +8,7 @@ import os
 import re
 
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt
@@ -38,6 +39,7 @@ class DocxRenderer:
         else:
             word_doc = Document()
 
+        _apply_normal_style(word_doc)  # T16.2: fijar tipografía corporativa
         _add_footer(word_doc)
         _add_cover_page(word_doc, doc.title, doc.company, doc.date)
 
@@ -47,6 +49,24 @@ class DocxRenderer:
         os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
         word_doc.save(output_path)
         return output_path
+
+
+# ---------------------------------------------------------------------------
+# Normal style (T16.2, DT-024)
+# ---------------------------------------------------------------------------
+
+def _apply_normal_style(doc: Document) -> None:
+    """Fija el estilo Normal: Calibri 11 pt, justificado, interlineado 1,16x, espacio 8 pt."""
+    style = doc.styles["Normal"]
+    font = style.font
+    font.name = "Calibri"  # Source Sans Pro como mejora futura si se instala en el servidor
+    font.size = Pt(11)
+    pf = style.paragraph_format
+    pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    pf.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
+    pf.line_spacing = 1.16
+    pf.space_after = Pt(8)
+    pf.widow_control = True
 
 
 # ---------------------------------------------------------------------------

@@ -24,6 +24,10 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
     from ic.domain.use_cases.generate_tendencias import GenerateTendencias
     from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
+    from ic.infrastructure.sources.cached_connector import (
+        CachedOpenAlexConnector,
+        CachedWebConnector,
+    )
     from ic.infrastructure.sources.openalex_connector import OpenAlexConnector
     from ic.shared.constants.gics_groups import extract_gics_code
 
@@ -31,36 +35,40 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     e, g, s = ctx.params.empresa, ctx.gics.grupo_gics, ctx.settings
     g_code = extract_gics_code(g)
 
+    # T16.0-B: cada thread abre su propia sesión y crea sus propios wrappers cached.
+    # SQLAlchemy Session no es thread-safe — nunca compartir entre threads paralelos.
     def _store(fn):
         with SessionLocal() as db:
             store = PGVectorStore(ctx.embedder, EmbeddingRepository(db), s)
             store.session_id = ctx.session_id
-            return fn(store)
+            cached_web = CachedWebConnector(ctx.web, db, s)
+            cached_oal = CachedOpenAlexConnector(OpenAlexConnector(s), db, s)
+            return fn(store, cached_web, cached_oal)
 
-    def _fn_cap2(store):
+    def _fn_cap2(store, web, _oal):
         return GenerateBenchmarking(
-            chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=ctx.web
+            chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=web
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code,
         )
 
-    def _fn_cap3(store):
+    def _fn_cap3(store, web, oal):
         if ctx.api_llm is None:
             return None
         return GenerateTendencias(
             chain=build_chain_04(ctx.api_llm), store=store,
-            web_connector=ctx.web, openalex_connector=OpenAlexConnector(s),
+            web_connector=web, openalex_connector=oal,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code,
         )
 
-    def _fn_cap4(store):
+    def _fn_cap4(store, web, _oal):
         if ctx.api_llm is None:
             return None
         return GenerateEcosistema(
-            chain=build_chain_05(ctx.api_llm), store=store, web_connector=ctx.web,
+            chain=build_chain_05(ctx.api_llm), store=store, web_connector=web,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code,

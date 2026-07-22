@@ -95,24 +95,22 @@ class GenerateInforme:
         self, params: InformeParams, step_fn: Any, total_start: float
     ) -> _PipelineContext:
         from ic.domain.chains.chain_intro import build_chain_intro
-        from ic.infrastructure.llm.gateway import CostTracker, build_api_llm, build_llm
+        from ic.infrastructure.llm.gateway import (
+            CostTracker,
+            build_llm,
+            build_resilient_api_llm,
+        )
         from ic.infrastructure.retrieval.embedder import Embedder
         from ic.infrastructure.sources.web_connector import WebConnector
 
         s = self._settings
         tracker = CostTracker(budget_limit=s.llm_budget_limit_usd)
-        api_llm = (
-            build_api_llm(s, tier="free", cost_tracker=tracker) if s.openrouter_api_key else None
-        )
-        api_llm_alt = (
-            build_api_llm(s, tier="free_alt", cost_tracker=tracker)
-            if s.openrouter_api_key and s.llm_api_free_alt_model else None
-        )
-        api_llm_synth = (
-            build_api_llm(s, tier="synth", cost_tracker=tracker) if s.openrouter_api_key else None
+        # T16.0-A: un solo modelo resiliente (free→free_alt→synth→paid)
+        resilient_llm = (
+            build_resilient_api_llm(s, cost_tracker=tracker) if s.openrouter_api_key else None
         )
         llm = build_llm(s, cost_tracker=tracker)
-        cap1_llms = [m for m in [api_llm, api_llm_alt, llm] if m is not None]
+        cap1_llms = [m for m in [resilient_llm, llm] if m is not None]
         slug = params.empresa.replace(" ", "_").replace(".", "").lower()
         output_path = params.output_path or f"./output/{slug}_informe.docx"
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -120,10 +118,13 @@ class GenerateInforme:
         return _PipelineContext(
             params=params, settings=s, step_fn=step_fn, total_start=total_start,
             session_id=uuid.uuid4().hex,
-            llm=llm, api_llm=api_llm, api_llm_alt=api_llm_alt, api_llm_synth=api_llm_synth,
+            llm=llm,
+            api_llm=resilient_llm,
+            api_llm_alt=None,
+            api_llm_synth=resilient_llm,  # mismo modelo; el fallback opera internamente
             cap1_llms=cap1_llms, embedder=Embedder(s), web=WebConnector(s),
             tracker=tracker,
-            intro_chain=build_chain_intro(api_llm) if api_llm else None,
+            intro_chain=build_chain_intro(resilient_llm) if resilient_llm else None,
             output_path=output_path,
         )
 
@@ -162,16 +163,21 @@ class GenerateInforme:
             logger.warning("No se pudo promover/purgar chunks web de la sesión", exc_info=True)
 
     def _run_n0(self, ctx: _PipelineContext) -> None:
+        from ic.data.database import SessionLocal
         from ic.domain.chains.chain_01_descripcion import build_chain_01
         from ic.domain.chains.chain_02_gics import build_chain_02
         from ic.domain.use_cases.classify_gics import ClassifyGICS
         from ic.domain.use_cases.generate_empresa_description import GenerateEmpresaDescription
+        from ic.infrastructure.sources.cached_connector import CachedWebConnector
 
         ctx.step_fn(1, "Cap 1 — Descripción de la empresa")
-        uc_desc = GenerateEmpresaDescription(
-            chain=build_chain_01(ctx.cap1_llms), web_connector=ctx.web
-        )
-        ctx.empresa = uc_desc.execute(ctx.params.empresa)
+        # T16.0-B: CachedWebConnector para Cap 1 (sesión breve, single-threaded)
+        with SessionLocal() as db_n0:
+            cached_web_n0 = CachedWebConnector(ctx.web, db_n0, ctx.settings)
+            uc_desc = GenerateEmpresaDescription(
+                chain=build_chain_01(ctx.cap1_llms), web_connector=cached_web_n0
+            )
+            ctx.empresa = uc_desc.execute(ctx.params.empresa)
         if ctx.params.ciiu:
             ctx.empresa = ctx.empresa.__class__(
                 nombre_empresa=ctx.empresa.nombre_empresa,
@@ -197,6 +203,7 @@ class GenerateInforme:
         from ic.domain.use_cases.generate_accionables import GenerateAccionables
         from ic.domain.use_cases.generate_convergencia import GenerateConvergencia
         from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
+        from ic.infrastructure.sources.cached_connector import CachedWebConnector
         from ic.shared.constants.gics_groups import extract_gics_code
 
         e, g = ctx.params.empresa, ctx.gics.grupo_gics
@@ -204,13 +211,14 @@ class GenerateInforme:
         with SessionLocal() as db_n2:
             store_n2 = PGVectorStore(ctx.embedder, EmbeddingRepository(db_n2), ctx.settings)
             store_n2.session_id = ctx.session_id
+            cached_web_n2 = CachedWebConnector(ctx.web, db_n2, ctx.settings)  # T16.0-B
 
             ctx.step_fn(6, "Cap 5 — Convergencia Empresarial")
             if ctx.api_llm_synth is not None:
                 ctx.cap_conv = GenerateConvergencia(
                     chain=build_chain_06_synth(ctx.api_llm_synth),
                     chain_eje=build_chain_06a(ctx.api_llm) if ctx.api_llm else None,
-                    store=store_n2, web_connector=ctx.web,
+                    store=store_n2, web_connector=cached_web_n2,
                 ).execute(
                     nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
                     sector_gics_code=g_code,
@@ -324,13 +332,22 @@ class GenerateInforme:
             resumen_ejecutivo=ctx.resumen, referencias=refs,
         )
 
-        from ic.infrastructure.charts.radar_chart import generate_placeholder_radar
+        from ic.infrastructure.charts.radar_chart import (
+            generate_placeholder_radar,
+            generate_radar_chart,
+        )
         from ic.infrastructure.render.docx_renderer import DocxRenderer
         from ic.infrastructure.render.pdf_renderer import convert_docx_to_pdf
 
         chart_path = ctx.output_path.replace(".docx", "_radar.png")
         try:
-            generate_placeholder_radar(chart_path, ctx.params.empresa)
+            # T16.1-D: usar datos reales del LLM si están disponibles; fallback a placeholder
+            rd = ctx.cap.radar_data if ctx.cap else None
+            if rd and rd.get("competidores") and rd.get("dimensions"):
+                generate_radar_chart(rd["competidores"], rd["dimensions"], chart_path,
+                                     title=f"Posicionamiento Competitivo — {ctx.params.empresa}")
+            else:
+                generate_placeholder_radar(chart_path, ctx.params.empresa)
         except Exception:
             logger.warning("No se pudo generar radar chart", exc_info=True)
             chart_path = None
