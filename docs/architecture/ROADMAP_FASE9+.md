@@ -103,6 +103,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 11 | Formato del Documento Final | ✅ | 2026-07-21 | `a581201`+ | `FASE11_HALLAZGOS.md` |
 | 12 | Optimización de Operación | ✅ | 2026-07-21 | `8f6e8f5`+ | `FASE12_HALLAZGOS.md` |
 | 13 | Repositorio Sectorial RAG | ✅ | 2026-07-22 | `62fe327` | `FASE13_HALLAZGOS.md` |
+| 14 | Calidad de Retrieval y Evaluación | ✅ | 2026-07-22 | `1fbe8a1` | `FASE14_HALLAZGOS.md` |
 
 > Cada fase, al cerrar, actualiza su fila (estado ✅, fecha, hash de commit) y marca sus
 > tareas en la sección correspondiente.
@@ -126,10 +127,10 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-019 | Datos estructurados del LLM para radar chart real (actualmente placeholder) | 16 | ⬜ (presentación) |
 | DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | ✅ footer parametrizable + `_run_pdf` retirado (corpus vía UI/lote, ADR-012) |
 | DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | 🟡 script listo; settings.json actualizado en Fase 10 |
-| DT-020 | Persistencia web indiscriminada: se ingesta todo lo buscado (usado o no). Objetivo: persistir **solo lo citado** (`chunks_usados`) + purgar el backlog no usado (~2024 chunks) | 14 | ⬜ nuevo (Fase 13) |
+| DT-020 | Persistencia web indiscriminada: se ingesta todo lo buscado (usado o no). Objetivo: persistir **solo lo citado** (`chunks_usados`) + purgar el backlog no usado | 14 | ✅ ADR-013: session ingest + `promote_cited_web` + `sweep_stale` + purga única (backlog 1202→0); la purga subió la evidencia sectorial 3.20→3.68 chunks/consulta |
 | DT-021 | Resiliencia OpenRouter free: rate-limits transitorios (`ResourceExhausted 32/32`) sin backoff/reintento dedicado | 15 | ⬜ nuevo (Fase 13); ligado a T12.1/T12.2 pospuestos |
-| DT-022 | Reranking/afinado de retrieval: MMR completo + evaluación (RAGAS), `chunk_size` 500→1000, índice parcial/GIN sobre `metadatos->>'sector_gics'` | 14 | ⬜ nuevo (Fase 13) |
-| DT-023 | Clasificación GICS: `chain_02_gics` no emite el código (mitigado por `extract_gics_code`). Usar `Comparacion_GICS_CIIU.csv` (CIIU→GICS) para acotar/validar candidatos y endurecer el prompt para emitir "(GICS XXXX)" | 14 | ⬜ nuevo (Fase 13) |
+| DT-022 | Reranking/afinado de retrieval: MMR completo + evaluación, `chunk_size` 500→1000, índice parcial/GIN sobre `metadatos->>'sector_gics'` | 14 | ✅ harness T14.1 (métricas propias); MMR medido y **revertido** (degrada mono-doc); `chunk_size` 1000/200 (neutral, se mantiene por eficiencia); índice **descartado** (SQL 15ms). Ver `FASE14_HALLAZGOS.md` + addendum ADR-012 |
+| DT-023 | Clasificación GICS: `chain_02_gics` no emite el código (mitigado por `extract_gics_code`). Usar `Comparacion_GICS_CIIU.csv` (CIIU→GICS) para acotar/validar candidatos y endurecer el prompt para emitir "(GICS XXXX)" | 14 | ✅ `ciiu_gics.py` (CIIU→Sección→candidatos); `ClassifyGICS` acota+valida/corrige; `chain_02` endurecido; fallback por nombre conservado; ≥5 CIIU probados |
 | DT-024 | Estilo Normal del documento no fijado: objetivo Source Sans Pro 11 pt, justificado, interlineado 1,16, espacio después 8 pt, control de viudas/huérfanas | 16 | ⬜ nuevo (Fase 13) |
 
 ---
@@ -684,8 +685,9 @@ Orden acordado con el usuario: absorber la deuda técnica descubierta antes de f
 - **Fase 14** — Calidad de Retrieval y Evaluación (DT-022, DT-020, DT-023). MMR completo,
   evaluación RAGAS, `chunk_size` 500→1000, índice GIN sectorial, ciclo de vida de chunks web,
   endurecer prompt GICS. **Detallada abajo con prompt de arranque.**
-- **Fase 15** — Resiliencia y Costo (DT-021 + T12.1/T12.2). Caché de LLM, circuit
-  breaker/backoff para rate-limits OpenRouter, control de presupuesto.
+- **Fase 15** — Resiliencia y Costo (DT-021 + T12.1/T12.2). Caché de retrieval, backoff/fallback
+  de tier para rate-limits OpenRouter, control de presupuesto y **estrategia de embedding**
+  (mayor palanca de latencia según Fase 14). **Detallada abajo con prompt de arranque.**
 - **Fase 16** — Presentación del contenido (DT-019 + DT-024 + tablas). Radar con datos reales
   del LLM, tablas de benchmarking en Word, pulido de formato .docx/.pdf. **Criterio de
   aceptación del estilo Normal** (DT-024): Source Sans Pro 11 pt · justificado · interlineado
@@ -700,7 +702,12 @@ Orden acordado con el usuario: absorber la deuda técnica descubierta antes de f
 
 # FASE 14 — Calidad de Retrieval y Evaluación
 
-**Prioridad:** P1 · **Estado:** ⬜ Pendiente · **Deuda:** DT-022, DT-020, DT-023
+**Prioridad:** P1 · **Estado:** ✅ Completada (2026-07-22, `1fbe8a1`) · **Deuda:** DT-020/022/023 cerradas
+
+> **Cierre T14.x:** T14.1 ✅ harness+gold set · T14.2 ✅ MMR medido y **revertido** (λ=1.0
+> default; degrada con evidencia mono-documento) · T14.3 ✅ chunk_size 1000/200 (neutral, se
+> mantiene por eficiencia) · T14.4 ✅ índice **descartado** (SQL 15ms) · T14.5 ✅ persistencia
+> web "solo lo citado" (ADR-013) + purga 1202→0 · T14.6 ✅ CIIU→GICS. Ver `FASE14_HALLAZGOS.md`.
 
 ### Objetivo
 Elevar la calidad y el rigor del retrieval RAG con evidencia medible. Fase 13 dejó tres
@@ -851,6 +858,151 @@ Actualiza la documentación del proyecto con AVANCES, RETOS y RECOMENDACIONES:
 
 ---
 
+# FASE 15 — Resiliencia y Costo
+
+**Prioridad:** P1 · **Estado:** ⬜ Pendiente · **Deuda:** DT-021, T12.1, T12.2
+
+### Objetivo
+Reducir latencia y costo del pipeline y hacerlo resiliente a rate-limits, **explotando los
+hallazgos cuantitativos de Fase 14**. Fase 14 dejó el retrieval en buen estado y —sobre todo—
+**instrumentación medible** (harness T14.1 con `--bench`/`--bench-sql`) que ahora se usa como
+gate de latencia/costo, no solo de calidad.
+
+### Hallazgos de Fase 14 que motivan esta fase (leer `FASE14_HALLAZGOS.md`)
+1. **El embedding domina el ~99% de la latencia** (~1320 ms por consulta; el SQL es ~15 ms).
+   Causa: `nomic-embed-text` con `keep_alive:0` **recarga el modelo en cada llamada**
+   (`infrastructure/retrieval/embedder.py`). Es la **mayor palanca de rendimiento** del sistema
+   (afecta re-ingesta, harness, y cada búsqueda N1/N2). Reconciliar con la política de VRAM de
+   ADR-006 (por eso está en `keep_alive:0`): buscar un *toggle de lote* seguro.
+2. **Sin caché de retrieval** (T12.1): web/OpenAlex se re-consultan en cada corrida; con la nueva
+   persistencia "solo lo citado" (ADR-013) tiene aún más sentido cachear la *búsqueda*, no el
+   *chunk*.
+3. **Rate-limits OpenRouter free** (DT-021): el gateway usa `tenacity @retry` con
+   `wait_exponential` genérico, pero **no detecta el 429/rate-limit del free-tier** (llega en el
+   body sin disparar `raise_for_status`, ver `gateway.py:233`). Falta backoff dedicado + fallback
+   de tier.
+4. **Higiene de tests**: `purge_unused_web_backlog()` es global (borra todo el backlog legacy);
+   seguro en régimen permanente (legacy=0) pero conviene un scoping opcional para tests.
+
+### Tareas
+- **T15.1 (hallazgo Fase 14, mayor palanca) — Estrategia de embedding.** Introducir un modo de
+  lote con `keep_alive` positivo (o servidor de embeddings persistente) para re-ingesta/harness/
+  N1, manteniendo `keep_alive:0` como default seguro de VRAM. Medir el antes/después con el
+  harness T14.1 `--bench` (objetivo: colapsar el 99% de latencia en lotes). Wrapper en
+  `infrastructure/`, parametrizado por `.env` (nunca hardcodear).
+- **T15.2 (T12.1) — Caché de retrieval.** Cachear resultados web/OpenAlex por `(query, ttl)` en
+  una tabla del esquema `informes_ic` para no re-consultar en cada corrida. Invalidación por TTL.
+  Medir hit-rate y ahorro de latencia/llamadas.
+- **T15.3 (DT-021, T12.2) — Resiliencia free-tier.** Detectar 429/rate-limit del body de
+  OpenRouter (no solo HTTP status), backoff dedicado + fallback de tier (free→free_alt→synth→
+  paid) con logging. Timeouts/paralelismo por tier configurables en `.env`.
+- **T15.4 — Gate de costo/latencia.** Extender el harness T14.1 (o un check de CI) para fijar un
+  presupuesto de latencia/costo y detectar regresiones (aprovecha `latency_ms`/`latency_sql_ms`
+  ya en los snapshots). Integrar con `CostTracker.within_budget`.
+- **T15.5 — Higiene y deuda menor.** Scoping opcional de `purge_unused_web_backlog` para tests;
+  revisar el `POST /api/generate` observado en la ingesta; reconciliar `keep_alive` con ADR-006.
+
+### Criterios de cierre
+- Reducción **medible** de latencia (harness `--bench`) y/o de llamadas (caché) documentada en
+  `FASE15_HALLAZGOS.md` antes/después.
+- Resiliencia demostrada: una corrida sobrevive a un 429 simulado sin abortar (fallback de tier).
+- Gate verde (ruff 0 + `pytest -m "not slow"`); tests para caché, backoff/fallback y el modo de
+  embedding en lote. Cobertura `domain/` ≥ 80%.
+- Decisiones estructurales en ADR (caché, keep_alive de lote) si aplica.
+
+### Prompt de arranque — Fase 15
+
+```
+# ROL Y MISIÓN
+Eres el ingeniero a cargo de la FASE 15 (Resiliencia y Costo) del sistema de Informes de
+Inteligencia Competitiva. Tu misión: reducir latencia y costo y hacer el pipeline resiliente a
+rate-limits, con evidencia MEDIBLE usando el harness T14.1 ya existente. Trabajas según CLAUDE.md
+y docs/architecture/PRIME_DIRECTIVE.md.
+
+# MÉTODO DE TRABAJO (obligatorio)
+Dos partes: PARTE A (diseño en Plan Mode, esperar aprobación) → PARTE B (ejecución).
+El plan es la especificación: si la realidad diverge del plan, DETENTE y vuelve a Plan Mode.
+Cambios atómicos (cada entrega compila y corre). Tests en el mismo PR que el código.
+
+# RESTRICCIONES DURAS (no negociables)
+- Modelos y parámetros de infra (keep_alive, timeouts, TTL) solo en .env / config (nunca
+  hardcodear nombres ni valores mágicos en código de aplicación). Sin secretos en git.
+- Dependency Agnosticism: domain NO importa SQLAlchemy/httpx/Streamlit; todo acceso externo por
+  wrapper en infrastructure/.
+- NO re-litigar decisiones cerradas: ADR-012 (filtrado sectorial), ADR-013 (persistencia web
+  solo-citado), MMR desactivado por defecto, chunk_size 1000/200. Se construye SOBRE ellas.
+- keep_alive:0 es el default de VRAM por ADR-006; cualquier keep_alive positivo debe ser un modo
+  de LOTE explícito y acotado, no el default.
+
+# ESTADO DE ENTRADA (Fase 14 cerrada)
+Branch develop (merge de feature/fase14-retrieval-eval, 1fbe8a1). Corpus: 25 docs / 998 chunks
+(chunk_size 1000/200). Backlog web purgado (0). 223 tests fast, ruff 0. Harness de evaluación
+operativo (scripts/eval_retrieval.py con --bench/--bench-sql; snapshots en docs/decisions/).
+
+# PASO 0 — GATE DE ENTRADA
+uv run ruff check src/ tests/ -q && uv run pytest -m "not slow" -q  → 0 errores / verde.
+
+# PASO 1 — LECTURA OBLIGATORIA (antes de planificar)
+docs/decisions/FASE14_HALLAZGOS.md (§4/§5/§9: latencia embed, índice, follow-ups) ·
+docs/architecture/ADR-013-persistencia-web-solo-citado.md · ADR-006 (keep_alive/VRAM) ·
+src/ic/infrastructure/llm/gateway.py (tenacity @retry, within_budget, tiers, gateway.py:233
+rate-limit en body) · src/ic/infrastructure/retrieval/embedder.py (keep_alive:0, _RETRY_WAITS) ·
+src/ic/infrastructure/sources/{web_connector,openalex_connector}.py · scripts/eval_retrieval.py
+(--bench/--bench-sql, snapshots) · Fase 12 T12.1/T12.2 (pospuestos) · DT-021 en §5.
+
+# PASO 2 — PLAN MODE (Parte A). Diseña las tareas EN ORDEN, cada una con criterio de éxito:
+
+T15.1 — Estrategia de embedding (MAYOR PALANCA; el embed es ~99% de la latencia).
+  Modo de lote con keep_alive positivo/servidor persistente para re-ingesta/harness/N1;
+  keep_alive:0 sigue siendo el default seguro. Parametrizado en .env.
+  ÉXITO: colapso medible de la latencia en lotes (harness --bench antes/después); sin regresión
+  funcional; reconciliado con ADR-006. Test del wrapper de embedding en modo lote.
+
+T15.2 (T12.1) — Caché de retrieval web/OpenAlex por (query, ttl) en el esquema informes_ic.
+  ÉXITO: hit-rate medido; una segunda corrida idéntica no re-consulta la web (assert de llamadas
+  al connector); invalidación por TTL probada.
+
+T15.3 (DT-021) — Resiliencia free-tier: detectar 429 en el body, backoff dedicado + fallback de
+  tier (free→free_alt→synth→paid) con logging; timeouts/paralelismo por tier en .env.
+  ÉXITO: una corrida sobrevive a un 429 simulado sin abortar (fallback); test del detector 429 y
+  del fallback de tier.
+
+T15.4 — Gate de costo/latencia sobre el harness (o CI): presupuesto configurable, detecta
+  regresiones usando latency_ms/latency_sql_ms de los snapshots + CostTracker.within_budget.
+  ÉXITO: el gate falla ante una regresión inyectada y pasa en la línea base.
+
+T15.5 — Higiene: scoping opcional de purge_unused_web_backlog para tests; investigar el
+  POST /api/generate en la ingesta; reconciliar keep_alive con ADR-006.
+  ÉXITO: tests de persistencia sin efecto colateral global; nota de decisión.
+
+Espera aprobación del plan antes de escribir código.
+
+# PASO 3 — EJECUCIÓN (Parte B)
+Implementa T15.1→T15.5 en orden. CADA cambio se justifica con números del harness (latencia/
+llamadas antes/después). No optimizar a ciegas.
+
+# CRITERIOS DE ÉXITO GLOBALES (Definition of Done)
+1. Gate verde: ruff 0 + pytest -m "not slow". Cobertura de domain ≥ 80%.
+2. Reducción MEDIBLE de latencia (harness --bench) y/o de llamadas (caché), con tabla antes/
+   después en FASE15_HALLAZGOS.md.
+3. Resiliencia demostrada ante 429 (fallback de tier), probada.
+4. Gate de costo/latencia operativo.
+5. Tests nuevos para embedding-en-lote, caché y backoff/fallback.
+
+# PASO 4 — VERIFICACIÓN
+Corre el gate. Ejecuta el harness --bench antes/después de T15.1 y adjunta la tabla. Genera 1
+informe E2E y confirma tiempo total reducido y supervivencia a rate-limits.
+
+# PASO 5 — DOCUMENTACIÓN (obligatoria al cierre)
+- docs/decisions/FASE15_HALLAZGOS.md: logros (latencia/costo antes/después), retos y
+  recomendaciones/follow-ups para fases siguientes (énfasis en oportunidades detectadas).
+- ROADMAP_FASE9+.md: tablero §4 (Fase 15 ✅ + hash), deuda §5 (DT-021/T12.1/T12.2), changelog §8.
+- ADR nuevo/actualizado si cambió una decisión estructural (caché, keep_alive de lote).
+- Confirma el commit conmigo antes de mergear a develop.
+```
+
+---
+
 ## 7. Decisiones abiertas / preguntas al humano
 
 Se resuelven en la fase indicada (o antes si se puede).
@@ -883,6 +1035,6 @@ ciclo de vida del corpus).
 | 2026-07-21 | 1.3 | Fase 10 cerrada: T10.1 CJK en 6 use cases ✅, T10.2 orphan checker + contexto con meta ✅, T10.3/T10.4 APA 7 fiel ✅, T10.5 panel fiabilidad JSONB ✅, T10.6 disclaimer parametrizable ✅. 137 tests, DT-009/015/017(parcial) cerrados. |
 | 2026-07-21 | 1.4 | Fase 11 cerrada: T11.1 report_model ✅, T11.2 docx_renderer+assembler refactor ✅, T11.3 markdown_parser+TableBlock ✅, T11.4 radar chart ✅, T11.5 PDF LibreOffice ✅, T11.7 callouts ✅. 162 tests fast, ADR-011 creado, DT-016 cerrado, DT-019 nuevo. Q2 resuelta. |
 | 2026-07-21 | 1.5 | Fase 12 cerrada: T12.3 DT-004 ✅ (generate_n1.py, 345 L), T12.4 DT-010 ✅ (tokens reales Ollama + tiempo_ollama_s), T12.5 DT-012 ✅ (paginación+filtro+CSV). 168 tests fast. T12.1/T12.2 (caché/resiliencia) pospuestos a Fase 14. |
-| 2026-07-22 | 1.8 | Insumos del usuario integrados: (1) tabla `Comparacion_GICS_CIIU.csv` (CIIU→GICS) → T14.6 para acotar/validar clasificación; (2) política de persistencia web "solo lo citado" + purga del backlog → T14.5 (DT-020); (3) estilo Normal del documento (Source Sans Pro 11/justificado/1,16/8pt/viudas) → Fase 16 (DT-024). Prompt de arranque de Fase 14 actualizado. |
+| 2026-07-22 | 1.9 | Fase 14 cerrada (`1fbe8a1`): T14.1 harness de evaluación + gold set (línea base filtered ya óptima: precision 1.0/contam 0.0/hit 1.0) ✅; T14.2 MMR portado **medido y revertido** (degrada con evidencia mono-documento; λ=1.0 por defecto) ✅; T14.3 chunk_size 1000/200 (retrieval-neutral, se mantiene por eficiencia: 998 vs 1746 chunks) ✅; T14.4 índice **descartado** (SQL 15ms, embed domina 99%) ✅; T14.5 persistencia web "solo lo citado" (ADR-013) + purga backlog 1202→0 → evidencia sectorial 3.20→3.68 ✅; T14.6 CIIU→GICS (`ciiu_gics.py`) ✅. DT-020/022/023 cerradas. 223 tests fast, E2E Comfama verificado. FASE14_HALLAZGOS + ADR-013 + addendum ADR-012. |
 | 2026-07-22 | 1.7 | Fase 13 cerrada (`62fe327`). Roadmap reordenado (deuda técnica primero, decisión del usuario): Fase 14 Calidad de Retrieval (DT-022/020/023, detallada + prompt de arranque), Fase 15 Resiliencia y Costo (DT-021+T12.1/2), Fase 16 Presentación (DT-019+tablas), luego cron/multi-tenant/API. |
 | 2026-07-22 | 1.6 | Fase 13 en curso: T13.1 esquema (sector_gics/activo + PAPER_ACADEMICO) ✅, T13.2 PdfIngestor (documento_id + fuente_tipo pdf) ✅, T13.3 filtrado sectorial + cap por doc ✅, T13.4 panel Repositorio + DocumentoRepository ✅, T13.5 lote 25 PDFs ingestado (1746 chunks, 0 errores) ✅, T13.6 `_run_pdf` retirado (DT-017) ✅, T13.7 APA informe_compilado + evaluación 3 empresas ✅ (Fase 13: 3/0 sect/cross vs base 0-1/2-4; añadida reserva sectorial tras hallazgo de backlog web), T13.8 ADR-012 + hallazgos RepositorioRN ✅. 179 tests fast. DT-011/DT-017 cerrados. |

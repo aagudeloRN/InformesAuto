@@ -17,6 +17,7 @@ class ChunkResult:
     fuente_url: str | None
     score: float
     metadatos: dict | None = field(default=None)
+    chunk_id: str | None = None  # id del EmbeddingVectorial (trazabilidad: MMR, persistencia web)
 
 
 @dataclass

@@ -33,7 +33,9 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
 
     def _store(fn):
         with SessionLocal() as db:
-            return fn(PGVectorStore(ctx.embedder, EmbeddingRepository(db), s))
+            store = PGVectorStore(ctx.embedder, EmbeddingRepository(db), s)
+            store.session_id = ctx.session_id
+            return fn(store)
 
     def _fn_cap2(store):
         return GenerateBenchmarking(

@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # Umbral relajado solo para los cupos reservados: el corpus sectorial es on-topic por
     # construcción; su vocabulario a veces embebe por debajo del umbral general (ADR-012)
     rag_sector_reserve_threshold: float = 0.5
+    # MMR (Fase 14, T14.2): reranking por diversidad de documento. λ=1.0 lo desactiva (no-op);
+    # λ<1.0 → penaliza chunks del mismo documento. DESACTIVADO por defecto (λ=1.0): la
+    # evaluación T14.1 mostró que degrada el retrieval en este corpus, donde la evidencia
+    # sectorial está concentrada en un único documento por sector (ver FASE14_HALLAZGOS.md).
+    # Se conserva parametrizable para corpus futuros con sectores multi-documento.
+    rag_mmr_lambda: float = 1.0
 
     # Fuentes automáticas (ADR-003)
     openalex_email: str = ""

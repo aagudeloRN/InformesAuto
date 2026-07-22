@@ -17,6 +17,9 @@ class PGVectorStore:
         self._max_chunks_per_doc = getattr(settings, "rag_max_chunks_per_doc", 4)
         self._sector_reserve = getattr(settings, "rag_sector_reserve", 3)
         self._sector_reserve_threshold = getattr(settings, "rag_sector_reserve_threshold", 0.5)
+        self._mmr_lambda = getattr(settings, "rag_mmr_lambda", 0.7)
+        # Sesión de la corrida (T14.5): marca los chunks web para promover solo lo citado.
+        self.session_id: str | None = None
 
     def ingest(
         self,
@@ -30,10 +33,16 @@ class PGVectorStore:
         chunk_urls: list[str | None] = []
         chunk_meta: list[dict | None] = []
 
+        # Chunks web: se etiquetan con la sesión de la corrida para promover solo lo citado
+        # al ensamblar (T14.5, DT-020). Otras fuentes no llevan session_id.
+        stamp_session = self.session_id if fuente_tipo == "web" else None
+
         for i, text in enumerate(texts):
             split = chunker_mod.chunk_text(text)
             url = urls[i] if i < len(urls) else None
             meta = metadatos_extra[i] if metadatos_extra and i < len(metadatos_extra) else None
+            if stamp_session:
+                meta = {**(meta or {}), "session_id": stamp_session}
             for _ in split:
                 chunks.append(_)
                 chunk_urls.append(url)
@@ -78,6 +87,7 @@ class PGVectorStore:
             sector_gics=sector_gics,
             solo_activos=solo_activos,
             max_chunks_per_doc=self._max_chunks_per_doc,
+            mmr_lambda=self._mmr_lambda,
         )
 
         # Con match de sector: reservar cupos para la evidencia sectorial estricta (mismo
@@ -103,6 +113,7 @@ class PGVectorStore:
                 fuente_url=obj.fuente_url,
                 score=score,
                 metadatos=obj.metadatos,
+                chunk_id=str(obj.id) if obj.id is not None else None,
             )
             for obj, score in rows
         ]
