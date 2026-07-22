@@ -5,4 +5,11 @@ from ic.data.models.empresa import Empresa
 from ic.data.models.historial_informe import HistorialInforme
 from ic.data.models.retrieval_cache import RetrievalCache
 
-__all__ = ["Base", "Empresa", "HistorialInforme", "DocumentoLocal", "EmbeddingVectorial", "RetrievalCache"]
+__all__ = [
+    "Base",
+    "Empresa",
+    "HistorialInforme",
+    "DocumentoLocal",
+    "EmbeddingVectorial",
+    "RetrievalCache",
+]
