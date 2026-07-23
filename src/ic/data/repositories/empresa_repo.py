@@ -25,3 +25,6 @@ class EmpresaRepository:
 
     def get_by_id(self, empresa_id: uuid.UUID) -> Empresa | None:
         return self._db.get(Empresa, empresa_id)
+
+    def list_all(self) -> list[Empresa]:
+        return list(self._db.execute(select(Empresa).order_by(Empresa.nombre)).scalars())

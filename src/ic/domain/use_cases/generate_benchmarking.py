@@ -56,6 +56,7 @@ class GenerateBenchmarking:
         descripcion_empresa: str,
         sector_gics: str,
         sector_gics_code: str | None = None,
+        empresa_id=None,
     ) -> CapBenchmarking:
         queries = [
             f"{sector_gics} competidores líderes globales",
@@ -73,7 +74,7 @@ class GenerateBenchmarking:
 
         chunks = self._store.search(
             f"{sector_gics} competitors benchmarking {nombre_empresa}",
-            sector_gics=sector_gics_code,
+            sector_gics=sector_gics_code, empresa_id=empresa_id,
         )
 
         if not check_retrieval_sufficient(chunks, min_chunks=_MIN_CHUNKS):

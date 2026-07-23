@@ -110,3 +110,59 @@ Evaluadas con el harness T14.1 (`scripts/eval_retrieval.py`). Detalle en `FASE14
   tiempo). Se mantiene la recomendación de §2: índice opcional solo si el corpus crece.
 - **Reserva de cupos (§2):** los cupos reservados usan orden por score puro (MMR no se aplica en
   la búsqueda estricta), garantizando que afloren los chunks sectoriales de mayor similitud.
+
+---
+
+## Addendum Fase 18 (2026-07-23) — Documentos globales y reserva por empresa
+
+Evaluado con N=5 corridas y E2E de Alpina S.A.S. Detalle en `FASE18_HALLAZGOS.md`.
+
+### 1. Documentos globales cross-sector (DT-031)
+
+Se introduce el flag `es_global=True` en `pdf_ingestor.ingest_batched()`. Un documento global:
+- Se ingesta con `sector_gics=None` y `metadatos["es_global"]="true"`.
+- No queda excluido por ningún filtro sectorial.
+- Se reserva automáticamente en el retrieval de **cualquier empresa** mediante la nueva capa
+  global en `PGVectorStore.search()`.
+
+La reserva global (`rag_global_reserve=2`, mismo umbral relajado que la reserva sectorial)
+garantiza presencia de documentos cross-sector (ej. informes de convergencia, estudios de
+industria amplia) sin desplazar la evidencia sectorial. Si no hay docs globales, la capa
+devuelve vacío y los slots se llenan por score desde el backlog general.
+
+**Orden de prioridad en el retrieval (de mayor a menor):**
+```
+empresa (rag_empresa_reserve slots, estricto por empresa_id)
+  → sector (rag_sector_reserve slots, estricto por sector_gics)
+    → global (rag_global_reserve slots, estricto por es_global=true)
+      → resto por score coseno descendente
+```
+Implementado con el helper `_prepend(priority, base, limit)` que antepone la capa de mayor
+prioridad deduplicando por `EmbeddingVectorial.id`.
+
+### 2. Reserva por empresa (Q6)
+
+El orquestador (`generate_informe._run_n0`) resuelve `empresa_id` al inicio del pipeline
+(antes vivía solo en `_run_n3`). El UUID se guarda en `_PipelineContext.empresa_id` y se
+propaga a todos los use cases N1/N2.
+
+`PGVectorStore.search()` añade la capa empresa (`rag_empresa_reserve=2`) mediante búsqueda
+estricta `empresa_id = :empresa_id`. Esto permite asociar documentos internos de una empresa
+(p. ej. plan estratégico, informe de gestión) y garantizar que aparezcan en su retrieval.
+
+### 3. Documentos multi-sector (Q5 parcial)
+
+`pdf_ingestor.ingest_batched()` acepta `sectores_adicionales: list[str]` → persiste
+`metadatos["sectores"] = [primario, *adicionales]`. El filtro no-estricto de `search_similar()`
+detecta estos docs con `jsonb_exists(metadatos->'sectores', :sector)` (operador funcional,
+compatible con el paramstyle nombrado de psycopg2, a diferencia del operador `?`).
+
+### 4. Consecuencias
+
+- **Positivas:** Cap 5/6 tienen contexto de convergencia disponible en todo sector; las empresas
+  con documentos propios reciben retrieval priorizado; el corpus multi-sector es más flexible.
+- **Costo:** la búsqueda ahora realiza hasta 3 consultas adicionales por retrieval (empresa,
+  sector estricto, global). A esta escala (~50 chunks/sector) la latencia SQL extra es marginal
+  frente al embedding (~14–15 ms vs. ~1500 ms cold).
+- **Regla invariante:** los slots de reserva son independientes; ninguna capa puede invadir los
+  slots de otra (garantizado por `_prepend` + recorte a `k` total).

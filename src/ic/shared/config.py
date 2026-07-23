@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     # sectorial está concentrada en un único documento por sector (ver FASE14_HALLAZGOS.md).
     # Se conserva parametrizable para corpus futuros con sectores multi-documento.
     rag_mmr_lambda: float = 1.0
+    # Cupos reservados para chunks globales cross-sector (Fase 18, DT-031): documentos con
+    # es_global=true participan en todos los sectores con cupo propio, antepuestos tras los
+    # sectoriales. Mismo umbral relajado que rag_sector_reserve_threshold (ADR-012 addendum).
+    rag_global_reserve: int = 2
+    # Cupos reservados para chunks de la empresa específica del informe (Fase 18, T18.3):
+    # docs asociados a empresa_id específica se anteponen con prioridad máxima.
+    rag_empresa_reserve: int = 2
 
     # Embedding — keep_alive (Fase 15, T15.1, ADR-006)
     # Default "0": libera VRAM inmediatamente (política ADR-006).

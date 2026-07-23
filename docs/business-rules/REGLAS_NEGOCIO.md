@@ -177,6 +177,57 @@ como `LLM_CAP_TIMEOUT_SPLIT_THRESHOLD=1800` (segundos).
 
 ---
 
+## RN-011 — HITL: revisión post-generación controlada por el usuario
+
+**Regla:** El pipeline es one-shot, pero el sistema expone un loop de mejora opcional
+post-generación. El analista puede auditar el informe, subir documentos adicionales y solicitar
+regeneración. El loop solo termina cuando el usuario pulsa "Aprobar informe".
+
+**Módulos (Fases 21–22):**
+- **Gap Auditor** (`domain/chains/chain_evaluar.py`): identifica brechas por prioridad
+  (Alta/Media/Baja) y tipo de dato faltante. Base: `source_prompts/13`.
+- **Consistency Checker** (`domain/chains/chain_consistencia.py`): detecta contradicciones
+  entre caps. Resolución automática para inconsistencias factuales; manual para estratégicas.
+
+**UI:** Panel "Auditar" en tab Historial + uploader + "Regenerar con nuevos insumos" +
+"Aprobar informe" (`aprobado=True` en BD). Ver ADR-015.
+
+**Invariante:** RN-001 aplica en todos los ciclos del loop — el complement-context no autoriza
+al LLM a inventar datos no respaldados por fuentes.
+
+---
+
+## RN-012 — Regeneración completa ante nuevos insumos documentales
+
+**Regla:** Cuando el usuario sube un nuevo documento vía HITL, el sistema: (1) verifica
+deduplicación doc-level (SHA-256 del contenido completo del PDF); (2) si es nuevo, ingesta al
+índice RAG; (3) lanza el pipeline completo (no selectivo por cap). La regeneración recibe el
+informe anterior como `complement_context`: "Complementar conclusiones previas, no contradecir
+salvo evidencia explícita en nuevas fuentes." Ver ADR-015 §2.
+
+**Implementación:** `PdfIngestor` verifica SHA-256 a nivel documento antes de `ingest_batched()`.
+`GenerateInforme.execute()` acepta `complement_context: str | None`.
+
+---
+
+## RN-013 — Búsqueda web: profundidad parametrizable según caso de uso
+
+**Regla:** `WebConnector.search()` acepta `search_depth: str = "basic"`.
+- `"basic"` (default): snippets ~200 chars. Para tendencias, overviews, verificación puntual.
+- `"advanced"`: contenido completo. Obligatorio para perfiles individuales de competidores
+  (Cap 2 Benchmarking) — ver DT-035 y Fase 19.
+
+**Implementación:** `infrastructure/sources/web_connector.py`. El parámetro no cruza hacia
+`domain/` directamente; lo pasan los use cases según la tabla:
+| Capítulo | search_depth | Tipo de query |
+|----------|-------------|---------------|
+| Cap 2 Benchmarking | `"advanced"` | `"{competidor} cuota mercado Colombia 2025"` |
+| Cap 3 Tendencias | `"basic"` | overviews de sector |
+| Casos locales Cap 3 | `"basic"` | `"{sector_gics} caso éxito empresa Colombia"` |
+| Consistency Checker | `"basic"` | verificación de dato puntual |
+
+---
+
 ## RN-010 — Ingesta de PDFs grandes: procesamiento por lotes con liberación de memoria
 
 **Regla:** Los PDFs de más de N páginas (`PDF_BATCH_SIZE_PAGES=20`, configurable) se

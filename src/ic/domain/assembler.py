@@ -1,6 +1,6 @@
 from datetime import date
 
-from ic.domain.markdown_parser import parse_markdown
+from ic.domain.markdown_parser import parse_markdown, renumber_subheadings
 from ic.domain.report_model import (
     Callout,
     CitationBlock,
@@ -62,16 +62,18 @@ class PilotAssembler:
             ))
         blocks.append(Paragraph(""))
 
+        # Número de capítulo canónico para renumerar subcapítulos que el LLM numeró mal (DT-032).
         _OPTIONAL_CAPS = [
-            ("Capítulo 3. Análisis Sectorial Tendencial", informe.cap_tendencias),
-            ("Capítulo 4. Ecosistema Empresarial", informe.cap_ecosistema),
-            ("Capítulo 5. Convergencia Empresarial", informe.cap_convergencia),
+            ("Capítulo 3. Análisis Sectorial Tendencial", informe.cap_tendencias, 3),
+            ("Capítulo 4. Ecosistema Empresarial", informe.cap_ecosistema, 4),
+            ("Capítulo 5. Convergencia Empresarial", informe.cap_convergencia, 5),
         ]
-        for titulo, cap in _OPTIONAL_CAPS:
+        for titulo, cap, cap_num in _OPTIONAL_CAPS:
             if cap is not None:
                 blocks.append(Heading(titulo, level=2))
                 if cap.retrieval_suficiente:
-                    blocks.extend(parse_markdown(cap.texto))
+                    cap_blocks = parse_markdown(cap.texto)
+                    blocks.extend(renumber_subheadings(cap_blocks, cap_num))
                 else:
                     blocks.append(Callout(_ABSENT_MSG, kind="absent_data"))
                 blocks.append(Paragraph(""))

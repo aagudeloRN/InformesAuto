@@ -68,18 +68,29 @@ def main() -> int:
             sector = (fila.get("sector_gics") or "").strip()
             if not archivo:
                 continue
+            # La ruta puede ser relativa al base_dir o relativa al root del repo
             pdf_path = base_dir / archivo
+            if not pdf_path.exists():
+                pdf_path = (_ROOT / archivo)
             if not pdf_path.exists():
                 logger.error("Archivo no encontrado: %s — se omite", pdf_path)
                 errores += 1
                 continue
 
             nombre_sector = nombre_por_codigo.get(sector, sector)
-            titulo = f"Informe sectorial: {nombre_sector}"
+            # Columna "titulo" en el CSV tiene prioridad; sino, inferir del sector
+            titulo_csv = (fila.get("titulo") or "").strip()
+            titulo = titulo_csv or f"Informe sectorial: {nombre_sector}"
             tipo = _tipo_from_csv(fila.get("tipo") or "")
             autor = (fila.get("autor") or "Ruta N").strip() or "Ruta N"
             año_raw = (fila.get("año") or "").strip()
             año = int(año_raw) if año_raw.isdigit() else None
+            # Sectores adicionales para docs multi-sector (Fase 18, T18.4)
+            sectores_add_raw = (fila.get("sectores_adicionales") or "").strip()
+            sectores_adicionales = (
+                [s.strip() for s in sectores_add_raw.split("|") if s.strip()]
+                if sectores_add_raw else None
+            )
 
             total_docs += 1
             logger.info("[%s] %s → %s", sector, archivo, titulo)
@@ -89,8 +100,9 @@ def main() -> int:
                     titulo=titulo,
                     autor=autor,
                     año=año,
-                    sector_gics=sector,
+                    sector_gics=sector or None,
                     tipo=tipo,
+                    sectores_adicionales=sectores_adicionales,
                 )
                 total_chunks += n
                 logger.info("  → %d chunks nuevos", n)

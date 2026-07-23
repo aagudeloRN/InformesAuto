@@ -24,12 +24,13 @@ class GenerateAccionables:
         descripcion_empresa: str,
         sector_gics: str,
         sector_gics_code: str | None = None,
+        empresa_id=None,
     ) -> CapAccionables:
         query = (
             f"{sector_gics} {nombre_empresa} "
             "estrategia accionables benchmarking tendencias ecosistema convergencia"
         )
-        chunks = self._store.search(query, sector_gics=sector_gics_code)
+        chunks = self._store.search(query, sector_gics=sector_gics_code, empresa_id=empresa_id)
 
         if not check_retrieval_sufficient(chunks, min_chunks=_MIN_CHUNKS):
             return CapAccionables(

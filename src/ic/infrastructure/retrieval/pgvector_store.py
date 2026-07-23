@@ -17,6 +17,8 @@ class PGVectorStore:
         self._max_chunks_per_doc = getattr(settings, "rag_max_chunks_per_doc", 4)
         self._sector_reserve = getattr(settings, "rag_sector_reserve", 3)
         self._sector_reserve_threshold = getattr(settings, "rag_sector_reserve_threshold", 0.5)
+        self._global_reserve = getattr(settings, "rag_global_reserve", 2)
+        self._empresa_reserve = getattr(settings, "rag_empresa_reserve", 2)
         self._mmr_lambda = getattr(settings, "rag_mmr_lambda", 0.7)
         # Sesión de la corrida (T14.5): marca los chunks web para promover solo lo citado.
         self.session_id: str | None = None
@@ -90,21 +92,52 @@ class PGVectorStore:
             mmr_lambda=self._mmr_lambda,
         )
 
-        # Con match de sector: reservar cupos para la evidencia sectorial estricta (mismo
-        # GICS), garantizando que aflore pese al backlog de chunks web sin sector (ADR-012).
+        # Prioridad final: empresa > sector > global > resto por score.
+        # Cada capa se recupera en búsqueda estricta y se antepone a las capas de menor
+        # prioridad, eliminando duplicados. Esto garantiza que la evidencia más relevante
+        # para el informe aflore pese al volumen de chunks web genéricos (ADR-012 addendum).
+        t_reserve = min(t, self._sector_reserve_threshold)
+
+        # Capa 1 — corpus sectorial estricto (ADR-012)
+        capa_sectorial: list[tuple] = []
         if sector_gics is not None and self._sector_reserve > 0:
-            t_sector = min(t, self._sector_reserve_threshold)
-            sectoral = self._repo.search_similar(
-                query_vec, self._sector_reserve, t_sector, empresa_id,
+            capa_sectorial = self._repo.search_similar(
+                query_vec, self._sector_reserve, t_reserve, empresa_id,
                 sector_gics=sector_gics,
                 solo_activos=solo_activos,
                 sector_estricto=True,
             )
-            # Los sectoriales ya pasaron el umbral; se anteponen para garantizar inclusión,
-            # el resto (web/otros) rellena por score. No se re-ordena para no expulsarlos.
-            vistos = {obj.id for obj, _ in sectoral}
-            resto = [(obj, sc) for obj, sc in rows if obj.id not in vistos]
-            rows = (sectoral + resto)[:k]
+
+        # Capa 2 — docs globales cross-sector (Fase 18, DT-031)
+        capa_global: list[tuple] = []
+        if self._global_reserve > 0:
+            capa_global = self._repo.search_similar(
+                query_vec, self._global_reserve, t_reserve, None,
+                solo_activos=solo_activos,
+                global_estricto=True,
+            )
+
+        # Capa 3 — docs de la empresa específica del informe (Fase 18, T18.3)
+        capa_empresa: list[tuple] = []
+        if empresa_id is not None and self._empresa_reserve > 0:
+            capa_empresa = self._repo.search_similar(
+                query_vec, self._empresa_reserve, t_reserve, empresa_id,
+                solo_activos=solo_activos,
+                empresa_estricto=True,
+            )
+
+        # Ensamblar en orden de prioridad decreciente: empresa > sector > global > resto.
+        # Se construye de mayor a menor prioridad: cada nivel de mayor prioridad se antepone
+        # al acumulado anterior, deduplicando por id.
+        def _prepend(priority: list[tuple], base: list[tuple], limit: int) -> list[tuple]:
+            seen = {obj.id for obj, _ in priority}
+            return (priority + [(obj, sc) for obj, sc in base if obj.id not in seen])[:limit]
+
+        # Orden de construcción: primero el "fondo" (resto por score), luego se anteponen
+        # en orden inverso de prioridad (global → sector → empresa).
+        rows = _prepend(capa_global, rows, k)
+        rows = _prepend(capa_sectorial, rows, k)
+        rows = _prepend(capa_empresa, rows, k)
 
         return [
             ChunkResult(

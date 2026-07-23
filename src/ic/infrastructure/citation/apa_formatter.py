@@ -75,12 +75,17 @@ def _apa_academic(meta: CitationMetadata) -> str:
 
 
 def _apa_report(meta: CitationMetadata) -> str:
-    """Formato APA 7 para informes/reportes (PDF sectorial)."""
+    """Formato APA 7 para informes/reportes (PDF sectorial).
+
+    No expone rutas locales — solo URLs públicas (DT-033).
+    """
     nombre = meta.autor or meta.fuente_nombre
     titulo_md = f"*{meta.titulo}*"
     distinto = meta.fuente_nombre and meta.fuente_nombre != nombre
     fuente_part = f" {meta.fuente_nombre}." if distinto else "."
-    url_part = f" {meta.url}" if meta.url else ""
+    # Rutas locales de archivo no son citables públicamente; se omiten (DT-033)
+    is_public_url = meta.url and meta.url.startswith("http")
+    url_part = f" {meta.url}" if is_public_url else ""
     # Informes compilados de Ruta N: se aclara que agregan múltiples fuentes (ADR-012)
     etiqueta = (
         " [Informe compilado de múltiples fuentes]"
@@ -113,12 +118,19 @@ def format_reference(meta: CitationMetadata, fuente_tipo: str = "web") -> Refere
 
 
 def format_chunks_with_meta(chunks: list[ChunkResult]) -> str:
-    """Formatea chunks incluyendo autor y año para que el LLM pueda citar inline."""
+    """Formatea chunks con autor/año para que el LLM cite (Autor, año) — nunca nombres de archivo.
+
+    Los PDFs locales no exponen su ruta; solo autor e año. (DT-033)
+    """
     parts = []
     for i, c in enumerate(chunks, 1):
         meta = extract_citation_metadata(c)
         src_label = f"{meta.autor or meta.fuente_nombre}, {meta.año}"
-        url_part = f" — {c.fuente_url}" if c.fuente_url else ""
+        # Rutas locales de PDFs no son URLs públicas; excluirlas para no exponer filenames
+        is_local_pdf = (
+            c.fuente_tipo == "pdf" and c.fuente_url and not c.fuente_url.startswith("http")
+        )
+        url_part = f" — {c.fuente_url}" if c.fuente_url and not is_local_pdf else ""
         parts.append(f"[{i}] {c.chunk_texto}\nFuente: {src_label}{url_part}")
     return "\n\n---\n\n".join(parts)
 

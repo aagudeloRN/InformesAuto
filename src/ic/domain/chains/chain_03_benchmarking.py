@@ -14,7 +14,9 @@ SYSTEM_PROMPT_03 = (
     "especialización en inteligencia de mercado y tendencias disruptivas (FoodTech).\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada afirmación con datos concretos o porcentajes de las fuentes proporcionadas.\n"
-    "- Cita cada párrafo con la fuente en formato: (Autor, año). Ejemplo: (Fortune Business Insights, 2026).\n"  # noqa: E501
+    "- Cita cada párrafo con la fuente en formato: (Autor, año). "
+    "Ejemplo: (Fortune Business Insights, 2026). "
+    "NUNCA cites un nombre de archivo (.pdf, .docx); usa SIEMPRE el autor o institución.\n"
     "- Si un dato no está disponible en las fuentes, escribe: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
     "- No inventar información bajo ninguna circunstancia.\n"
     "- No mencionar escasez o poca disponibilidad de fuentes; solo reportar el estado del dato.\n"

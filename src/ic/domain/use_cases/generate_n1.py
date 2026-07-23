@@ -52,7 +52,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=web
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
-            sector_gics_code=g_code,
+            sector_gics_code=g_code, empresa_id=ctx.empresa_id,
         )
 
     def _fn_cap3(store, web, oal):
@@ -63,7 +63,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             web_connector=web, openalex_connector=oal,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
-            sector_gics_code=g_code,
+            sector_gics_code=g_code, empresa_id=ctx.empresa_id,
         )
 
     def _fn_cap4(store, web, _oal):
@@ -73,7 +73,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             chain=build_chain_05(ctx.api_llm), store=store, web_connector=web,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
-            sector_gics_code=g_code,
+            sector_gics_code=g_code, empresa_id=ctx.empresa_id,
         )
 
     with ThreadPoolExecutor(max_workers=3) as pool:

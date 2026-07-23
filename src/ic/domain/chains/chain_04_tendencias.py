@@ -4,6 +4,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
+from ic.infrastructure.citation.apa_formatter import format_chunks_with_meta
 from ic.shared.types import ChunkResult
 
 SYSTEM_PROMPT_04 = (
@@ -74,11 +75,8 @@ USER_PROMPT_04 = (
 
 
 def format_chunks_as_context(chunks: list[ChunkResult]) -> str:
-    parts = []
-    for i, c in enumerate(chunks, 1):
-        src = c.fuente_url or "fuente desconocida"
-        parts.append(f"[{i}] {c.chunk_texto}\nFuente: {src}")
-    return "\n\n---\n\n".join(parts)
+    """Delega en format_chunks_with_meta: incluye autor/año, nunca nombre de archivo (DT-033)."""
+    return format_chunks_with_meta(chunks)
 
 
 def format_academic_sources(web_results: list) -> str:
