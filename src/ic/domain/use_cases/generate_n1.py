@@ -41,8 +41,10 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         with SessionLocal() as db:
             store = PGVectorStore(ctx.embedder, EmbeddingRepository(db), s)
             store.session_id = ctx.session_id
-            cached_web = CachedWebConnector(ctx.web, db, s)
-            cached_oal = CachedOpenAlexConnector(OpenAlexConnector(s), db, s)
+            cached_web = CachedWebConnector(ctx.web, db, s, counter=ctx.cache_web_counter)
+            cached_oal = CachedOpenAlexConnector(
+                OpenAlexConnector(s), db, s, counter=ctx.cache_oal_counter
+            )
             return fn(store, cached_web, cached_oal)
 
     def _fn_cap2(store, web, _oal):

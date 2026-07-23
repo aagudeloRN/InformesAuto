@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 StepCallback = Callable[[int, int, str], None]
 
+# Estimación de latencia de una búsqueda web (ms) para reportar el ahorro de caché (T17.1).
+# No es un nombre de modelo: no aplica la regla TIER 1 de config.
+_AVG_WEB_MS = 800.0
+
 
 @dataclass
 class InformeParams:
@@ -33,6 +37,10 @@ class InformeResult:
     tiempo_total_s: float
     cost_records: list
     ruta_pdf: str | None = None
+    cache_web_hits: int = 0
+    cache_web_misses: int = 0
+    cache_oal_hits: int = 0
+    cache_oal_misses: int = 0
 
 
 @dataclass
@@ -60,6 +68,8 @@ class _PipelineContext:
     cap_conv: Any = None
     cap_acc: Any = None
     resumen: Any = None
+    cache_web_counter: Any = None
+    cache_oal_counter: Any = None
 
 
 class GenerateInforme:
@@ -101,6 +111,7 @@ class GenerateInforme:
             build_resilient_api_llm,
         )
         from ic.infrastructure.retrieval.embedder import Embedder
+        from ic.infrastructure.sources.cached_connector import CacheCounter
         from ic.infrastructure.sources.web_connector import WebConnector
 
         s = self._settings
@@ -126,6 +137,8 @@ class GenerateInforme:
             tracker=tracker,
             intro_chain=build_chain_intro(resilient_llm) if resilient_llm else None,
             output_path=output_path,
+            cache_web_counter=CacheCounter(),
+            cache_oal_counter=CacheCounter(),
         )
 
     def _sweep_stale_web(self, ctx: _PipelineContext) -> None:
@@ -173,7 +186,9 @@ class GenerateInforme:
         ctx.step_fn(1, "Cap 1 — Descripción de la empresa")
         # T16.0-B: CachedWebConnector para Cap 1 (sesión breve, single-threaded)
         with SessionLocal() as db_n0:
-            cached_web_n0 = CachedWebConnector(ctx.web, db_n0, ctx.settings)
+            cached_web_n0 = CachedWebConnector(
+                ctx.web, db_n0, ctx.settings, counter=ctx.cache_web_counter
+            )
             uc_desc = GenerateEmpresaDescription(
                 chain=build_chain_01(ctx.cap1_llms), web_connector=cached_web_n0
             )
@@ -211,7 +226,9 @@ class GenerateInforme:
         with SessionLocal() as db_n2:
             store_n2 = PGVectorStore(ctx.embedder, EmbeddingRepository(db_n2), ctx.settings)
             store_n2.session_id = ctx.session_id
-            cached_web_n2 = CachedWebConnector(ctx.web, db_n2, ctx.settings)  # T16.0-B
+            cached_web_n2 = CachedWebConnector(  # T16.0-B
+                ctx.web, db_n2, ctx.settings, counter=ctx.cache_web_counter
+            )
 
             ctx.step_fn(6, "Cap 5 — Convergencia Empresarial")
             if ctx.api_llm_synth is not None:
@@ -344,9 +361,15 @@ class GenerateInforme:
             # T16.1-D: usar datos reales del LLM si están disponibles; fallback a placeholder
             rd = ctx.cap.radar_data if ctx.cap else None
             if rd and rd.get("competidores") and rd.get("dimensions"):
+                # T17.2 (DT-027): instrumentar hit del bloque radar_json emitido por el LLM.
+                logger.info(
+                    "Radar: datos reales del LLM — %d competidores, %d dimensiones",
+                    len(rd["competidores"]), len(rd["dimensions"]),
+                )
                 generate_radar_chart(rd["competidores"], rd["dimensions"], chart_path,
                                      title=f"Posicionamiento Competitivo — {ctx.params.empresa}")
             else:
+                logger.info("Radar: placeholder (radar_json ausente o no parseable) — DT-027 miss")
                 generate_placeholder_radar(chart_path, ctx.params.empresa)
         except Exception:
             logger.warning("No se pudo generar radar chart", exc_info=True)
@@ -378,9 +401,20 @@ class GenerateInforme:
         except Exception:
             logger.warning("No se pudo persistir historial", exc_info=True)
 
+        # T17.1 (DT-026): instrumentación de hit-rate de caché por informe.
+        wc = ctx.cache_web_counter
+        oc = ctx.cache_oal_counter
+        logger.info(
+            "Cache web: %d HITs / %d MISSes — ahorro estimado: %.0f ms",
+            wc.hits, wc.misses, wc.hits * _AVG_WEB_MS,
+        )
+        logger.info("Cache openalex: %d HITs / %d MISSes", oc.hits, oc.misses)
+
         return InformeResult(
             ruta_docx=ctx.output_path, n_referencias=len(refs),
             costo_usd=ctx.tracker.total_cost(), tokens_in=tokens_in, tokens_out=tokens_out,
             tiempo_total_s=time.time() - ctx.total_start, cost_records=ctx.tracker.records(),
             ruta_pdf=ruta_pdf,
+            cache_web_hits=wc.hits, cache_web_misses=wc.misses,
+            cache_oal_hits=oc.hits, cache_oal_misses=oc.misses,
         )

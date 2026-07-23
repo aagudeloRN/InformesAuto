@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -51,7 +50,7 @@ def main() -> int:
     snapshot = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))
     budget = json.loads(Path(args.budget).read_text(encoding="utf-8"))
 
-    print(f"\n=== Gate de calidad/latencia/costo ===")
+    print("\n=== Gate de calidad/latencia/costo ===")
     print(f"  Snapshot : {args.snapshot}")
     print(f"  Presupuesto: {args.budget}\n")
 

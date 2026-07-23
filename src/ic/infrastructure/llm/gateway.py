@@ -307,6 +307,7 @@ class OpenRouterGatewayLLM(BaseChatModel):
 
 
 _RATE_LIMIT_PATTERNS = ("rate limit", "resourceexhausted", "quota", "429", "too many requests")
+_TRANSIENT_NETWORK_PATTERNS = ("incomplete chunked read", "peer closed connection")
 
 
 def is_rate_limit_error(exc: Exception) -> bool:
@@ -321,6 +322,21 @@ def is_rate_limit_error(exc: Exception) -> bool:
     if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
         return True
     return any(p in text for p in _RATE_LIMIT_PATTERNS)
+
+
+def is_transient_network_error(exc: Exception) -> bool:
+    """Detecta cortes de red transitorios que justifican fallback de tier (DT-029).
+
+    El tier free de OpenRouter puede cerrar la conexión con el cuerpo a medias
+    (RemoteProtocolError: incomplete chunked read) sin que sea un rate-limit.
+    En ese caso tiene sentido intentar el siguiente tier en lugar de abortar.
+    """
+    if isinstance(
+        exc, (httpx.RemoteProtocolError, httpx.ReadError, httpx.ConnectError, httpx.ReadTimeout)
+    ):
+        return True
+    text = str(exc).lower()
+    return any(p in text for p in _TRANSIENT_NETWORK_PATTERNS)
 
 
 class RateLimitError(RuntimeError):
@@ -362,7 +378,14 @@ class ResilientChatModel(BaseChatModel):
                     )
                     last_exc = exc
                     continue
-                raise  # error no-rate-limit → propagar inmediatamente
+                if is_transient_network_error(exc):
+                    logger.warning(
+                        "Error de red transitorio en tier %d (model=%s): %s. Intentando fallback.",
+                        i, tier_llm.model, exc,
+                    )
+                    last_exc = exc
+                    continue
+                raise  # error no-recuperable → propagar inmediatamente
         raise last_exc  # type: ignore[misc]
 
     def _stream(
@@ -383,6 +406,14 @@ class ResilientChatModel(BaseChatModel):
                 if is_rate_limit_error(exc):
                     logger.warning(
                         "Rate-limit en tier %d (model=%s, stream): %s. Intentando fallback.",
+                        i, tier_llm.model, exc,
+                    )
+                    last_exc = exc
+                    continue
+                if is_transient_network_error(exc):
+                    logger.warning(
+                        "Error de red transitorio en tier %d (model=%s, stream): %s. "
+                        "Intentando fallback.",
                         i, tier_llm.model, exc,
                     )
                     last_exc = exc

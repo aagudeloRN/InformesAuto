@@ -7,7 +7,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.shared import Pt
 
 from ic.domain.report_model import ReportDocument, TableBlock
-from ic.infrastructure.render.docx_renderer import DocxRenderer
+from ic.infrastructure.render.docx_renderer import NORMAL_FONT_NAME, DocxRenderer
 
 
 def _empty_doc() -> ReportDocument:
@@ -15,12 +15,12 @@ def _empty_doc() -> ReportDocument:
 
 
 def test_normal_style_font_size(tmp_path):
-    """Estilo Normal tiene fuente Calibri 11pt."""
+    """Estilo Normal tiene fuente Open Sans 11pt (T17.4, DT-024)."""
     path = str(tmp_path / "out.docx")
     DocxRenderer().render(_empty_doc(), path)
     word = WDocument(path)
     style = word.styles["Normal"]
-    assert style.font.name == "Calibri"
+    assert style.font.name == NORMAL_FONT_NAME == "Open Sans"
     assert style.font.size == Pt(11)
 
 
