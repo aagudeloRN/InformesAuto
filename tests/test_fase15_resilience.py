@@ -1,4 +1,4 @@
-"""Tests T15.3 — Resiliencia free-tier: detector 429 + ResilientChatModel (Fase 15)."""
+"""Tests T15.3 + DT-029 — Resiliencia free-tier: detector 429/red + ResilientChatModel."""
 
 from __future__ import annotations
 
@@ -156,6 +156,101 @@ def test_resilient_falls_through_multiple_rate_limits():
     t1._generate.assert_called_once()
     t2._generate.assert_called_once()
     t3._generate.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# build_resilient_api_llm — construcción
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# is_transient_network_error — DT-029
+# ---------------------------------------------------------------------------
+
+
+def test_detects_remote_protocol_error():
+    from ic.infrastructure.llm.gateway import is_transient_network_error
+
+    exc = httpx.RemoteProtocolError(
+        "peer closed connection without sending complete message body (incomplete chunked read)"
+    )
+    assert is_transient_network_error(exc) is True
+
+
+def test_detects_read_error():
+    from ic.infrastructure.llm.gateway import is_transient_network_error
+
+    exc = httpx.ReadError("connection reset by peer")
+    assert is_transient_network_error(exc) is True
+
+
+def test_detects_connect_error():
+    from ic.infrastructure.llm.gateway import is_transient_network_error
+
+    exc = httpx.ConnectError("connection refused")
+    assert is_transient_network_error(exc) is True
+
+
+def test_detects_read_timeout():
+    from ic.infrastructure.llm.gateway import is_transient_network_error
+
+    exc = httpx.ReadTimeout("timed out", request=MagicMock())
+    assert is_transient_network_error(exc) is True
+
+
+def test_detects_incomplete_chunked_read_text():
+    from ic.infrastructure.llm.gateway import is_transient_network_error
+
+    exc = RuntimeError("incomplete chunked read")
+    assert is_transient_network_error(exc) is True
+
+
+def test_does_not_flag_rate_limit_as_transient():
+    from ic.infrastructure.llm.gateway import is_transient_network_error
+
+    exc = RuntimeError("rate limit exceeded")
+    assert is_transient_network_error(exc) is False
+
+
+def test_does_not_flag_http_500_as_transient():
+    from ic.infrastructure.llm.gateway import is_transient_network_error
+
+    resp = MagicMock()
+    resp.status_code = 500
+    exc = httpx.HTTPStatusError("500", request=MagicMock(), response=resp)
+    assert is_transient_network_error(exc) is False
+
+
+def test_resilient_falls_to_second_tier_on_remote_protocol_error():
+    """RemoteProtocolError en tier 1 → fallback a tier 2 (DT-029)."""
+    network_exc = httpx.RemoteProtocolError(
+        "peer closed connection without sending complete message body (incomplete chunked read)"
+    )
+    t1 = _make_failing_tier(network_exc)
+    t2 = _make_tier("respuesta desde tier 2")
+
+    model = _resilient([t1, t2])
+    result = model._generate([HumanMessage(content="hola")])
+
+    t1._generate.assert_called_once()
+    t2._generate.assert_called_once()
+    assert result.generations[0].message.content == "respuesta desde tier 2"
+
+
+def test_resilient_propagates_http_500_without_fallback():
+    """HTTP 500 sigue propagándose inmediatamente (sin fallback)."""
+    resp = MagicMock()
+    resp.status_code = 500
+    http_exc = httpx.HTTPStatusError("500", request=MagicMock(), response=resp)
+
+    t1 = _make_failing_tier(http_exc)
+    t2 = _make_tier("no debería llegar aquí")
+
+    model = _resilient([t1, t2])
+    with pytest.raises(httpx.HTTPStatusError):
+        model._generate([HumanMessage(content="hola")])
+
+    t2._generate.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
