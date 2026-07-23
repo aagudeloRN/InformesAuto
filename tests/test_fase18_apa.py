@@ -155,3 +155,63 @@ def test_assert_no_filenames_helper():
     assert_no_filenames("Ver (Ruta N, 2026) para más detalles.")
     with pytest.raises(AssertionError):
         assert_no_filenames("El InformeConvergencia.pdf muestra que...")
+
+
+# --- T18.5 — renumber_subheadings (DT-032) ---
+
+
+from ic.domain.markdown_parser import renumber_subheadings  # noqa: E402
+from ic.domain.report_model import Heading, Paragraph  # noqa: E402
+
+
+def test_renumber_corrige_prefijo_erroneo():
+    """Heading con prefijo 5.1 en Cap 4 → reescribe a 4.1."""
+    blocks = [Heading("5.1. Ecosistema Local", level=3)]
+    resultado = renumber_subheadings(blocks, chapter_number=4)
+    assert resultado[0].text == "4.1. Ecosistema Local"
+
+
+def test_renumber_respeta_cap_correcto():
+    """Si el prefijo ya es correcto, no toca el texto."""
+    blocks = [Heading("4.2. Ecosistema Global", level=3)]
+    resultado = renumber_subheadings(blocks, chapter_number=4)
+    assert resultado[0].text == "4.2. Ecosistema Global"
+
+
+def test_renumber_sin_prefijo_numerico_intacto():
+    """Headings sin prefijo N.M quedan sin cambios."""
+    blocks = [Heading("Ecosistema Local", level=3)]
+    resultado = renumber_subheadings(blocks, chapter_number=4)
+    assert resultado[0].text == "Ecosistema Local"
+
+
+def test_renumber_no_toca_paragrafos():
+    """Los bloques Paragraph no se modifican."""
+    blocks = [Paragraph("5.1. Este es un párrafo, no heading.")]
+    resultado = renumber_subheadings(blocks, chapter_number=4)
+    assert resultado[0].text == "5.1. Este es un párrafo, no heading."
+
+
+def test_renumber_con_punto_final():
+    """Funciona con '5.1.' (punto final tras el número)."""
+    blocks = [Heading("5.1. Local", level=3)]
+    resultado = renumber_subheadings(blocks, chapter_number=4)
+    assert resultado[0].text.startswith("4.1")
+
+
+def test_renumber_mezcla_caps_y_headings():
+    """Mezcla de bloques: solo los Heading numerados se tocan."""
+    blocks = [
+        Heading("Capítulo 4. Ecosistema Empresarial", level=2),
+        Paragraph("Introducción."),
+        Heading("5.1. Local", level=3),
+        Heading("5.2. Global", level=3),
+        Heading("Actores sin número", level=3),
+    ]
+    resultado = renumber_subheadings(blocks, chapter_number=4)
+    textos = [b.text for b in resultado]
+    assert textos[0] == "Capítulo 4. Ecosistema Empresarial"  # sin prefijo N.M → intacto
+    assert textos[1] == "Introducción."
+    assert textos[2] == "4.1. Local"
+    assert textos[3] == "4.2. Global"
+    assert textos[4] == "Actores sin número"

@@ -16,6 +16,7 @@ from ic.domain.report_model import (
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)")
 _TABLE_ROW_RE = re.compile(r"^\|(.+)\|$")
 _TABLE_SEP_RE = re.compile(r"^\|[\s\-|:]+\|$")
+_SUBHEADING_NUM_RE = re.compile(r"^(\d+)\.(\d+)([\.\s].*|$)")
 
 
 def parse_markdown(text: str) -> list[DocumentBlock]:
@@ -65,6 +66,28 @@ def parse_markdown(text: str) -> list[DocumentBlock]:
         i += 1
 
     return blocks
+
+
+def renumber_subheadings(blocks: list[DocumentBlock], chapter_number: int) -> list[DocumentBlock]:
+    """Corrige el prefijo N.M en Headings al capítulo correcto.
+
+    Si el LLM emite `## 5.1` para el Capítulo 4, esta función lo reescribe a `## 4.1`.
+    Solo actúa sobre Headings que ya tienen un prefijo numérico N.M (donde N != chapter_number).
+    Headings sin prefijo numérico quedan intactos.
+    """
+    result: list[DocumentBlock] = []
+    for block in blocks:
+        if isinstance(block, Heading):
+            m = _SUBHEADING_NUM_RE.match(block.text)
+            if m:
+                cap_actual = int(m.group(1))
+                sub = m.group(2)
+                resto = m.group(3)
+                if cap_actual != chapter_number:
+                    nuevo_texto = f"{chapter_number}.{sub}{resto}"
+                    block = Heading(text=nuevo_texto, level=block.level)
+        result.append(block)
+    return result
 
 
 def _parse_table(table_lines: list[str]) -> TableBlock | None:
