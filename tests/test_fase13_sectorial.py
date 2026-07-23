@@ -119,6 +119,9 @@ def test_search_propaga_filtros_sector_y_activos():
     settings.rag_max_chunks_per_doc = 4
     settings.rag_sector_reserve = 3
     settings.rag_sector_reserve_threshold = 0.5
+    settings.rag_global_reserve = 0   # desactivar para este test
+    settings.rag_empresa_reserve = 0  # desactivar para este test
+    settings.rag_mmr_lambda = 1.0
 
     embedder = MagicMock()
     embedder.embed.return_value = [0.1] * 768
@@ -151,6 +154,9 @@ def test_search_reserva_garantiza_chunks_sectoriales():
     settings.rag_max_chunks_per_doc = 4
     settings.rag_sector_reserve = 2
     settings.rag_sector_reserve_threshold = 0.5
+    settings.rag_global_reserve = 0   # desactivar para aislar comportamiento sectorial
+    settings.rag_empresa_reserve = 0
+    settings.rag_mmr_lambda = 1.0
 
     def _chunk(cid, sector, tf):
         obj = MagicMock()
@@ -171,7 +177,7 @@ def test_search_reserva_garantiza_chunks_sectoriales():
     embedder = MagicMock()
     embedder.embed.return_value = [0.1] * 768
     repo = MagicMock()
-    repo.search_similar.side_effect = [web, sect]  # 1ª general, 2ª reserva
+    repo.search_similar.side_effect = [web, sect]  # 1ª general, 2ª reserva sectorial
 
     store = PGVectorStore(embedder, repo, settings)
     res = store.search("q", sector_gics="2530")
@@ -180,6 +186,78 @@ def test_search_reserva_garantiza_chunks_sectoriales():
     ids = [r.chunk_texto for r in res]
     assert "c10" in ids
     assert len(res) == 3
+
+
+def test_search_reserva_global_garantiza_chunks_globales():
+    """Los chunks globales (es_global=true) aparecen en cualquier sector."""
+    from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
+
+    settings = MagicMock()
+    settings.rag_top_k = 3
+    settings.rag_similarity_threshold = 0.7
+    settings.rag_max_chunks_per_doc = 4
+    settings.rag_sector_reserve = 0   # desactivar sectorial para aislar global
+    settings.rag_sector_reserve_threshold = 0.5
+    settings.rag_global_reserve = 2
+    settings.rag_empresa_reserve = 0
+    settings.rag_mmr_lambda = 1.0
+
+    def _chunk(cid, es_global=False):
+        obj = MagicMock()
+        obj.id = cid
+        obj.chunk_texto = f"c{cid}"
+        obj.fuente_tipo = "pdf"
+        obj.fuente_url = None
+        obj.metadatos = (
+            {"es_global": "true", "tipo_fuente": "informe_compilado"} if es_global else None
+        )
+        return obj
+
+    web = [
+        (_chunk(1), 0.83),
+        (_chunk(2), 0.82),
+        (_chunk(3), 0.81),
+    ]
+    globales = [(_chunk(99, es_global=True), 0.65)]
+
+    embedder = MagicMock()
+    embedder.embed.return_value = [0.1] * 768
+    repo = MagicMock()
+    repo.search_similar.side_effect = [web, globales]  # 1ª general, 2ª global_estricto
+
+    store = PGVectorStore(embedder, repo, settings)
+    res = store.search("q", sector_gics="5010")
+
+    ids = [r.chunk_texto for r in res]
+    assert "c99" in ids  # chunk global presente aunque sector sea distinto al suyo
+    assert len(res) == 3
+
+
+def test_search_reserva_global_llama_con_flag_correcto():
+    """PGVectorStore hace la llamada global_estricto=True al repo."""
+    from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
+
+    settings = MagicMock()
+    settings.rag_top_k = 5
+    settings.rag_similarity_threshold = 0.7
+    settings.rag_max_chunks_per_doc = 4
+    settings.rag_sector_reserve = 0
+    settings.rag_sector_reserve_threshold = 0.5
+    settings.rag_global_reserve = 2
+    settings.rag_empresa_reserve = 0
+    settings.rag_mmr_lambda = 1.0
+
+    embedder = MagicMock()
+    embedder.embed.return_value = [0.1] * 768
+    repo = MagicMock()
+    repo.search_similar.return_value = []
+
+    store = PGVectorStore(embedder, repo, settings)
+    store.search("consulta")
+
+    llamadas = repo.search_similar.call_args_list
+    flags = [c.kwargs for c in llamadas]
+    assert any(f.get("global_estricto") is True for f in flags)
 
 
 # --- ingest_batched estampa sector_gics y documento_id ---

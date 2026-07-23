@@ -136,6 +136,8 @@ class EmbeddingRepository:
         solo_activos: bool = True,
         max_chunks_per_doc: int | None = None,
         sector_estricto: bool = False,
+        global_estricto: bool = False,
+        empresa_estricto: bool = False,
         mmr_lambda: float = 1.0,
     ) -> list[tuple[EmbeddingVectorial, float]]:
         # Margen amplio: el filtro sectorial + el cap por documento reducen candidatos
@@ -147,10 +149,18 @@ class EmbeddingRepository:
         conditions: list[str] = []
         params: dict = {"vec": vec_str, "fetch_k": fetch_k}
 
-        if empresa_id is not None:
+        if empresa_estricto and empresa_id is not None:
+            # Solo chunks de la empresa específica (reserva empresa, Fase 18 T18.3)
+            conditions.append("e.empresa_id = :empresa_id")
+            params["empresa_id"] = str(empresa_id)
+        elif empresa_id is not None:
             conditions.append("(e.empresa_id = :empresa_id OR e.empresa_id IS NULL)")
             params["empresa_id"] = str(empresa_id)
-        if sector_gics is not None and sector_estricto:
+
+        if global_estricto:
+            # Solo chunks con es_global=true (reserva global cross-sector, Fase 18 DT-031)
+            conditions.append("e.metadatos->>'es_global' = 'true'")
+        elif sector_gics is not None and sector_estricto:
             # Solo el corpus sectorial compilado del GICS pedido (evidencia sectorial garantizada)
             conditions.append(
                 "(e.metadatos->>'sector_gics' = :sector "
@@ -158,10 +168,13 @@ class EmbeddingRepository:
             )
             params["sector"] = sector_gics
         elif sector_gics is not None:
-            # Incluye el sector pedido + fuentes sin sector (web/académicas)
+            # Incluye el sector pedido + docs multi-sector + fuentes sin sector (web/académicas)
+            # jsonb_exists verifica si el array "sectores" contiene el código pedido (Fase 18 T18.4)
             conditions.append(
                 "(e.metadatos->>'sector_gics' = :sector "
-                "OR e.metadatos->>'sector_gics' IS NULL)"
+                "OR jsonb_exists(e.metadatos->'sectores', :sector) "
+                "OR (e.metadatos->>'sector_gics' IS NULL "
+                "    AND NOT coalesce(e.metadatos->>'es_global', 'false') = 'true'))"
             )
             params["sector"] = sector_gics
         if solo_activos:

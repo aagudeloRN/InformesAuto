@@ -79,6 +79,8 @@ class PdfIngestor:
         año: int | None = None,
         sector_gics: str | None = None,
         tipo: str = TipoDocumento.PDF_SECTORIAL,
+        es_global: bool = False,
+        sectores_adicionales: list[str] | None = None,
     ) -> int:
         _ensure_metadatos_column()
         schema = self._settings.db_schema
@@ -88,9 +90,14 @@ class PdfIngestor:
         total_pages = len(reader.pages)
         pdf_info = reader.metadata or {}
 
-        titulo_final = titulo or pdf_info.get("/Title") or Path(pdf_path).name
-        autor_final = autor or pdf_info.get("/Author")
+        # Título: nunca exponer extensión .pdf ni sufijos de ruta (DT-033)
+        titulo_raw = titulo or pdf_info.get("/Title") or Path(pdf_path).stem
+        titulo_final = titulo_raw.removesuffix(".pdf").strip()
+        autor_final = autor or pdf_info.get("/Author") or "Ruta N"
         año_str = str(año) if año else None
+
+        # Con es_global, forzar sector_gics=None para que participe en todos los sectores
+        sector_efectivo = None if es_global else sector_gics
 
         # Fast-path: si el documento ya está indexado, no re-procesar
         with SessionLocal() as _db:
@@ -98,17 +105,23 @@ class PdfIngestor:
                 logger.info("PDF ya indexado: '%s' — saltando re-ingesta", titulo_final)
                 return 0
 
-        metadatos_base = {
+        metadatos_base: dict = {
             "titulo": titulo_final,
-            "fuente_nombre": autor_final or Path(pdf_path).name,
+            "fuente_nombre": autor_final,
             "año": año_str or "s.f.",
             "autor": autor_final,
             "fecha_acceso": None,
         }
-        if sector_gics:
-            metadatos_base["sector_gics"] = sector_gics
+        if sector_efectivo:
+            metadatos_base["sector_gics"] = sector_efectivo
+        if es_global:
+            metadatos_base["es_global"] = "true"
+        # Sectores adicionales para docs multi-sector (Fase 18, T18.4)
+        if sectores_adicionales:
+            todos = ([sector_efectivo] if sector_efectivo else []) + sectores_adicionales
+            metadatos_base["sectores"] = todos
         # Los informes sectoriales de Ruta N son compilaciones de múltiples fuentes (ADR-012)
-        if tipo == TipoDocumento.PDF_SECTORIAL:
+        if tipo == TipoDocumento.PDF_SECTORIAL or es_global:
             metadatos_base["tipo_fuente"] = "informe_compilado"
 
         # Crear el DocumentoLocal PRIMERO para estampar documento_id en cada chunk
@@ -122,7 +135,7 @@ class PdfIngestor:
                     nombre_archivo=Path(pdf_path).name,
                     ruta_archivo=os.path.abspath(pdf_path),
                     tipo=tipo,
-                    sector_gics=sector_gics,
+                    sector_gics=sector_efectivo,
                     estado_ingesta=EstadoIngesta.PENDIENTE,
                     metadatos=metadatos_base,
                 ))
