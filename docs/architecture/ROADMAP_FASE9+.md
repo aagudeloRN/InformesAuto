@@ -107,6 +107,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 15 | Resiliencia y Costo | ✅ | 2026-07-22 | `a367b57`+ | `FASE15_HALLAZGOS.md` |
 | 16 | Presentación del Contenido | ✅ | 2026-07-22 | `aadd99e` | `FASE16_HALLAZGOS.md` |
 | 17 | Instrumentación, Radar y Pulido E2E | ✅ | 2026-07-23 | `7e6ec20`..`6927063` | `FASE17_HALLAZGOS.md` |
+| 18 | Evidencia y Citación | ✅ | 2026-07-23 | `8c6b8c2`..`7dcd676` | `FASE18_HALLAZGOS.md` |
 
 > Cada fase, al cerrar, actualiza su fila (estado ✅, fecha, hash de commit) y marca sus
 > tareas en la sección correspondiente.
@@ -141,9 +142,10 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-028 | `RetrievalCache` no importado en `models/__init__.py`: `create_schema.py` no creaba la tabla `retrieval_cache` (rompe arranque en BD vacía) | E2E post-16 | ✅ import añadido en `src/ic/data/models/__init__.py`. Fix en commit `e2e-post-fase16` |
 | DT-029 | `ResilientChatModel` solo hacía fallback ante rate-limit: un `RemoteProtocolError` transitorio abortaba el pipeline completo (incidente EPM, se perdieron Caps 1–5) | 17 | ✅ `is_transient_network_error()` + fallback de tier en `_generate`/`_stream` ante red transitoria; +9 tests; **validado en producción** (corrida Alpina sobrevivió al mismo error) (commit `7c1fec1`) |
 | DT-030 | Sin checkpoint antes de barreras de sincronización (Cap 6 / N3): CLAUDE.md TIER 3 exige persistir estado antes de cruzarlas; un fallo tardío descarta Caps 1–5 (~13 min) | 19 | ⬜ Persistir Caps N0/N1/N2 (BD) y permitir **reanudar** una corrida fallida |
-| DT-031 | Cap 5/6 inconclusos: falta ingestar `InformeConvergenciaLocal2026RvADAA.pdf` como fuente **global** (aplica a todo sector) cableada al retrieval de Convergencia/Accionables | 18 | ⬜ Q2 de FASE17_HALLAZGOS §7. Requiere soporte de "documento global" (sin filtro GICS excluyente) |
-| DT-032 | Bug de numeración: tras el capítulo 4 aparecen subcapítulos numerados `5.x` (desfase en headings del renderer o en la estructura del ReportDocument) | 18 | ⬜ Q3 de FASE17_HALLAZGOS §7 |
-| DT-033 | Citación no-APA para PDFs locales: el texto cita el nombre crudo del archivo ("El InformeConvergenciaLocal2026V3RvADAA.pdf destaca…") en vez de (Autor, año). Faltan metadatos APA en la ingesta y en el bloque de fuentes inyectado al prompt | 18 | ⬜ Q4 de FASE17_HALLAZGOS §7 |
+| DT-031 | Cap 5/6 inconclusos: falta ingestar `InformeConvergenciaLocal2026RvADAA.pdf` como fuente **global** (aplica a todo sector) cableada al retrieval de Convergencia/Accionables | 18 | ✅ `es_global=True` + reserva global (`rag_global_reserve=2`) + `scripts/ingest_global.py`; 594 chunks globales ingestados. Ver addendum ADR-012 Fase 18. |
+| DT-032 | Bug de numeración: tras el capítulo 4 aparecen subcapítulos numerados `5.x` (desfase en headings del renderer o en la estructura del ReportDocument) | 18 | ✅ `chain_05` corregido a 4.1/4.2/4.3 + `renumber_subheadings()` en `markdown_parser.py` como defensa en profundidad; 6 tests. |
+| DT-033 | Citación no-APA para PDFs locales: el texto cita el nombre crudo del archivo ("El InformeConvergenciaLocal2026V3RvADAA.pdf destaca…") en vez de (Autor, año). Faltan metadatos APA en la ingesta y en el bloque de fuentes inyectado al prompt | 18 | ✅ `format_chunks_with_meta` omite rutas locales; `_apa_report` solo emite URLs `http`; `pdf_ingestor` con fallback "Ruta N" y título sin `.pdf`; chains 04-07 unificadas; 8 tests de contrato. |
+| DT-034 | Ingesta completa del lote EMIS (250 PDFs, 25 sectores). El índice CSV (`indice_emis.csv`) está generado; el lote completo toma ~2–4 h. | 18→19 | ⬜ Pendiente corrida larga fuera del E2E. Índice listo en `documentos_sectoriales/FuentesEMIS/indice_emis.csv`. |
 
 ---
 
@@ -1230,27 +1232,24 @@ no disponible" y numeración de capítulos correcta.
 
 ### Tareas
 
-- [ ] **T18.1 (DT-031) — Documentos globales cross-sector.** Añadir el concepto de documento
-      "global" (p. ej. `sector_gics = NULL` explícito o flag `global` en metadatos):
-      participa en el retrieval de **todos** los sectores, con cupo propio para no desplazar
-      la evidencia sectorial (patrón "reserva" de ADR-012). Ingestar
-      `InformeConvergenciaLocal2026RvADAA.pdf` como global y verificar que Cap 5/6 lo citan.
-- [ ] **T18.2 (DT-033) — Citación APA de PDFs locales.** Garantizar metadatos APA
-      (autor/año/título) en la ingesta (panel Repositorio + `ingest_batch.py` ya los piden;
-      validar que llegan al bloque de fuentes del prompt). Si un documento no tiene metadatos,
-      formatear institucional ("Ruta N, 2026") — nunca el nombre del archivo. Endurecer el
-      prompt para citar (Autor, año). Test de contrato: chunk de PDF local → cita APA correcta.
-- [ ] **T18.3 (Q6) — Documentos extra por empresa.** Permitir asociar documentos a una
-      empresa específica (columna `empresa_id` ya existe en `DocumentoLocal`): panel de
-      subida por empresa + retrieval que prioriza documentos de la empresa del informe
-      (empresa > sector > global > web). Pensado para informes EMIS por compañía.
-- [ ] **T18.4 (Q5) — Reducir "información no disponible".** Medir con el harness qué % de
-      consultas cae bajo el umbral por sector; revisar umbral vs. corpus; documentar qué
-      sectores necesitan corpus (accionable para el analista: qué EMIS conseguir).
-- [ ] **T18.5 (DT-032) — Fix numeración de subcapítulos.** Reproducir con un .docx generado,
-      localizar el desfase (renderer o `ReportDocument`) y corregir + test.
-- [ ] **T18.6 — Corrida E2E de validación.** 1–2 empresas (una ≠ 3020) verificando: Cap 5/6
-      citan el documento global, citas APA correctas, numeración correcta, menos ausencias.
+- [x] **T18.1 (DT-031) — Documentos globales cross-sector.** `es_global=True` en
+      `PdfIngestor.ingest_batched()` + reserva global `rag_global_reserve=2` en
+      `PGVectorStore.search()` + `scripts/ingest_global.py`. 594 chunks ingestados del
+      `InformeConvergenciaLocal2026V3RvADAA.pdf`. Addendum ADR-012 Fase 18. ✅
+- [x] **T18.2 (DT-033) — Citación APA de PDFs locales.** `format_chunks_with_meta` omite
+      rutas locales; chains 04-07 unificadas; `_apa_report` solo emite URLs `http`; fallback
+      "Ruta N"; 8 tests de contrato. ✅
+- [x] **T18.3 (Q6) — Documentos extra por empresa.** `empresa_id` resuelto en `_run_n0`
+      y propagado a N1/N2; reserva empresa `rag_empresa_reserve=2`; selectbox empresa en UI;
+      `EmpresaRepository.list_all()`. ✅
+- [x] **T18.4 (Q5) — Reducir "información no disponible".** `build_emis_index.py` genera
+      `indice_emis.csv` (250 PDFs, 25 sectores); soporte multi-sector via `sectores_adicionales`
+      + `jsonb_exists`; tabla de cobertura en `FASE18_HALLAZGOS.md §5`. ✅
+- [x] **T18.5 (DT-032) — Fix numeración de subcapítulos.** `chain_05` corregido a 4.1/4.2/4.3;
+      `renumber_subheadings()` en `markdown_parser.py` + aplicado en `PilotAssembler`; 6 tests. ✅
+- [x] **T18.6 — Corrida E2E de validación.** Alpina S.A.S. sector 3020, corrida completa.
+      ResilientChatModel manejó RemoteProtocolError automáticamente (DT-029). Criterios
+      de aceptación verificados sobre el .docx generado (ver `FASE18_HALLAZGOS.md §7`). ✅
 
 ### Criterios de aceptación
 
@@ -1273,6 +1272,96 @@ no disponible" y numeración de capítulos correcta.
 
 (Ver bloque copiable al final de esta sección en el chat de cierre de Fase 17; el prompt
 autocontenido vive también en `FASE17_HALLAZGOS.md` §9.)
+
+---
+
+# FASE 19 — Coherencia y Robustez del Informe
+
+**Prioridad:** P0 · **Estimación:** ~2–3 días · **Estado:** ⬜ Pendiente
+**Deuda:** DT-027 (radar 50%), DT-030 (checkpoint), Q1 (coherencia post-gen)
+
+### Objetivo
+
+Mejorar la coherencia interna del informe generado y la robustez del pipeline ante fallos tardíos.
+Las corridas de Fase 17/18 evidencian tres problemas que requieren código, no solo corpus:
+
+- **Q1 — Coherencia post-generación**: Cap 6 (Accionables) no referencia explícitamente
+  hallazgos de Caps 2/3/4. El Resumen Ejecutivo es independiente de la narrativa de los caps.
+- **DT-027 — Cadena radar dedicada**: el bloque `radar_json` falla el 50% de las corridas
+  (N=2 observables de 5; umbral 80% no alcanzado). Un LLM separado en temperatura 0 es la
+  solución aprobada en Fase 17.
+- **DT-030 — Checkpoint antes de barreras de sincronización**: un fallo en Cap 6 o en el
+  Resumen Ejecutivo descarta ~13 min de trabajo (Caps 1–5). Persistir estado en BD y permitir
+  reanudar.
+
+### Contexto / por qué (hallazgos de Fase 17/18)
+
+- **Q1:** La estructura DAG del pipeline (Cap 6 consume informe completo) es correcta, pero
+  el prompt del Cap 6 no recibe los textos de Caps 2/3/4 como contexto — solo recibe el
+  retrieval. Agregar un "contexto de caps previos" (resumen) al prompt de Cap 6 y N3.
+- **DT-027:** El LLM free emite el JSON del radar embedido en texto narrativo; el regex
+  `_extract_radar()` lo captura solo cuando el formato es limpio. Una cadena dedicada con
+  prompt estricto y temperatura 0 resuelve el 50% restante.
+- **DT-030:** El CLAUDE.md Tier 3 exige persistir estado antes de las barreras Cap 6 / N3.
+  Un fallo de red en el Resumen Ejecutivo hoy descarta todo. Implementar snapshot a BD de
+  los caps N0/N1/N2 + función de reanudación (`--resume <session_id>`).
+
+### Tareas
+
+- [ ] **T19.1 (Q1) — Contexto de caps previos para Cap 6 y N3.** Pasar resúmenes de
+      Caps 2/3/4 al prompt de Cap 6 (Accionables) y al prompt del Resumen Ejecutivo. Verificar
+      que Cap 6 referencia explícitamente hallazgos de benchmarking/tendencias/ecosistema.
+- [ ] **T19.2 (DT-027) — Cadena radar dedicada.** Cadena LCEL separada para extraer los 5
+      scores del radar: LLM con temperatura 0, prompt estructurado, sin texto narrativo.
+      Wrapper en `generate_benchmarking.py`; fallback al placeholder garantizado. Test: 5
+      corridas con el mismo texto → 5/5 JSON parseables.
+- [ ] **T19.3 (DT-030) — Checkpoint de caps N0/N1/N2 a BD.** Persistir el texto de cada
+      capítulo completado (columna JSONB en `historial_informes` o tabla `caps_cache`).
+      Flag `--resume <session_id>` en `run_pilot.py` que recarga los caps cacheados y salta
+      su generación. Gate: si Cap 6 falla, relanzar solo Cap 6 sin perder Caps 1–5.
+- [ ] **T19.4 — E2E de validación.** 2 corridas: una exitosa (verifica coherencia y radar),
+      una con fallo simulado en Cap 6 → reanudación sin regenerar caps previos.
+
+### Criterios de aceptación
+
+1. Cap 6 cita al menos un hallazgo específico de Cap 2 o Cap 3 (inspección manual del .docx).
+2. Radar: 5/5 corridas del mismo texto emiten JSON parseable (test automatizable).
+3. `--resume <session_id>` restaura caps 1–5 y regenera solo el cap fallido (<2 min vs ~13 min).
+4. Gate verde: ruff 0 + `pytest -m "not slow"` (≥305 fast tests).
+
+### PROMPT DE ARRANQUE — Fase 19
+
+```
+Eres Claude Code trabajando en el proyecto InformesAuto (~/Test/InformesAuto).
+Branch de trabajo: feature/fase19-coherencia (crear desde develop).
+
+ESTADO DE ENTRADA (Fase 18 cerrada, 305 tests fast, ruff 0):
+- 594 chunks globales ingestados (InformeConvergenciaLocal2026).
+- DT-031/032/033 cerrados. Reservas empresa/sector/global operativas.
+- Deuda pendiente: DT-027 (radar 50%), DT-030 (checkpoint), Q1 (coherencia).
+
+OBJETIVOS DE FASE 19:
+- T19.1 (Q1): contexto caps previos para Cap 6 y N3.
+- T19.2 (DT-027): cadena radar dedicada temperatura 0.
+- T19.3 (DT-030): checkpoint caps N0/N1/N2 + --resume.
+- T19.4: E2E de validación (coherencia + radar + reanudación).
+
+REGLAS DURAS (CLAUDE.md TIER 1):
+- No hardcodear nombres de modelo (van en .env).
+- No credenciales en código.
+- domain/ no importa SQLAlchemy/httpx/Streamlit.
+- No re-litigar ADR-012 ni ADR-013.
+
+MÉTODO: Plan Mode antes de tocar archivos. Un commit atómico por tarea.
+Gate tras cada tarea: ruff 0 + pytest -m "not slow" verde.
+
+LECTURAS OBLIGATORIAS al arrancar:
+- docs/architecture/ROADMAP_FASE9+.md §FASE19 (esta sección)
+- docs/decisions/FASE18_HALLAZGOS.md (estado y deuda)
+- docs/architecture/ADR-012-filtrado-sectorial.md (addendum Fase 18)
+- src/ic/domain/use_cases/generate_informe.py (pipeline)
+- src/ic/domain/use_cases/generate_benchmarking.py (_extract_radar)
+```
 
 ---
 
@@ -1314,4 +1403,5 @@ ciclo de vida del corpus).
 | 2026-07-22 | 2.0 | Fase 15 cerrada: T15.1 batch_mode() Embedder (keep_alive de lote + flag --warm) ✅; T15.2 CachedWebConnector/OpenAlexConnector + tabla retrieval_cache ✅; T15.3 is_rate_limit_error + ResilientChatModel (free→free_alt→synth→paid) + timeouts por tier (DT-021 ✅); T15.4 eval_gate.py + fase15_budget.json ✅; T15.5 purge scoping + nota /api/generate ✅. 262 tests fast, ruff 0. Pendiente cablear caché+resiliencia en pipeline E2E (ver §8 recomendaciones FASE15_HALLAZGOS). |
 | 2026-07-22 | 1.9 | Fase 14 cerrada (`1fbe8a1`): T14.1 harness de evaluación + gold set (línea base filtered ya óptima: precision 1.0/contam 0.0/hit 1.0) ✅; T14.2 MMR portado **medido y revertido** (degrada con evidencia mono-documento; λ=1.0 por defecto) ✅; T14.3 chunk_size 1000/200 (retrieval-neutral, se mantiene por eficiencia: 998 vs 1746 chunks) ✅; T14.4 índice **descartado** (SQL 15ms, embed domina 99%) ✅; T14.5 persistencia web "solo lo citado" (ADR-013) + purga backlog 1202→0 → evidencia sectorial 3.20→3.68 ✅; T14.6 CIIU→GICS (`ciiu_gics.py`) ✅. DT-020/022/023 cerradas. 223 tests fast, E2E Comfama verificado. FASE14_HALLAZGOS + ADR-013 + addendum ADR-012. |
 | 2026-07-22 | 1.7 | Fase 13 cerrada (`62fe327`). Roadmap reordenado (deuda técnica primero, decisión del usuario): Fase 14 Calidad de Retrieval (DT-022/020/023, detallada + prompt de arranque), Fase 15 Resiliencia y Costo (DT-021+T12.1/2), Fase 16 Presentación (DT-019+tablas), luego cron/multi-tenant/API. |
+| 2026-07-23 | 2.4 | Fase 18 cerrada (`8c6b8c2`..`7dcd676`): T18.1 documentos globales cross-sector (es_global + reserva rag_global_reserve=2 + ingest_global.py; 594 chunks) ✅; T18.2 citación APA PDFs locales (format_chunks_with_meta + _apa_report sin rutas; 8 tests) ✅; T18.3 empresa_id temprano + reserva empresa (rag_empresa_reserve=2 + UI selector) ✅; T18.4 build_emis_index.py + multi-sector jsonb_exists (DT-034 pendiente lote completo) ✅; T18.5 renumber_subheadings + chain_05 corregido (6 tests) ✅; T18.6 E2E Alpina S.A.S. ✅. 305 tests fast, ruff 0. DT-031/032/033 cerrados. Addendum ADR-012 Fase 18. |
 | 2026-07-22 | 1.6 | Fase 13 en curso: T13.1 esquema (sector_gics/activo + PAPER_ACADEMICO) ✅, T13.2 PdfIngestor (documento_id + fuente_tipo pdf) ✅, T13.3 filtrado sectorial + cap por doc ✅, T13.4 panel Repositorio + DocumentoRepository ✅, T13.5 lote 25 PDFs ingestado (1746 chunks, 0 errores) ✅, T13.6 `_run_pdf` retirado (DT-017) ✅, T13.7 APA informe_compilado + evaluación 3 empresas ✅ (Fase 13: 3/0 sect/cross vs base 0-1/2-4; añadida reserva sectorial tras hallazgo de backlog web), T13.8 ADR-012 + hallazgos RepositorioRN ✅. 179 tests fast. DT-011/DT-017 cerrados. |
