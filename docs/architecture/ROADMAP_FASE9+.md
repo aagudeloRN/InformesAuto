@@ -8,7 +8,7 @@
 > **Este documento se consulta y se actualiza en cada ejecución.** No es inmutable (a
 > diferencia de los ADR). Cada fase se refina con los hallazgos de la anterior.
 
-**Versión del roadmap:** 2.0 · **Creado:** 2026-07-21 · **Última actualización:** 2026-07-22
+**Versión del roadmap:** 2.3 · **Creado:** 2026-07-21 · **Última actualización:** 2026-07-23
 
 ---
 
@@ -106,6 +106,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 14 | Calidad de Retrieval y Evaluación | ✅ | 2026-07-22 | `1fbe8a1` | `FASE14_HALLAZGOS.md` |
 | 15 | Resiliencia y Costo | ✅ | 2026-07-22 | `a367b57`+ | `FASE15_HALLAZGOS.md` |
 | 16 | Presentación del Contenido | ✅ | 2026-07-22 | `aadd99e` | `FASE16_HALLAZGOS.md` |
+| 17 | Instrumentación, Radar y Pulido E2E | ✅ | 2026-07-23 | `7e6ec20`..`6927063` | `FASE17_HALLAZGOS.md` |
 
 > Cada fase, al cerrar, actualiza su fila (estado ✅, fecha, hash de commit) y marca sus
 > tareas en la sección correspondiente.
@@ -133,11 +134,16 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-021 | Resiliencia OpenRouter free: rate-limits transitorios (`ResourceExhausted 32/32`) sin backoff/reintento dedicado | 15 | ✅ `is_rate_limit_error` + `ResilientChatModel` (free→free_alt→synth→paid); timeouts por tier. Ver `FASE15_HALLAZGOS.md` §4 |
 | DT-022 | Reranking/afinado de retrieval: MMR completo + evaluación, `chunk_size` 500→1000, índice parcial/GIN sobre `metadatos->>'sector_gics'` | 14 | ✅ harness T14.1 (métricas propias); MMR medido y **revertido** (degrada mono-doc); `chunk_size` 1000/200 (neutral, se mantiene por eficiencia); índice **descartado** (SQL 15ms). Ver `FASE14_HALLAZGOS.md` + addendum ADR-012 |
 | DT-023 | Clasificación GICS: `chain_02_gics` no emite el código (mitigado por `extract_gics_code`). Usar `Comparacion_GICS_CIIU.csv` (CIIU→GICS) para acotar/validar candidatos y endurecer el prompt para emitir "(GICS XXXX)" | 14 | ✅ `ciiu_gics.py` (CIIU→Sección→candidatos); `ClassifyGICS` acota+valida/corrige; `chain_02` endurecido; fallback por nombre conservado; ≥5 CIIU probados |
-| DT-024 | Estilo Normal del documento no fijado: objetivo Source Sans Pro 11 pt, justificado, interlineado 1,16, espacio después 8 pt, control de viudas/huérfanas | 16 | ✅ `_apply_normal_style()` en `docx_renderer`; Calibri 11 pt (Source Sans Pro como mejora futura) |
+| DT-024 | Estilo Normal del documento no fijado: objetivo Source Sans Pro 11 pt, justificado, interlineado 1,16, espacio después 8 pt, control de viudas/huérfanas | 16/17 | ✅ `_apply_normal_style()` con **Open Sans** 11 pt (Fase 17; Source Sans Pro no empaquetado en Ubuntu 24.04, instalados `fonts-open-sans` + Carlito) |
 | DT-025 | Medición real de latencia `--bench --warm`: los números en `FASE15_HALLAZGOS.md §2` son estimados teóricos (Ollama no disponible en sesión de Fase 15/16) | 17 | ✅ cold 1527.8 ms / warm 158.3 ms → 9.6× mejora. FASE15_HALLAZGOS §2 actualizado con datos reales (E2E post-Fase 16, 2026-07-22) |
-| DT-026 | Hit-rate de caché no instrumentado: `CachedWebConnector`/`CachedOpenAlexConnector` no emiten métricas de hits/misses en el log del informe | 17 | 🟡 E2E 2ª corrida: 0 INSERTs en retrieval_cache → 100% HITs verificados por SQL. Contador explícito en log pendiente (Fase 17) |
-| DT-027 | Hit-rate del bloque `radar_json` desconocido: no se sabe qué % de corridas con modelos free-tier emiten el JSON parseable. Si < 50%, considerar cadena dedicada de extracción de scores | 17 | 🟡 1ª corrida real con qwen3:8b: bloque emitido y parseable (8 competidores). N=1. Continuar midiendo; decisión de cadena dedicada pendiente con N≥5 |
+| DT-026 | Hit-rate de caché no instrumentado: `CachedWebConnector`/`CachedOpenAlexConnector` no emiten métricas de hits/misses en el log del informe | 17 | ✅ `CacheCounter` thread-safe compartido + log `Cache web: N HITs / M MISSes` al cierre de `_run_n3` + campos en `InformeResult` (commit `7e6ec20`) |
+| DT-027 | Hit-rate del bloque `radar_json`: qué % de corridas emiten JSON parseable. Umbral de decisión: ≥ 80% | 17→18 | 🔴 Tasa confirmada 50% (Nestlé ✅, Avianca ❌ placeholder; N=2 observables de 5 corridas). **Decisión: cadena dedicada de extracción de scores** (LLM separado, temperatura 0) en Fase 19 |
 | DT-028 | `RetrievalCache` no importado en `models/__init__.py`: `create_schema.py` no creaba la tabla `retrieval_cache` (rompe arranque en BD vacía) | E2E post-16 | ✅ import añadido en `src/ic/data/models/__init__.py`. Fix en commit `e2e-post-fase16` |
+| DT-029 | `ResilientChatModel` solo hacía fallback ante rate-limit: un `RemoteProtocolError` transitorio abortaba el pipeline completo (incidente EPM, se perdieron Caps 1–5) | 17 | ✅ `is_transient_network_error()` + fallback de tier en `_generate`/`_stream` ante red transitoria; +9 tests; **validado en producción** (corrida Alpina sobrevivió al mismo error) (commit `7c1fec1`) |
+| DT-030 | Sin checkpoint antes de barreras de sincronización (Cap 6 / N3): CLAUDE.md TIER 3 exige persistir estado antes de cruzarlas; un fallo tardío descarta Caps 1–5 (~13 min) | 19 | ⬜ Persistir Caps N0/N1/N2 (BD) y permitir **reanudar** una corrida fallida |
+| DT-031 | Cap 5/6 inconclusos: falta ingestar `InformeConvergenciaLocal2026RvADAA.pdf` como fuente **global** (aplica a todo sector) cableada al retrieval de Convergencia/Accionables | 18 | ⬜ Q2 de FASE17_HALLAZGOS §7. Requiere soporte de "documento global" (sin filtro GICS excluyente) |
+| DT-032 | Bug de numeración: tras el capítulo 4 aparecen subcapítulos numerados `5.x` (desfase en headings del renderer o en la estructura del ReportDocument) | 18 | ⬜ Q3 de FASE17_HALLAZGOS §7 |
+| DT-033 | Citación no-APA para PDFs locales: el texto cita el nombre crudo del archivo ("El InformeConvergenciaLocal2026V3RvADAA.pdf destaca…") en vez de (Autor, año). Faltan metadatos APA en la ingesta y en el bloque de fuentes inyectado al prompt | 18 | ⬜ Q4 de FASE17_HALLAZGOS §7 |
 
 ---
 
@@ -685,24 +691,28 @@ Pregunta si algo no está claro antes de empezar.
 
 ---
 
-## 6. Roadmap posterior (reordenado: deuda técnica primero — decisión 2026-07-22)
+## 6. Roadmap posterior (reordenado 2026-07-23: calidad de contenido → coherencia → estilo)
 
-Orden acordado con el usuario: absorber la deuda técnica descubierta antes de features nuevas.
-- **Fase 14** — Calidad de Retrieval y Evaluación (DT-022, DT-020, DT-023). MMR completo,
-  evaluación RAGAS, `chunk_size` 500→1000, índice GIN sectorial, ciclo de vida de chunks web,
-  endurecer prompt GICS. **Detallada abajo con prompt de arranque.**
-- **Fase 15** — Resiliencia y Costo (DT-021 + T12.1/T12.2). Caché de retrieval, backoff/fallback
-  de tier para rate-limits OpenRouter, control de presupuesto y **estrategia de embedding**
-  (mayor palanca de latencia según Fase 14). **Detallada abajo con prompt de arranque.**
-- **Fase 16** — Presentación del contenido (DT-019 + DT-024 + tablas). Radar con datos reales
-  del LLM, tablas de benchmarking en Word, pulido de formato .docx/.pdf. **Criterio de
-  aceptación del estilo Normal** (DT-024): Source Sans Pro 11 pt · justificado · interlineado
-  múltiple 1,16 líneas · espacio después 8 pt · control de líneas viudas/huérfanas · estilo
-  visible en la galería. Implementación vía plantilla `docx_template_path` y/o estilos en
-  `infrastructure/render/docx_renderer.py` (ligado a DT-016).
-- **Fase 17** — Actualización programada del corpus sectorial (cron de re-ingesta y frescura).
-- **Fase 18** — Multi-tenant / control de acceso (si se ofrece a varias empresas).
-- **Fase 19** — Exportación a portal web / API (FastAPI) además de Streamlit.
+Con el pipeline instrumentado y resiliente (Fases 14–17), las corridas E2E de Fase 17
+revelaron que la palanca ahora es la **calidad del contenido** (evidencia, citación, cobertura),
+después la **coherencia** del documento como un todo, y al final el **pulido visual**. Orden
+acordado con el usuario (2026-07-23):
+
+- **Fase 18 — Evidencia y Citación** (DT-031, DT-032, DT-033, Q5, Q6). La mayor palanca de
+  calidad: documentos globales cross-sector (InformeConvergencia → Cap 5/6), documentos extra
+  por empresa/sector (EMIS), citación APA correcta para PDFs locales, reducir los "información
+  no disponible" y corregir la numeración de subcapítulos. **Detallada abajo con prompt de
+  arranque.**
+- **Fase 19 — Coherencia y Robustez del Informe** (Q1, DT-027, DT-030). Pase de revisión de
+  coherencia post-generación (leer el informe completo, detectar contradicciones entre
+  capítulos y corregirlas), cadena dedicada de extracción del radar (tasa actual 50% < 80%) y
+  checkpoint/reanudación antes de las barreras Cap 6/N3.
+- **Fase 20 — Estilo y Visualización del Documento Final** (Q7). Fase dedicada al entregable
+  visual: plantilla de estilos Word más rica (callouts, colores corporativos, tablas
+  estilizadas), jerarquía tipográfica, transiciones narrativas, figuras adicionales, y QA
+  visual sistemático del .docx/.pdf. Cierra el ciclo "producto comercial".
+- **Fase 21+** — Operación continua: actualización programada del corpus (cron de re-ingesta y
+  frescura), multi-tenant / control de acceso, exportación a portal web / API (FastAPI).
 
 ---
 
@@ -1162,6 +1172,110 @@ a FASE15_HALLAZGOS.md (actualizar con datos reales).
 
 ---
 
+# FASE 17 — Instrumentación, Calidad de Radar y Pulido E2E
+
+**Prioridad:** P1 · **Estado:** ✅ Completada (2026-07-23) · **Deuda:** DT-026 ✅, DT-024 ✅, DT-029 ✅ · **Rama:** `feature/fase17-instrumentacion`
+
+### Resumen de cierre (detalle en `FASE17_HALLAZGOS.md`)
+
+- **T17.1 (DT-026) ✅** — `CacheCounter` thread-safe compartido, inyectado en las 5
+  construcciones de `Cached*Connector` (n0, n2, ×3 n1); log de hits/misses al cierre de
+  `_run_n3`; campos en `InformeResult`; +3 tests (`7e6ec20`).
+- **T17.2 (DT-027) 🔴→Fase 19** — N=5 corridas completas (Nestlé, Alpina 762 s, Bancolombia
+  555 s, Avianca 1088 s; EPM abortó pre-fix). Radar observable: Nestlé ✅ / Avianca ❌ → tasa
+  50% < 80% → **decisión: cadena dedicada de extracción** (Fase 19).
+- **T17.3 ✅** — Cross-sector validado: EPM → GICS 5510 (Utilities), filtrado
+  `sector_gics='5510'` operativo en pgvector.
+- **T17.4 (DT-024) ✅** — Open Sans 11 pt en estilo Normal (`NORMAL_FONT_NAME`).
+- **DT-029 ✅ (no planificada, crítica)** — Incidente EPM (`RemoteProtocolError` abortó el
+  pipeline en Cap 6). Fix: `is_transient_network_error()` + fallback de tier ante red
+  transitoria; **validado en producción** en la corrida de Alpina (`7c1fec1`).
+- **Extra:** fix logging `run_pilot.py` (ic.* a INFO); fix ruff `eval_gate.py`; E501
+  pre-existente en `models/__init__.py`.
+- **Gate de cierre:** 289 tests fast, ruff 0.
+
+### Hallazgos que definen las fases siguientes (Q1–Q7, ver `FASE17_HALLAZGOS.md` §7)
+
+Las corridas E2E revelaron 7 problemas de calidad del documento → reordenaron el roadmap
+posterior (§6): Fase 18 (evidencia/citación), Fase 19 (coherencia/radar/checkpoint),
+Fase 20 (estilo y visualización).
+
+---
+
+# FASE 18 — Evidencia y Citación
+
+**Prioridad:** P0 (mayor palanca de calidad del contenido) · **Estimación:** ~3–4 días · **Estado:** ⬜ Pendiente · **Deuda:** DT-031, DT-032, DT-033 + Q5/Q6
+
+### Objetivo
+
+Que el contenido de los informes esté **anclado en más y mejor evidencia, citada
+correctamente**: documentos globales cross-sector para Cap 5/6, documentos extra por
+empresa/sector (EMIS), citación APA real para PDFs locales, menos secciones en "información
+no disponible" y numeración de capítulos correcta.
+
+### Contexto / por qué (hallazgos de Fase 17)
+
+- **Cap 5 (Convergencia) y Cap 6 (Accionables) salen inconclusos.** El documento
+  `InformeConvergenciaLocal2026RvADAA.pdf` contiene elementos aplicables a cualquier sector,
+  pero el filtrado sectorial (ADR-012) lo excluye cuando el informe es de otro sector. Falta
+  el concepto de **documento global** (DT-031).
+- **Citación rota para PDFs locales:** el texto dice "El InformeConvergenciaLocal2026V3RvADAA.pdf
+  destaca que…" en lugar de (Autor, año). El bloque de fuentes inyectado al prompt usa el
+  nombre de archivo cuando el documento no tiene metadatos APA (DT-033).
+- **Muchos "información no disponible" (Q5):** el corpus por sector es delgado fuera de 3020.
+  Alpina/Bancolombia citaron solo 4 refs; Avianca 13 (mejor cobertura web). Más documentos
+  por sector (EMIS, Q6) + revisión del umbral de retrieval.
+- **Numeración (DT-032):** tras el Cap 4 aparecen subcapítulos `5.x` — bug del renderer o del
+  modelo de documento que resta credibilidad inmediata al entregable.
+
+### Tareas
+
+- [ ] **T18.1 (DT-031) — Documentos globales cross-sector.** Añadir el concepto de documento
+      "global" (p. ej. `sector_gics = NULL` explícito o flag `global` en metadatos):
+      participa en el retrieval de **todos** los sectores, con cupo propio para no desplazar
+      la evidencia sectorial (patrón "reserva" de ADR-012). Ingestar
+      `InformeConvergenciaLocal2026RvADAA.pdf` como global y verificar que Cap 5/6 lo citan.
+- [ ] **T18.2 (DT-033) — Citación APA de PDFs locales.** Garantizar metadatos APA
+      (autor/año/título) en la ingesta (panel Repositorio + `ingest_batch.py` ya los piden;
+      validar que llegan al bloque de fuentes del prompt). Si un documento no tiene metadatos,
+      formatear institucional ("Ruta N, 2026") — nunca el nombre del archivo. Endurecer el
+      prompt para citar (Autor, año). Test de contrato: chunk de PDF local → cita APA correcta.
+- [ ] **T18.3 (Q6) — Documentos extra por empresa.** Permitir asociar documentos a una
+      empresa específica (columna `empresa_id` ya existe en `DocumentoLocal`): panel de
+      subida por empresa + retrieval que prioriza documentos de la empresa del informe
+      (empresa > sector > global > web). Pensado para informes EMIS por compañía.
+- [ ] **T18.4 (Q5) — Reducir "información no disponible".** Medir con el harness qué % de
+      consultas cae bajo el umbral por sector; revisar umbral vs. corpus; documentar qué
+      sectores necesitan corpus (accionable para el analista: qué EMIS conseguir).
+- [ ] **T18.5 (DT-032) — Fix numeración de subcapítulos.** Reproducir con un .docx generado,
+      localizar el desfase (renderer o `ReportDocument`) y corregir + test.
+- [ ] **T18.6 — Corrida E2E de validación.** 1–2 empresas (una ≠ 3020) verificando: Cap 5/6
+      citan el documento global, citas APA correctas, numeración correcta, menos ausencias.
+
+### Criterios de aceptación
+
+1. Cap 5/6 de un informe de cualquier sector citan `InformeConvergenciaLocal2026` (log/refs).
+2. Ninguna cita en el cuerpo usa un nombre de archivo (test de contrato + inspección E2E).
+3. Un documento asociado a una empresa aparece priorizado en su informe (test).
+4. Tabla de cobertura por sector documentada (qué % de consultas bajo umbral).
+5. Numeración de capítulos/subcapítulos correcta en el .docx E2E.
+6. Gate verde: ruff 0 + `pytest -m "not slow"`. Tablero §4 y deuda §5 actualizados.
+
+### Riesgos
+
+- El cupo de documentos globales puede desplazar evidencia sectorial → calibrar con el
+  harness (patrón reserva ADR-012), no a ciegas.
+- Metadatos APA de PDFs existentes pueden estar incompletos → migración/backfill del índice
+  (`indice.csv`) antes de exigirlos.
+- Prompts más largos (bloque de fuentes con APA) pueden degradar los modelos free → medir.
+
+### PROMPT DE ARRANQUE — Fase 18
+
+(Ver bloque copiable al final de esta sección en el chat de cierre de Fase 17; el prompt
+autocontenido vive también en `FASE17_HALLAZGOS.md` §9.)
+
+---
+
 ## 7. Decisiones abiertas / preguntas al humano
 
 Se resuelven en la fase indicada (o antes si se puede).
@@ -1188,6 +1302,7 @@ ciclo de vida del corpus).
 
 | Fecha | Versión | Cambio |
 |-------|---------|--------|
+| 2026-07-23 | 2.3 | Fase 17 cerrada (`7e6ec20`..`6927063`): T17.1 CacheCounter ✅ (DT-026), T17.4 Open Sans ✅ (DT-024), DT-029 fallback red transitoria ✅ (validado en prod, corrida Alpina), T17.3 cross-sector EPM→5510 ✅, T17.2 N=5 corridas → radar 50% → DT-027 🔴 cadena dedicada. Nuevas DT-030..033 (checkpoint, doc global convergencia, numeración, citación APA PDFs). §6 reordenado: F18 Evidencia y Citación → F19 Coherencia y Robustez → F20 Estilo y Visualización → F21+ operación. Sección FASE 18 detallada. 289 tests fast, ruff 0. |
 | 2026-07-21 | 1.0 | Creación del roadmap Fase 9–13 con prompts de arranque autocontenidos. |
 | 2026-07-21 | 1.1 | Resueltas Q1 (flujo GitHub PRIME DIRECTIVE + CI local), Q3 parcial (RAG del equipo en `~/Test/RepositorioRN`). Añadido paso de rama por fase; prompt Fase 9 actualizado. |
 | 2026-07-21 | 1.2 | Fase 9 cerrada: T9.1 ruff 0 errores ✅, T9.4 E2E 165.87 s ✅, T9.3 Makefile+ci.yml ✅, T9.2 check-ruff.sh ✅ (settings.json pendiente manual). DT-005 ✅, DT-018 🟡. |

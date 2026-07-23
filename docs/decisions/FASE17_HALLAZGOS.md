@@ -183,12 +183,122 @@ afectan directamente el contenido y la credibilidad del informe.
 5. T17.2: N=5 corridas completas (Nestlé + Alpina + Bancolombia + Avianca).
 6. Fix logging en `run_pilot.py` — ic.domain ahora emite INFO al log.
 
-### Pendiente para Fase 18
-1. Registrar DT-029/030/031/032/033 en ROADMAP §5.
-2. Decidir DT-027 (radar_json): confirmar grep de Avianca y cerrar o planificar cadena dedicada.
-3. Ingestar `InformeConvergenciaLocal2026RvADAA.pdf` como fuente global Cap 5/6 (Q2, DT-031).
-4. Corregir citación APA — nombre de archivo crudo en lugar de metadatos APA (Q4, DT-033).
-5. Mecanismo EMIS y docs extra por empresa (Q6).
-6. DT-030: checkpoint antes de barreras N2/N3.
-7. Investigar bug numeración subcapítulos post-Cap 4 (Q3, DT-032).
-8. Merge `--no-ff` a `develop`, generar prompt Fase 18.
+### Cierre administrativo (2026-07-23)
+- DT-029/030/031/032/033 registradas en ROADMAP §5. DT-027 decidido: 🔴 cadena dedicada
+  (tasa 50% < 80%) → Fase 19.
+- Roadmap §6 reordenado: **F18 Evidencia y Citación → F19 Coherencia y Robustez →
+  F20 Estilo y Visualización → F21+ operación continua**.
+- Radar de Avianca: `Radar: placeholder — DT-027 miss` confirmado en log.
+  `Cache web: 0 HITs / 12 MISSes` (primera corrida de la empresa, esperado).
+
+---
+
+## 9. PROMPT DE ARRANQUE — Fase 18 (Evidencia y Citación)
+
+```text
+# ROL Y MISIÓN
+Eres el ingeniero a cargo de la FASE 18 (Evidencia y Citación) del sistema de Informes de
+Inteligencia Competitiva. Tu misión: anclar el contenido en más y mejor evidencia, citada
+correctamente — documentos globales cross-sector para Cap 5/6, documentos por empresa (EMIS),
+citación APA real para PDFs locales, menos "información no disponible" y numeración correcta.
+Trabajas según CLAUDE.md y docs/architecture/PRIME_DIRECTIVE.md.
+
+# MÉTODO DE TRABAJO (obligatorio)
+Dos partes: PARTE A (diseño en Plan Mode, esperar aprobación) → PARTE B (ejecución).
+El plan es la especificación: si la realidad diverge, DETENTE y vuelve a Plan Mode.
+Cambios atómicos. Tests en el mismo commit que el código.
+
+# RESTRICCIONES DURAS (no negociables)
+- Modelos solo en .env (nunca hardcodear nombres). Sin secretos en git.
+- Dependency Agnosticism: domain/ NO importa SQLAlchemy/httpx/Streamlit/python-docx.
+- NO re-litigar: ADR-012 (filtrado sectorial + reserva), ADR-013 (persistencia web
+  solo-citado), ADR-002 (datos ausentes = condición de recuperación). Se construye SOBRE ellos.
+- El cupo de documentos globales NO debe desplazar la evidencia sectorial: calibrar con el
+  harness (scripts/eval_retrieval.py), no a ciegas.
+
+# ESTADO DE ENTRADA (Fase 17 cerrada)
+Branch develop (merge de feature/fase17-instrumentacion). 289 tests fast, ruff 0.
+Pipeline instrumentado (CacheCounter, log radar) y resiliente (DT-029: fallback de tier ante
+rate-limit Y red transitoria, validado en producción). N=5 corridas E2E completas.
+Problemas abiertos que esta fase ataca (FASE17_HALLAZGOS.md §7): Cap 5/6 inconclusos,
+citas con nombre de archivo crudo, muchas secciones "información no disponible",
+numeración 5.x tras el Cap 4.
+
+# ANTES DE EMPEZAR — pídeme al usuario:
+1. La ruta del PDF `InformeConvergenciaLocal2026RvADAA.pdf` (fuente global para Cap 5/6).
+2. Si hay PDFs EMIS u otros documentos por empresa disponibles para probar T18.3.
+
+# PASO 0 — Ramas y gate de entrada
+git checkout develop && git checkout -b feature/fase18-evidencia-citacion
+uv run ruff check src/ tests/ -q && uv run pytest -m "not slow" -q  → 0 errores / verde.
+
+# PASO 1 — LECTURA OBLIGATORIA (antes de planificar)
+docs/architecture/ROADMAP_FASE9+.md → sección FASE 18 (tareas T18.1–T18.6, criterios) ·
+docs/decisions/FASE17_HALLAZGOS.md (§7 problemas Q1–Q7) ·
+docs/architecture/ADR-012-filtrado-sectorial.md (filtro + reserva sectorial — patrón a
+extender para documentos globales) ·
+src/ic/infrastructure/retrieval/pgvector_store.py (search: filtro sector_gics, cupos) ·
+src/ic/data/models/documento_local.py (empresa_id, sector_gics, metadatos) ·
+src/ic/infrastructure/sources/pdf_ingestor.py (qué metadatos llegan a los chunks) ·
+src/ic/infrastructure/citation/apa_formatter.py (dispatch por tipo de fuente) ·
+src/ic/domain/use_cases/generate_convergencia.py y generate_accionables.py (retrieval Cap 5/6) ·
+src/ic/domain/chains/ (cómo se inyecta el bloque de fuentes numeradas al prompt) ·
+src/ic/infrastructure/render/docx_renderer.py + src/ic/domain/report_model.py (numeración
+de headings — bug DT-032) ·
+src/ic/presentation/app.py (panel Repositorio — patrón para subida por empresa).
+
+# PASO 2 — PLAN MODE (Parte A). Diseña las tareas EN ORDEN, cada una con criterio de éxito:
+
+T18.1 (DT-031) — Documentos globales cross-sector.
+  Concepto "global" (flag en metadatos o sector_gics NULL explícito) que participa en el
+  retrieval de TODOS los sectores con cupo propio (patrón reserva ADR-012). Ingestar el
+  InformeConvergencia como global.
+  ÉXITO: Cap 5/6 de un informe de sector ≠ 3020 citan el documento global (log/refs);
+  el harness muestra que la evidencia sectorial NO se degrada.
+
+T18.2 (DT-033) — Citación APA de PDFs locales.
+  Metadatos APA (autor/año/título) garantizados en ingesta y en el bloque de fuentes del
+  prompt. Fallback institucional ("Ruta N, 2026") si faltan — NUNCA el nombre del archivo.
+  ÉXITO: test de contrato chunk PDF local → cita (Autor, año); cero nombres de archivo en
+  el cuerpo de un informe E2E.
+
+T18.3 (Q6) — Documentos por empresa.
+  Asociar documentos a empresa (empresa_id ya existe); subida por empresa en el panel;
+  retrieval prioriza empresa > sector > global > web.
+  ÉXITO: un doc asociado a la empresa del informe aparece citado/priorizado (test).
+
+T18.4 (Q5) — Medir y reducir "información no disponible".
+  Con el harness: % de consultas bajo umbral por sector; revisar umbral vs corpus;
+  tabla de cobertura por sector (qué EMIS conseguir).
+  ÉXITO: tabla documentada en FASE18_HALLAZGOS.md con acciones concretas.
+
+T18.5 (DT-032) — Fix numeración de subcapítulos post-Cap 4.
+  Reproducir con .docx generado, localizar desfase (renderer o ReportDocument), corregir.
+  ÉXITO: numeración correcta en .docx E2E + test.
+
+T18.6 — Corrida E2E de validación (1–2 empresas, una ≠ 3020) verificando los criterios.
+
+Espera aprobación del plan antes de escribir código.
+
+# PASO 3 — EJECUCIÓN (Parte B)
+Implementa T18.1→T18.6 en orden. Gate ruff+pytest tras cada tarea.
+
+# CRITERIOS DE ÉXITO GLOBALES (Definition of Done)
+1. Gate verde: ruff 0 + pytest -m "not slow" ≥ 289 passed. Cobertura domain/ ≥ 80%.
+2. Cap 5/6 citan el documento global en informes de cualquier sector.
+3. Cero citas con nombre de archivo (test de contrato + E2E).
+4. Retrieval por empresa operativo y probado.
+5. Tabla de cobertura por sector documentada.
+6. Numeración correcta verificada en .docx.
+
+# PASO 4 — DOCUMENTACIÓN (obligatoria al cierre)
+- docs/decisions/FASE18_HALLAZGOS.md: logros, retos, recomendaciones (patrón FASE17).
+- ROADMAP_FASE9+.md: tablero §4 (Fase 18 ✅ + hash), deuda §5 (DT-031/032/033), changelog §8.
+- ADR nuevo/actualizado si cambia una decisión estructural (documentos globales extiende
+  ADR-012 → considerar addendum).
+- Confirma el commit conmigo antes de mergear a develop con --no-ff.
+- Redacta y propón el PROMPT DE ARRANQUE de la FASE 19 (Coherencia y Robustez: pase de
+  coherencia post-generación Q1, cadena dedicada radar DT-027, checkpoint DT-030).
+
+Pregunta si algo no está claro antes de empezar.
+```
