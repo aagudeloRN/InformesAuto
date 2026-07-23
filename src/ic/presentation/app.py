@@ -54,6 +54,17 @@ def _render_repositorio() -> None:
 
     # ── Subida ──────────────────────────────────────────────────────────────
     with st.expander("➕ Subir documento", expanded=False):
+        # Cargar empresas conocidas para asociación de docs (T18.3)
+        _empresas_conocidas: list[tuple[str, str]] = [("", "— ninguna (documento sectorial) —")]
+        try:
+            from ic.data.database import SessionLocal as _SL
+            from ic.data.repositories.empresa_repo import EmpresaRepository as _ER
+            with _SL() as _db_e:
+                for _emp in _ER(_db_e).list_all():
+                    _empresas_conocidas.append((str(_emp.id), _emp.nombre))
+        except Exception:
+            pass
+
         with st.form("repo_upload_form"):
             archivo = st.file_uploader("Archivo PDF", type=["pdf"])
             sector_code = st.selectbox(
@@ -61,11 +72,19 @@ def _render_repositorio() -> None:
                 options=[c for c, _ in opciones],
                 format_func=lambda c: etiqueta_por_codigo.get(c, c),
             )
-            col_a, col_b = st.columns(2)
-            tipo_doc = col_a.selectbox(
-                "Tipo",
-                options=[TipoDocumento.PDF_SECTORIAL.value, TipoDocumento.PAPER_ACADEMICO.value],
+            empresa_sel = st.selectbox(
+                "Empresa (opcional)",
+                options=[eid for eid, _ in _empresas_conocidas],
+                format_func=lambda eid: dict(_empresas_conocidas).get(eid, eid),
+                help="Asociar a una empresa hace que sus docs se prioricen en sus informes.",
             )
+            col_a, col_b = st.columns(2)
+            _tipo_opts = [
+                TipoDocumento.PDF_SECTORIAL.value,
+                TipoDocumento.INFORME_EMIS.value,
+                TipoDocumento.PAPER_ACADEMICO.value,
+            ]
+            tipo_doc = col_a.selectbox("Tipo", options=_tipo_opts)
             año_doc = col_b.number_input("Año", min_value=1990, max_value=2100, value=2026)
             autor_doc = st.text_input("Autor", value="Ruta N")
             titulo_doc = st.text_input(
@@ -78,6 +97,7 @@ def _render_repositorio() -> None:
                 st.error("Debes seleccionar un archivo PDF.")
             else:
                 import tempfile
+                import uuid as _uuid
 
                 from ic.shared.config import get_settings
 
@@ -85,6 +105,7 @@ def _render_repositorio() -> None:
                 tmp_dir = Path(tempfile.mkdtemp())
                 tmp_path = tmp_dir / archivo.name
                 tmp_path.write_bytes(archivo.getbuffer())
+                _empresa_id = _uuid.UUID(empresa_sel) if empresa_sel else None
                 with st.spinner(f"Ingiriendo '{archivo.name}'…"):
                     try:
                         from ic.infrastructure.sources.pdf_ingestor import PdfIngestor
@@ -96,10 +117,12 @@ def _render_repositorio() -> None:
                             año=int(año_doc),
                             sector_gics=sector_code,
                             tipo=tipo_doc,
+                            empresa_id=_empresa_id,
                         )
-                        st.success(
-                            f"✅ '{archivo.name}': {n} chunks ingestados (sector {sector_code})."
-                        )
+                        msg = f"✅ '{archivo.name}': {n} chunks ingestados (sector {sector_code})"
+                        if _empresa_id:
+                            msg += " — asociado a empresa."
+                        st.success(msg)
                     except Exception as exc:
                         st.error(f"Error al ingerir: {exc}")
 

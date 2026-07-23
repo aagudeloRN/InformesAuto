@@ -70,6 +70,7 @@ class _PipelineContext:
     resumen: Any = None
     cache_web_counter: Any = None
     cache_oal_counter: Any = None
+    empresa_id: Any = None  # UUID resuelto en N0; se pasa a todos los use cases (T18.3)
 
 
 class GenerateInforme:
@@ -204,6 +205,21 @@ class GenerateInforme:
             nombre_empresa=ctx.params.empresa, descripcion_empresa=ctx.empresa.texto,
             ciiu=ctx.params.ciiu,
         )
+        # Resolver empresa_id al inicio del pipeline para pasarlo a todos los use cases (T18.3).
+        # Esto permite que el retrieval priorice docs asociados a esta empresa.
+        try:
+            from ic.data.database import SessionLocal, engine
+            from ic.data.models.historial_informe import ensure_historial_columns
+            from ic.data.repositories.empresa_repo import EmpresaRepository
+            ensure_historial_columns(engine)
+            with SessionLocal() as db_e:
+                empresa_orm = EmpresaRepository(db_e).upsert_by_name(ctx.params.empresa)
+                ctx.empresa_id = empresa_orm.id
+        except Exception:
+            logger.warning(
+                "No se pudo resolver empresa_id temprano — retrieval sin filtro empresa",
+                exc_info=True,
+            )
 
     def _run_n1(self, ctx: _PipelineContext) -> None:
         from ic.domain.use_cases.generate_n1 import run_n1_parallel
@@ -238,7 +254,7 @@ class GenerateInforme:
                     store=store_n2, web_connector=cached_web_n2,
                 ).execute(
                     nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
-                    sector_gics_code=g_code,
+                    sector_gics_code=g_code, empresa_id=ctx.empresa_id,
                 )
 
             ctx.step_fn(7, "Cap 6 — Accionables Estratégicos")
@@ -247,7 +263,7 @@ class GenerateInforme:
                     chain=build_chain_07(ctx.api_llm), store=store_n2,
                 ).execute(
                     nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
-                    sector_gics_code=g_code,
+                    sector_gics_code=g_code, empresa_id=ctx.empresa_id,
                 )
 
         ctx.step_fn(8, "Párrafos introductorios N2")
@@ -389,9 +405,11 @@ class GenerateInforme:
         try:
             ensure_historial_columns(engine)
             with SessionLocal() as db_h:
-                empresa_orm = EmpresaRepository(db_h).upsert_by_name(ctx.params.empresa)
+                # empresa_id ya resuelto en _run_n0 (T18.3); si falló, resolver aquí como fallback
+                if ctx.empresa_id is None:
+                    ctx.empresa_id = EmpresaRepository(db_h).upsert_by_name(ctx.params.empresa).id
                 informe_repo = InformeRepository(db_h)
-                rec = informe_repo.create(empresa_orm.id, {"empresa": ctx.params.empresa})
+                rec = informe_repo.create(ctx.empresa_id, {"empresa": ctx.params.empresa})
                 informe_repo.update_completado(
                     rec.id, ruta_docx=ctx.output_path, costo=ctx.tracker.total_cost(),
                     tiempo_s=time.time() - ctx.total_start,
