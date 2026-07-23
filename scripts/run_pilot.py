@@ -14,7 +14,9 @@ from pathlib import Path
 # Asegurar que src/ está en el path cuando se corre desde la raíz del proyecto
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-# Silenciar logs verbosos de SQLAlchemy e httpx para que la salida sea legible
+# Configurar logging: ic.* en INFO, librerías verbosas en WARNING
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logging.getLogger("ic").setLevel(logging.INFO)
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)

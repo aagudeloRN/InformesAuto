@@ -47,17 +47,33 @@ inyectado en cada instancia vía el nuevo parámetro opcional `counter=`.
 
 ## 3. T17.2 — Robustez de `radar_json` (DT-027)  ·  N≥5 corridas
 
-| Empresa | Modelo | radar_json emitido | parseable | n_competidores | GICS | tiempo | refs |
-|---------|--------|--------------------|-----------|----------------|------|--------|------|
-| Nestlé Colombia | qwen3:8b | ✅ | ✅ | 8 | 3020 | — | — |
-| EPM | resilient/qwen3:8b | ⚠️ no capturado | — | — | 5510 | (abortó) | — |
+| Empresa | GICS | Completó | Tiempo | DT-029 | Tier ultra | Refs | radar_json |
+|---------|------|----------|--------|--------|------------|------|------------|
+| Nestlé Colombia | 3020 | ✅ | — | — | — | — | ✅ real (8 comp.) |
+| EPM | 5510 | ⚠️ abortó | — | ❌ pre-fix | — | — | no capturado |
+| Alpina | 3020* | ✅ | 761.8s | ✅ 1 fallback | Cap 5/6 | 4 | sin datos† |
+| Bancolombia | 4010* | ✅ | 555.2s | — | Resumen | 4 | sin datos† |
+| Avianca | 2030* | ✅ | 1088.2s | — | Cap 5 | 13 | ❌ placeholder |
 
-**Estado:** N útil = 1 (Nestlé). La corrida de EPM abortó en Cap 6 por un incidente de red
-(§6) **antes** de llegar a `_run_n3`, donde vive la instrumentación del radar. El `radar_json`
-se genera en Cap 2 (que sí completó) pero solo se observa/usa en el ensamblado, que no se
-alcanzó. **DT-027 sigue 🟡** — faltan corridas completas.
+*GICS inferido. †Logging no capturaba ic.domain en esas corridas (corregido en Avianca).
 
-**Decisión DT-027:** pendiente. Mantener 🟡 hasta tener N≥5 corridas **completas**.
+**Observaciones de la serie:**
+- **N1 (Caps 2/3/4)** es el cuello de botella: 182–525 s según empresa.
+- **Referencias:** Avianca obtuvo 13 únicas vs 4 de Alpina/Bancolombia — mayor cobertura web
+  para aerolíneas. Variación indica que la densidad del corpus web impacta el retrieval.
+- **DT-029 validado en producción:** Alpina disparó fallback ante `RemoteProtocolError` y
+  completó exitosamente. Las otras dos corridas usaron solo el tier free.
+- **Tier ultra (Nemotron 550B):** apareció en las 3 corridas nuevas en 1 sola llamada de
+  síntesis (Cap 5, Cap 6 o Resumen). Actúa como red de seguridad ante respuestas incompletas.
+- **Cache web (Avianca):** 0 HITs / 12 MISSes — esperado para primera corrida de empresa nueva.
+  En re-corridas el hit-rate debería subir.
+
+**Decisión DT-027:** Tasa radar real confirmada = 1/2 = 50% (Nestlé ✅, Avianca ❌).
+Umbral requerido: ≥ 80%. **→ DT-027 requiere cadena dedicada de extracción de scores.**
+Planificar en Fase 18: llamada LLM separada a temperatura 0 para extraer `radar_json` de
+forma estructurada, desacoplada del prompt principal del capítulo.
+
+**Estado T17.2:** N=5 corridas completas ✅. DT-027 🔴 requiere acción en Fase 18.
 
 ---
 
@@ -137,17 +153,42 @@ corrida. Alcance mayor → candidata a fase propia (¿Fase 18?).
 
 ---
 
-## 7. Curso de acción para mañana (arranque de la próxima sesión)
+## 7. Observaciones de calidad identificadas en corridas E2E (→ Fase 18+)
 
-1. **Commitear lo verde de hoy** (si no se hizo): T17.1 (contadores caché), T17.4 (Open Sans),
-   instrumentación radar/GICS, fix E501 en `models/__init__.py`. Rama
-   `feature/fase17-instrumentacion`. Gate ya verde (280 tests, ruff 0).
-2. **Implementar DT-029** (resiliencia red transitoria) — es el bloqueante real de las corridas
-   E2E. Sin esto, cada corrida larga tiene alta probabilidad de morir en tier free.
-3. **Re-correr EPM completa** + 3 empresas más (Alpina, Bancolombia, Avianca) para cerrar T17.2
-   (N≥5 completas) y adjuntar el radar real de EPM.
-4. **Registrar DT-029 y DT-030** en ROADMAP §5. Evaluar DT-030 como Fase 18 (checkpoint/reanudar)
-   y reordenar el roadmap posterior.
-5. Investigar los **615 s de Cap 1** (retrieval web lento) — opcional, no bloquea.
-6. Cerrar Fase 17: actualizar ROADMAP §4/§5/§8, commit `docs(fase17)`, merge `--no-ff` a
-   `develop`, generar prompt Fase 18.
+Identificadas en revisión de documentos generados durante T17.2. Guardadas en memoria
+`project_calidad_documento.md`.
+
+| # | Problema | Severidad | Candidato |
+|---|----------|-----------|-----------|
+| Q1 | Sin revisión de coherencia post-generación (contradicciones entre caps) | Alta | Fase 18/19 |
+| Q2 | Cap 5/6 inconclusos — falta ingestar `InformeConvergenciaLocal2026RvADAA.pdf` como fuente global | Alta | DT-031, pronto |
+| Q3 | Bug de numeración: subcapítulos post-Cap 4 numerados como `5.x` | Media | DT-032 |
+| Q4 | Citación incorrecta: nombre de archivo crudo en vez de APA (ej. `InformeConvergenciaLocal2026V3RvADAA.pdf`) | Media | DT-033 |
+| Q5 | Alta frecuencia de "información no disponible" — corpus insuficiente | Alta | Fase 18 |
+| Q6 | Sin mecanismo para adjuntar docs extra por empresa (EMIS, sectoriales) | Alta | Fase 18/19 |
+| Q7 | Mejora de forma y estilo visual del .docx | Baja | Fase 19/20 |
+
+**Prioridad inmediata:** Q2 (PDF convergencia) + Q4 (citación APA) + Q6 (EMIS) — las tres
+afectan directamente el contenido y la credibilidad del informe.
+
+---
+
+## 8. Estado de cierre de Fase 17
+
+### Completado ✅
+1. T17.1 (DT-026): contadores caché hits/misses — 289 tests, ruff 0.
+2. T17.4 (DT-024): Open Sans en estilo Normal del .docx.
+3. DT-029: fallback de tier ante errores de red transitorios — validado en producción (Alpina).
+4. T17.3: EPM → GICS 5510 cross-sector validado.
+5. T17.2: N=5 corridas completas (Nestlé + Alpina + Bancolombia + Avianca).
+6. Fix logging en `run_pilot.py` — ic.domain ahora emite INFO al log.
+
+### Pendiente para Fase 18
+1. Registrar DT-029/030/031/032/033 en ROADMAP §5.
+2. Decidir DT-027 (radar_json): confirmar grep de Avianca y cerrar o planificar cadena dedicada.
+3. Ingestar `InformeConvergenciaLocal2026RvADAA.pdf` como fuente global Cap 5/6 (Q2, DT-031).
+4. Corregir citación APA — nombre de archivo crudo en lugar de metadatos APA (Q4, DT-033).
+5. Mecanismo EMIS y docs extra por empresa (Q6).
+6. DT-030: checkpoint antes de barreras N2/N3.
+7. Investigar bug numeración subcapítulos post-Cap 4 (Q3, DT-032).
+8. Merge `--no-ff` a `develop`, generar prompt Fase 18.
