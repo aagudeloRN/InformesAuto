@@ -8,7 +8,7 @@
 > **Este documento se consulta y se actualiza en cada ejecución.** No es inmutable (a
 > diferencia de los ADR). Cada fase se refina con los hallazgos de la anterior.
 
-**Versión del roadmap:** 2.3 · **Creado:** 2026-07-21 · **Última actualización:** 2026-07-23
+**Versión del roadmap:** 2.5 · **Creado:** 2026-07-21 · **Última actualización:** 2026-07-23
 
 ---
 
@@ -108,6 +108,10 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 16 | Presentación del Contenido | ✅ | 2026-07-22 | `aadd99e` | `FASE16_HALLAZGOS.md` |
 | 17 | Instrumentación, Radar y Pulido E2E | ✅ | 2026-07-23 | `7e6ec20`..`6927063` | `FASE17_HALLAZGOS.md` |
 | 18 | Evidencia y Citación | ✅ | 2026-07-23 | `8c6b8c2`..`7dcd676` | `FASE18_HALLAZGOS.md` |
+| 19 | Calidad de Contenido — Sprint A | ⬜ | — | — | — |
+| 20 | Coherencia y Robustez del Informe | ⬜ | — | — | — |
+| 21 | HITL Módulo 1 — Gap Auditor | ⬜ | — | — | — |
+| 22 | HITL Módulo 2 — Consistency Checker | ⬜ | — | — | — |
 
 > Cada fase, al cerrar, actualiza su fila (estado ✅, fecha, hash de commit) y marca sus
 > tareas en la sección correspondiente.
@@ -145,7 +149,9 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-031 | Cap 5/6 inconclusos: falta ingestar `InformeConvergenciaLocal2026RvADAA.pdf` como fuente **global** (aplica a todo sector) cableada al retrieval de Convergencia/Accionables | 18 | ✅ `es_global=True` + reserva global (`rag_global_reserve=2`) + `scripts/ingest_global.py`; 594 chunks globales ingestados. Ver addendum ADR-012 Fase 18. |
 | DT-032 | Bug de numeración: tras el capítulo 4 aparecen subcapítulos numerados `5.x` (desfase en headings del renderer o en la estructura del ReportDocument) | 18 | ✅ `chain_05` corregido a 4.1/4.2/4.3 + `renumber_subheadings()` en `markdown_parser.py` como defensa en profundidad; 6 tests. |
 | DT-033 | Citación no-APA para PDFs locales: el texto cita el nombre crudo del archivo ("El InformeConvergenciaLocal2026V3RvADAA.pdf destaca…") en vez de (Autor, año). Faltan metadatos APA en la ingesta y en el bloque de fuentes inyectado al prompt | 18 | ✅ `format_chunks_with_meta` omite rutas locales; `_apa_report` solo emite URLs `http`; `pdf_ingestor` con fallback "Ruta N" y título sin `.pdf`; chains 04-07 unificadas; 8 tests de contrato. |
-| DT-034 | Ingesta completa del lote EMIS (250 PDFs, 25 sectores). El índice CSV (`indice_emis.csv`) está generado; el lote completo toma ~2–4 h. | 18→19 | ⬜ Pendiente corrida larga fuera del E2E. Índice listo en `documentos_sectoriales/FuentesEMIS/indice_emis.csv`. |
+| DT-034 | Ingesta completa del lote EMIS (250 PDFs, 25 sectores). El índice CSV (`indice_emis.csv`) está generado; el lote completo toma ~2–4 h. | 18→20 | ⬜ Pendiente corrida larga fuera del E2E. Índice listo en `documentos_sectoriales/FuentesEMIS/indice_emis.csv`. |
+| DT-035 | Cap 2 — Competidores sin datos: `WebConnector.search()` usa `search_depth="basic"` y queries genéricas de sector → solo overviews, no perfiles de competidores individuales. Solución: parámetro `search_depth` en `WebConnector.search()` + `search_depth="advanced"` en `generate_benchmarking.py` + queries targeted por empresa/competidor. | 19 | ⬜ Causa raíz confirmada por comparativa Alpina (mañana vs Fase 18). |
+| DT-036 | Cap 3 — Casos locales off-topic: 594 chunks del InformeConvergenciaLocal2026 contienen casos Medellín/Antioquia multi-sector (KPO, turismo inteligente) que se recuperan para cualquier empresa independientemente de su sector GICS. Causa: reserva global sin constraint sectorial en el prompt de casos locales. Solución: añadir instrucción explícita en `chain_04_tendencias.py` que restrinja los casos locales al sector de la empresa analizada + query web de casos locales sectoriales. | 19 | ⬜ Causa raíz confirmada: chunks globales recuperados para Alpina (sector 3020 Alimentos) devolvieron "KPO en Medellín" y "Turismo Inteligente" por similitud vectorial temática. |
 
 ---
 
@@ -1275,7 +1281,113 @@ autocontenido vive también en `FASE17_HALLAZGOS.md` §9.)
 
 ---
 
-# FASE 19 — Coherencia y Robustez del Informe
+# FASE 19 — Calidad de Contenido — Sprint A
+
+**Prioridad:** P0 · **Estimación:** ~1 día · **Estado:** ⬜ Pendiente
+**Deuda:** DT-035 (competidores Cap 2 sin datos), DT-036 (casos locales off-topic Cap 3)
+
+### Objetivo
+
+Corregir dos deficiencias de contenido identificadas en la comparativa Alpina (mañana vs Fase 18):
+Cap 2 devuelve tablas vacías de competidores porque el web search usa modo `basic` con queries
+genéricas de sector; Cap 3 cita casos locales off-topic (KPO, turismo) traídos por los 594 chunks
+globales sin filtro sectorial en el prompt. Además, documentar las ecuaciones de búsqueda EMIS.
+
+### Contexto / causa raíz
+
+- **DT-035 (Cap 2):** `generate_benchmarking.py` lanza queries del tipo
+  `"{sector_gics} competidores líderes globales"` → Tavily devuelve overviews de sector, no perfiles
+  de empresas individuales. Con `search_depth="basic"` solo se reciben snippets de ~200 chars.
+  El LLM ve fichas vacías y aplica correctamente la política "Dato no disponible". La versión de
+  la mañana usaba datos de entrenamiento del LLM (prohibido por política de no-alucinación).
+- **DT-036 (Cap 3):** Los 594 chunks globales del InformeConvergenciaLocal2026 son cross-sector:
+  contienen casos Medellín/Antioquia de KPO, turismo inteligente, etc. Al recuperarse para la
+  query de "casos locales" de una empresa de alimentos, el LLM los usa porque no hay constraint
+  sectorial en el prompt de casos locales.
+- **Ecuaciones de búsqueda:** `source_prompts/0. Ecuaciones de búsqueda.docx` contiene las
+  instrucciones para el analista que construye el corpus EMIS; no están documentadas como runbook.
+
+### Tareas
+
+- [ ] **T19.1 (DT-035) — `WebConnector.search()` con `search_depth` parametrizable.**
+      Añadir `search_depth: str = "basic"` a `WebConnector.search()` y `_search_tavily()`.
+      Actualizar `generate_benchmarking.py`: pasar `search_depth="advanced"` + queries más
+      específicas (p.ej. `"{competidor} cuota mercado Colombia LatAm 2025"`). Los queries
+      genéricos de sector siguen siendo `"basic"`; el `advanced` se usa solo donde se necesitan
+      perfiles detallados.
+      Wrapper en `infrastructure/sources/web_connector.py` — no tocar `domain/`.
+- [ ] **T19.2 (DT-036) — Constraint sectorial en Cap 3 casos locales.**
+      En `chain_04_tendencias.py` (sistema/usuario prompt de casos locales): añadir instrucción
+      explícita "Los casos locales deben pertenecer al sector GICS {sector_gics} de la empresa
+      analizada. Si no hay casos locales del mismo sector, indicar 'Dato no disponible en fuentes
+      consultadas.' — NO usar casos de otros sectores aunque sean de Medellín o Colombia."
+      En `generate_tendencias.py`: añadir query web dedicada a casos locales sectoriales
+      (ej. `"{sector_gics} caso éxito empresa Colombia Medellín Antioquia"`).
+- [ ] **T19.3 — `docs/runbooks/BUSQUEDA_FUENTES.md`.**
+      Extraer y documentar las ecuaciones de búsqueda del `source_prompts/0. Ecuaciones de
+      búsqueda.docx` como guía de analista para enriquecer el corpus EMIS. Incluir: motores
+      (EMIS, Scopus, Web of Science), operadores booleanos por sector GICS, criterios de
+      selección de PDFs, proceso de ingesta (`ingest_batch.py` con `indice_emis.csv`).
+- [ ] **T19.4 — E2E de validación Sprint A.**
+      Corrida con Alpina S.A.S. (sector 3020): verificar que Cap 2 tiene al menos 1 tabla de
+      competidor con datos reales (no "Dato no disponible"); Cap 3 no cita KPO ni turismo.
+
+### Criterios de aceptación
+
+1. `WebConnector.search()` acepta `search_depth` sin cambio de firma pública (default `"basic"`).
+2. Cap 2 de la corrida E2E tiene ≥1 ficha de competidor con datos (no solo "no disponible").
+3. Cap 3 de la corrida E2E no menciona sectores ajenos a la empresa analizada en casos locales.
+4. Gate verde: ruff 0 + `pytest -m "not slow"` (≥305 fast tests).
+
+### PROMPT DE ARRANQUE — Fase 19
+
+```
+Eres Claude Code trabajando en el proyecto InformesAuto (~/Test/InformesAuto).
+Branch de trabajo: feature/fase19-calidad-contenido (crear desde develop).
+
+ESTADO DE ENTRADA (Fase 18 cerrada, 305 tests fast, ruff 0):
+- 594 chunks globales ingestados (InformeConvergenciaLocal2026).
+- DT-031/032/033 cerrados. Reservas empresa/sector/global operativas.
+- Deuda nueva: DT-035 (Cap 2 competidores vacíos), DT-036 (Cap 3 casos off-topic).
+
+CONTEXTO CRÍTICO — comparativa Alpina (identificado en sesión 2026-07-23):
+- La versión de la mañana tenía datos de competidores ricos → procedían del conocimiento
+  de entrenamiento del LLM (PROHIBIDO: política de no-alucinación).
+- La versión Fase 18 tiene tablas vacías → CORRECTO comportamiento, pero el RAG no
+  tiene perfiles de competidores reales porque Tavily basic + queries genéricas no los capturan.
+- Cap 3 version Fase 18 cita "KPO en Medellín" y "Turismo Inteligente" para Alpina (alimentos)
+  → chunks globales cross-sector recuperados sin constraint de sector GICS en el prompt.
+
+OBJETIVOS DE FASE 19 (Sprint A):
+- T19.1 (DT-035): WebConnector.search() con search_depth="advanced" para queries de competidores.
+- T19.2 (DT-036): constraint sectorial en prompt de casos locales Cap 3.
+- T19.3: docs/runbooks/BUSQUEDA_FUENTES.md (ecuaciones de búsqueda EMIS → analista).
+- T19.4: E2E Alpina S.A.S. validando Cap 2 y Cap 3.
+
+REGLAS DURAS (CLAUDE.md TIER 1):
+- No hardcodear nombres de modelo (van en .env).
+- No credenciales en código.
+- domain/ no importa httpx/SQLAlchemy/Streamlit directamente.
+- No re-litigar ADR-012, ADR-013, ADR-014, ADR-015.
+- NUNCA usar datos de entrenamiento del LLM como fuente de afirmaciones en el informe.
+
+MÉTODO: Plan Mode antes de tocar archivos. Un commit atómico por tarea.
+Gate tras cada tarea: ruff 0 + pytest -m "not slow" verde.
+
+LECTURAS OBLIGATORIAS al arrancar:
+- docs/architecture/ROADMAP_FASE9+.md §FASE19 (esta sección)
+- docs/decisions/FASE18_HALLAZGOS.md (estado y comparativa)
+- docs/architecture/ADR-015-hitl.md (arquitectura HITL — contexto futuro)
+- src/ic/infrastructure/sources/web_connector.py (Tavily actual)
+- src/ic/domain/use_cases/generate_benchmarking.py (queries actuales)
+- src/ic/domain/chains/chain_04_tendencias.py (prompt casos locales)
+- src/ic/domain/use_cases/generate_tendencias.py (queries web tendencias)
+- source_prompts/0. Ecuaciones de búsqueda.docx (guía analista EMIS)
+```
+
+---
+
+# FASE 20 — Coherencia y Robustez del Informe
 
 **Prioridad:** P0 · **Estimación:** ~2–3 días · **Estado:** ⬜ Pendiente
 **Deuda:** DT-027 (radar 50%), DT-030 (checkpoint), Q1 (coherencia post-gen)
@@ -1308,18 +1420,18 @@ Las corridas de Fase 17/18 evidencian tres problemas que requieren código, no s
 
 ### Tareas
 
-- [ ] **T19.1 (Q1) — Contexto de caps previos para Cap 6 y N3.** Pasar resúmenes de
+- [ ] **T20.1 (Q1) — Contexto de caps previos para Cap 6 y N3.** Pasar resúmenes de
       Caps 2/3/4 al prompt de Cap 6 (Accionables) y al prompt del Resumen Ejecutivo. Verificar
       que Cap 6 referencia explícitamente hallazgos de benchmarking/tendencias/ecosistema.
-- [ ] **T19.2 (DT-027) — Cadena radar dedicada.** Cadena LCEL separada para extraer los 5
+- [ ] **T20.2 (DT-027) — Cadena radar dedicada.** Cadena LCEL separada para extraer los 5
       scores del radar: LLM con temperatura 0, prompt estructurado, sin texto narrativo.
       Wrapper en `generate_benchmarking.py`; fallback al placeholder garantizado. Test: 5
       corridas con el mismo texto → 5/5 JSON parseables.
-- [ ] **T19.3 (DT-030) — Checkpoint de caps N0/N1/N2 a BD.** Persistir el texto de cada
+- [ ] **T20.3 (DT-030) — Checkpoint de caps N0/N1/N2 a BD.** Persistir el texto de cada
       capítulo completado (columna JSONB en `historial_informes` o tabla `caps_cache`).
       Flag `--resume <session_id>` en `run_pilot.py` que recarga los caps cacheados y salta
       su generación. Gate: si Cap 6 falla, relanzar solo Cap 6 sin perder Caps 1–5.
-- [ ] **T19.4 — E2E de validación.** 2 corridas: una exitosa (verifica coherencia y radar),
+- [ ] **T20.4 — E2E de validación.** 2 corridas: una exitosa (verifica coherencia y radar),
       una con fallo simulado en Cap 6 → reanudación sin regenerar caps previos.
 
 ### Criterios de aceptación
@@ -1327,40 +1439,231 @@ Las corridas de Fase 17/18 evidencian tres problemas que requieren código, no s
 1. Cap 6 cita al menos un hallazgo específico de Cap 2 o Cap 3 (inspección manual del .docx).
 2. Radar: 5/5 corridas del mismo texto emiten JSON parseable (test automatizable).
 3. `--resume <session_id>` restaura caps 1–5 y regenera solo el cap fallido (<2 min vs ~13 min).
-4. Gate verde: ruff 0 + `pytest -m "not slow"` (≥305 fast tests).
+4. Gate verde: ruff 0 + `pytest -m "not slow"` (≥305 fast tests, ajustar según lo añadido en F19).
 
-### PROMPT DE ARRANQUE — Fase 19
+### PROMPT DE ARRANQUE — Fase 20
 
 ```
 Eres Claude Code trabajando en el proyecto InformesAuto (~/Test/InformesAuto).
-Branch de trabajo: feature/fase19-coherencia (crear desde develop).
+Branch de trabajo: feature/fase20-coherencia (crear desde develop).
 
-ESTADO DE ENTRADA (Fase 18 cerrada, 305 tests fast, ruff 0):
-- 594 chunks globales ingestados (InformeConvergenciaLocal2026).
+ESTADO DE ENTRADA (Fase 19 cerrada, tests fast en verde, ruff 0):
+- DT-035 y DT-036 cerrados (Sprint A). WebConnector.search() con search_depth parametrizable.
 - DT-031/032/033 cerrados. Reservas empresa/sector/global operativas.
 - Deuda pendiente: DT-027 (radar 50%), DT-030 (checkpoint), Q1 (coherencia).
 
-OBJETIVOS DE FASE 19:
-- T19.1 (Q1): contexto caps previos para Cap 6 y N3.
-- T19.2 (DT-027): cadena radar dedicada temperatura 0.
-- T19.3 (DT-030): checkpoint caps N0/N1/N2 + --resume.
-- T19.4: E2E de validación (coherencia + radar + reanudación).
+OBJETIVOS DE FASE 20:
+- T20.1 (Q1): contexto caps previos para Cap 6 y N3.
+- T20.2 (DT-027): cadena radar dedicada temperatura 0.
+- T20.3 (DT-030): checkpoint caps N0/N1/N2 + --resume.
+- T20.4: E2E de validación (coherencia + radar + reanudación).
 
 REGLAS DURAS (CLAUDE.md TIER 1):
 - No hardcodear nombres de modelo (van en .env).
 - No credenciales en código.
 - domain/ no importa SQLAlchemy/httpx/Streamlit.
-- No re-litigar ADR-012 ni ADR-013.
+- No re-litigar ADR-012, ADR-013, ADR-014, ADR-015.
 
 MÉTODO: Plan Mode antes de tocar archivos. Un commit atómico por tarea.
 Gate tras cada tarea: ruff 0 + pytest -m "not slow" verde.
 
 LECTURAS OBLIGATORIAS al arrancar:
-- docs/architecture/ROADMAP_FASE9+.md §FASE19 (esta sección)
-- docs/decisions/FASE18_HALLAZGOS.md (estado y deuda)
+- docs/architecture/ROADMAP_FASE9+.md §FASE20 (esta sección)
+- docs/decisions/FASE19_HALLAZGOS.md (estado y deuda)
 - docs/architecture/ADR-012-filtrado-sectorial.md (addendum Fase 18)
 - src/ic/domain/use_cases/generate_informe.py (pipeline)
 - src/ic/domain/use_cases/generate_benchmarking.py (_extract_radar)
+```
+
+---
+
+# FASE 21 — HITL Módulo 1: Gap Auditor
+
+**Prioridad:** P1 · **Estimación:** ~3–4 días · **Estado:** ⬜ Pendiente
+**ADR:** ADR-015 (HITL Post-Generación, aprobado 2026-07-23)
+
+### Objetivo
+
+Implementar la primera capa de revisión post-generación: el **Gap Auditor**. Tras generar un
+informe, el usuario puede auditarlo con un LLM que identifica brechas de información, solicita
+documentos adicionales, y desencadena una regeneración completa con los nuevos insumos.
+
+El Gap Auditor convierte el sistema de "pipeline one-shot" a "loop de calidad controlado
+por el usuario" sin abrir el pipeline a mid-gen HITL (que se reserva para fases futuras).
+
+### Decisiones arquitectónicas aprobadas (2026-07-23)
+
+1. **Punto de intervención:** Post-generación (no mid-pipeline). El usuario ve el informe
+   completo antes de decidir si auditarlo.
+2. **Regeneración:** Full pipeline cuando se añaden nuevos documentos. Los nuevos docs se
+   ingresan al índice RAG (con deduplicación SHA-256) → regeneración completa → el nuevo
+   contenido impacta en todos los caps.
+3. **Lógica "complement-not-replace":** La regeneración recibe el texto del informe anterior
+   como contexto adicional en los prompts para guiar al LLM a complementar, no contradecir.
+   Evita partir de cero y preserva hallazgos previos válidos.
+4. **Aprobación:** El usuario controla cuándo termina el loop. Botón "Aprobar informe" en UI.
+   Futuro: notificaciones cuando haya cambios pendientes de aprobación.
+5. **UI:** Integrado en el tab Historial (por informe). Botón "Auditar" abre panel lateral
+   con: gaps priorizados (Alta/Media/Baja), tipo de dato faltante, fuentes recomendadas,
+   upload de documentos adicionales, botón "Regenerar con nuevos insumos".
+
+### Base: `source_prompts/13. Prompt (Opcional) - Evaluar Informe.docx`
+
+El prompt de auditoría ya existe como template en `source_prompts/`. La fase lo adapta a
+`chain_evaluar.py` con la estructura requerida:
+- Sección 1: Gaps identificados con prioridad (Alta/Media/Baja) y tipo (datos de mercado,
+  perfiles competidores, marco regulatorio, etc.)
+- Sección 2: Fuentes recomendadas para cada gap
+- Sección 3: Plan de mejora priorizado
+
+### Tareas
+
+- [ ] **T21.1 — `chain_evaluar.py` (domain/chains/).** Adaptar `source_prompts/13` a LCEL.
+      Inputs: texto completo del informe (caps 1–6 + resumen). Output: `EvaluacionResult`
+      (lista de `Gap(prioridad, tipo, descripcion, fuente_recomendada)`).
+- [ ] **T21.2 — `generate_evaluacion.py` (domain/use_cases/).** Use case que invoca
+      `chain_evaluar.py` y persiste el resultado en BD (tabla `evaluaciones_informe`).
+- [ ] **T21.3 — Deduplicación de documentos.** Antes de ingestar un documento nuevo,
+      verificar SHA-256 del texto contra los existentes en BD. Si ya existe (mismo contenido),
+      notificar al usuario y no duplicar chunks. Implementar en `PdfIngestor` (ya tiene
+      chunk-level SHA; este es doc-level SHA del contenido completo).
+- [ ] **T21.4 — UI: panel Auditar en tab Historial (`app.py`).**
+      Por cada informe en el historial: botón "Auditar" → llama a `generate_evaluacion.py` →
+      muestra panel con gaps priorizados + upload de docs + botón "Regenerar".
+      Botón "Aprobar informe" para cerrar el loop.
+- [ ] **T21.5 — Regeneración completa con complement context.**
+      `GenerateInforme.execute()` acepta `complement_context: str | None` (texto del informe
+      anterior). Si presente, se inyecta como contexto adicional en todos los prompts N1/N2/N3
+      con instrucción: "El análisis previo concluyó: {complement_context[:500]}. Complementar
+      con los nuevos insumos; no contradecir conclusiones válidas salvo evidencia explícita."
+- [ ] **T21.6 — Tests y E2E.** Tests unitarios de `chain_evaluar` (fixtures de informe con
+      gaps conocidos). Test de deduplicación. E2E: auditar informe Alpina → subir 1 PDF nuevo
+      → regenerar → verificar que el nuevo PDF es citado en el informe regenerado.
+
+### Criterios de aceptación
+
+1. El Gap Auditor identifica ≥1 gap real en un informe E2E (inspección manual).
+2. Subir un PDF ya ingestado muestra advertencia de duplicado sin ingestar de nuevo.
+3. El informe regenerado con nuevo PDF cita el nuevo documento (trazable en referencias).
+4. "Aprobar informe" marca el informe como aprobado en la BD (campo `aprobado=True`).
+5. Gate verde: ruff 0 + `pytest -m "not slow"` (≥305 + tests nuevos de F19 + F21).
+
+### PROMPT DE ARRANQUE — Fase 21
+
+```
+Eres Claude Code trabajando en el proyecto InformesAuto (~/Test/InformesAuto).
+Branch de trabajo: feature/fase21-hitl-gap-auditor (crear desde develop).
+
+ESTADO DE ENTRADA (Fases 19 y 20 cerradas):
+- DT-035/036 cerrados (Sprint A). DT-027/030/Q1 cerrados (coherencia).
+- El sistema genera informes completos con citación APA, retrieval priorizado y checkpoint.
+- HITL no existe aún: el analista solo puede ver el informe final.
+
+CONTEXTO DE LA DECISIÓN (ADR-015, aprobado 2026-07-23):
+- Gap Auditor: post-generación, loop controlado por usuario.
+- Regeneración: full pipeline (nuevos docs → RAG → todos los caps se benefician).
+- Deduplicación: check SHA-256 a nivel documento antes de ingestar.
+- Complement-not-replace: texto previo como contexto para no partir de cero.
+- UI: panel en tab Historial, botón "Auditar" por informe, botón "Aprobar informe".
+- Template base: source_prompts/13. Prompt (Opcional) - Evaluar Informe.docx
+
+OBJETIVOS DE FASE 21:
+- T21.1: chain_evaluar.py (LCEL, adaptar source_prompts/13).
+- T21.2: generate_evaluacion.py + tabla evaluaciones_informe en BD.
+- T21.3: deduplicación doc-level SHA-256 en PdfIngestor.
+- T21.4: UI panel Auditar en historial.
+- T21.5: GenerateInforme.execute() acepta complement_context.
+- T21.6: tests + E2E con nuevo PDF.
+
+REGLAS DURAS:
+- No hardcodear modelos. domain/ no importa librerías externas.
+- No re-litigar ADR-012, ADR-013, ADR-014, ADR-015.
+- La regeneración es SIEMPRE full pipeline (no selectiva por cap).
+- El deduplicador verifica doc-level SHA ANTES de ingestar.
+
+LECTURAS OBLIGATORIAS al arrancar:
+- docs/architecture/ROADMAP_FASE9+.md §FASE21 (esta sección)
+- docs/architecture/ADR-015-hitl.md (todas las decisiones)
+- docs/decisions/FASE20_HALLAZGOS.md (estado)
+- source_prompts/13. Prompt (Opcional) - Evaluar Informe.docx (template)
+- src/ic/domain/use_cases/generate_informe.py (pipeline actual)
+- src/ic/presentation/app.py (UI actual — historial tab)
+- src/ic/infrastructure/sources/pdf_ingestor.py (deduplicación chunk-level existente)
+```
+
+---
+
+# FASE 22 — HITL Módulo 2: Consistency Checker
+
+**Prioridad:** P1 · **Estimación:** ~2–3 días · **Estado:** ⬜ Pendiente
+**ADR:** ADR-015 (HITL Post-Generación, aprobado 2026-07-23)
+**Prerequisito:** Fase 21 (Módulo 1 operativo)
+
+### Objetivo
+
+Implementar la segunda capa de revisión post-generación: el **Consistency Checker**. Detecta
+contradicciones entre capítulos y las resuelve automáticamente (contradicciones factuales) o
+las presenta al usuario para resolución manual (claims estratégicos).
+
+### Decisiones arquitectónicas aprobadas (2026-07-23)
+
+- **Detección:** LLM lee pares de capítulos y genera un reporte de inconsistencias tipadas.
+- **Resolución auto:** Inconsistencias **factuales** (cifras, porcentajes, años, nombres de
+  empresas) — el sistema las resuelve usando Tavily `basic` para verificar el dato correcto.
+- **Resolución manual:** Inconsistencias **estratégicas** (interpretaciones, recomendaciones,
+  prioridades) — se presentan al usuario en un panel con las dos versiones para que elija.
+- **UI:** Panel en historial, integrado con el Gap Auditor (Fase 21). El analista ve:
+  inconsistencia, tipo (factual/estratégica), caps involucrados, propuesta de resolución.
+
+### Tareas
+
+- [ ] **T22.1 — `chain_consistencia.py`.** LLM compara caps por pares y genera lista de
+      `Inconsistencia(tipo, cap_a, cap_b, texto_a, texto_b, descripcion)`.
+- [ ] **T22.2 — `generate_consistencia.py`.** Orquesta la comparación: N1 caps vs N2/N3;
+      persiste resultado en BD.
+- [ ] **T22.3 — Resolución automática de inconsistencias factuales.** Para cada
+      inconsistencia factual: buscar con Tavily `basic` → determinar valor correcto →
+      aplicar patch al texto del cap afectado.
+- [ ] **T22.4 — UI: panel de inconsistencias.** Complementa el panel de gaps de Fase 21.
+      Lista de inconsistencias con tipo + botón "Resolver auto" para factuales + formulario
+      de selección para estratégicas.
+- [ ] **T22.5 — Tests y E2E.** Fixture con informe que tiene inconsistencia conocida;
+      verificar que el checker la detecta y la resolución auto la corrige.
+
+### Criterios de aceptación
+
+1. El checker detecta una inconsistencia factual introducida deliberadamente en un fixture.
+2. La resolución auto corrige la inconsistencia y el cambio es trazable en logs.
+3. Una inconsistencia estratégica se presenta al usuario con las dos versiones.
+4. Gate verde: ruff 0 + `pytest -m "not slow"`.
+
+### PROMPT DE ARRANQUE — Fase 22
+
+```
+Eres Claude Code trabajando en el proyecto InformesAuto (~/Test/InformesAuto).
+Branch de trabajo: feature/fase22-hitl-consistency (crear desde develop).
+
+ESTADO DE ENTRADA (Fases 19, 20, 21 cerradas):
+- Gap Auditor operativo (chain_evaluar, generate_evaluacion, complement_context, UI panel).
+- Deduplicación doc-level en PdfIngestor.
+
+CONTEXTO (ADR-015):
+- Factual: auto-resolve con Tavily basic.
+- Estratégico: presentar al usuario para selección.
+- UI integrado en el panel de historial junto al Gap Auditor.
+
+OBJETIVOS DE FASE 22:
+- T22.1: chain_consistencia.py (comparación por pares).
+- T22.2: generate_consistencia.py.
+- T22.3: resolución auto factuales (Tavily basic).
+- T22.4: UI panel inconsistencias.
+- T22.5: tests + E2E.
+
+LECTURAS OBLIGATORIAS:
+- docs/architecture/ROADMAP_FASE9+.md §FASE22
+- docs/architecture/ADR-015-hitl.md
+- docs/decisions/FASE21_HALLAZGOS.md
+- src/ic/presentation/app.py (UI panel gap auditor de Fase 21)
 ```
 
 ---
@@ -1381,9 +1684,17 @@ Se resuelven en la fase indicada (o antes si se puede).
     `documentos_sectoriales/indice.csv`.
   - Identificador sectorial canónico: **código GICS numérico** vía `extract_gics_code`
     (ADR-012), en lugar de una tabla CIIU/GICS.
+- **Q4 (Fase 18) — HITL: arquitectura y 4 decisiones. ✅ RESUELTO (2026-07-23).**
+  Sesión de análisis comparativo de informes Alpina reveló que:
+  - Cap 2 vacío en competidores = comportamiento correcto (no alucinación), pero el RAG
+    necesita queries específicas + Tavily `advanced` (DT-035 → Fase 19).
+  - Cap 3 off-topic = contaminación de chunks globales sin filtro sectorial (DT-036 → Fase 19).
+  - Source prompt #13 (Evaluar Informe) no estaba implementado → base del Gap Auditor.
+  Decisiones HITL aprobadas: (1) post-generación; (2) full pipeline al añadir docs +
+  deduplicación SHA-256 + complement-not-replace; (3) usuario controla el cierre del loop;
+  (4) UI en tab Historial. Documentadas en ADR-015.
 
-**ADRs vigentes:** ADR-001 … ADR-011 + **ADR-012** (filtrado sectorial en el retrieval y
-ciclo de vida del corpus).
+**ADRs vigentes:** ADR-001 … ADR-013 + **ADR-015** (HITL post-generación).
 
 ---
 
@@ -1404,4 +1715,5 @@ ciclo de vida del corpus).
 | 2026-07-22 | 1.9 | Fase 14 cerrada (`1fbe8a1`): T14.1 harness de evaluación + gold set (línea base filtered ya óptima: precision 1.0/contam 0.0/hit 1.0) ✅; T14.2 MMR portado **medido y revertido** (degrada con evidencia mono-documento; λ=1.0 por defecto) ✅; T14.3 chunk_size 1000/200 (retrieval-neutral, se mantiene por eficiencia: 998 vs 1746 chunks) ✅; T14.4 índice **descartado** (SQL 15ms, embed domina 99%) ✅; T14.5 persistencia web "solo lo citado" (ADR-013) + purga backlog 1202→0 → evidencia sectorial 3.20→3.68 ✅; T14.6 CIIU→GICS (`ciiu_gics.py`) ✅. DT-020/022/023 cerradas. 223 tests fast, E2E Comfama verificado. FASE14_HALLAZGOS + ADR-013 + addendum ADR-012. |
 | 2026-07-22 | 1.7 | Fase 13 cerrada (`62fe327`). Roadmap reordenado (deuda técnica primero, decisión del usuario): Fase 14 Calidad de Retrieval (DT-022/020/023, detallada + prompt de arranque), Fase 15 Resiliencia y Costo (DT-021+T12.1/2), Fase 16 Presentación (DT-019+tablas), luego cron/multi-tenant/API. |
 | 2026-07-23 | 2.4 | Fase 18 cerrada (`8c6b8c2`..`7dcd676`): T18.1 documentos globales cross-sector (es_global + reserva rag_global_reserve=2 + ingest_global.py; 594 chunks) ✅; T18.2 citación APA PDFs locales (format_chunks_with_meta + _apa_report sin rutas; 8 tests) ✅; T18.3 empresa_id temprano + reserva empresa (rag_empresa_reserve=2 + UI selector) ✅; T18.4 build_emis_index.py + multi-sector jsonb_exists (DT-034 pendiente lote completo) ✅; T18.5 renumber_subheadings + chain_05 corregido (6 tests) ✅; T18.6 E2E Alpina S.A.S. ✅. 305 tests fast, ruff 0. DT-031/032/033 cerrados. Addendum ADR-012 Fase 18. |
+| 2026-07-23 | 2.5 | Post-Fase 18: análisis comparativo informes Alpina (mañana vs Fase 18). Diagnosticadas causas raíz DT-035 (Tavily basic + queries genéricas → Cap 2 vacío) y DT-036 (chunks globales sin filtro sectorial → Cap 3 off-topic). Decisiones HITL (Q4) aprobadas: 4 decisiones arquitectónicas documentadas en ADR-015. Roadmap reordenado: F19 Sprint A (DT-035+036) → F20 Coherencia (ex-F19) → F21 HITL Gap Auditor → F22 HITL Consistency. REGLAS_NEGOCIO.md +RN-011/012/013. |
 | 2026-07-22 | 1.6 | Fase 13 en curso: T13.1 esquema (sector_gics/activo + PAPER_ACADEMICO) ✅, T13.2 PdfIngestor (documento_id + fuente_tipo pdf) ✅, T13.3 filtrado sectorial + cap por doc ✅, T13.4 panel Repositorio + DocumentoRepository ✅, T13.5 lote 25 PDFs ingestado (1746 chunks, 0 errores) ✅, T13.6 `_run_pdf` retirado (DT-017) ✅, T13.7 APA informe_compilado + evaluación 3 empresas ✅ (Fase 13: 3/0 sect/cross vs base 0-1/2-4; añadida reserva sectorial tras hallazgo de backlog web), T13.8 ADR-012 + hallazgos RepositorioRN ✅. 179 tests fast. DT-011/DT-017 cerrados. |
