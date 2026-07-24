@@ -104,6 +104,29 @@ la mitad de retrieval/breadth → F22 (T22.4). Este es el trabajo de mejora que 
 _Cross-sector (avianca 2030 / bancolombia 4010) con la rúbrica: pendiente de corrida manual (§5.1);
 mismo techo de corpus aplica._
 
+### 5.2 Prueba A/B — ingesta del sector 3020 (2026-07-24)
+
+Se ingestó el lote EMIS del sector 3020 (con el fix DT-051 de bytes NUL): **44 → 286 chunks en
+14 documentos distintos** (EMIS Colombia F&B 121, CFA 49, compilado viejo 44, GlobalData 11, 10
+Euromonitor "Sector Capsule"). Se re-corrió el E2E de Alpina (`output/alpina_sas_post_emis.docx`).
+
+| Métrica | Antes (pre-EMIS) | Después (post-EMIS 3020) |
+|---|---|---|
+| Tablas Word | 1 | **16** |
+| Cap 2.1 fichas de competidor | ausente | **14 fichas en tabla** |
+| Radar de posicionamiento | placeholder | **datos reales del LLM (6 comp., 5 dims)** |
+| Referencias citadas | 3 | **3 (sin cambio)** |
+| "Dato no disponible" | 18 | 23 |
+
+**Lectura:** el corpus enriquecido **mejoró mucho el contenido** (fichas de competidor, radar real,
+tablas), lo que valida ingestar el lote EMIS completo (F23/DT-034). Pero **la citación no siguió al
+corpus**: las 14 fuentes EMIS nuevas no aparecen en Referencias ni en el texto (Euromonitor/CFA/
+GlobalData = 0 menciones), 0 chunks web citados (123 descartados por ADR-013) y hay una cita
+huérfana. Es un problema de **atribución/trazabilidad (RN-001)**, no de disponibilidad de corpus →
+**DT-052**, a resolver en F22 junto con el breadth de retrieval (T22.4/DT-049). El aumento de
+"Dato no disponible" (18→23) viene de que las secciones granulares (2.3 tabla por región, Cap 4
+eventos) ahora intentan más celdas y reportan honestamente las que faltan.
+
 ### 5.1 Procedimiento reproducible
 
 ```bash
