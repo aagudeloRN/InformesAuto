@@ -109,7 +109,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 17 | Instrumentación, Radar y Pulido E2E | ✅ | 2026-07-23 | `7e6ec20`..`6927063` | `FASE17_HALLAZGOS.md` |
 | 18 | Evidencia y Citación | ✅ | 2026-07-23 | `8c6b8c2`..`7dcd676` | `FASE18_HALLAZGOS.md` |
 | 19 | Auditoría de Arquitectura, Código y Docs | ✅ | 2026-07-24 | _pendiente_ | `FASE19_HALLAZGOS.md` |
-| 20 | Gap Analysis de Calidad vs Informe Patrón (Noel) | ⬜ | — | — | — |
+| 20 | Gap Analysis de Calidad vs Informe Patrón (Noel) | ✅ | 2026-07-24 | `3d59a14` | `FASE20_HALLAZGOS.md` |
 | 21 | Calidad de Contenido — Sprint A (ex-F19) | ⬜ | — | — | — |
 | 22 | Coherencia y Robustez del Informe (ex-F20) | ⬜ | — | — | — |
 | 23 | Fuentes: Corpus EMIS completo + Búsqueda paga | ⬜ | — | — | — |
@@ -162,6 +162,12 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-040 | `gateway.py:23-29` `_PRICING` hardcodea IDs de modelo (`nvidia/nemotron-…`, `google/gemma-3-…`); el hook `check-hardcoded-models.sh` no los bloquea porque sus patrones exigen dígito pegado (`gemma[0-9]`) y omiten `nemotron`/`gpt-oss`. Decidir: mover la tabla de precios a config/`.env` o declararla excepción explícita, **y** endurecer los patrones del hook (formas con guion + familias faltantes). | 22 | ⬜ Detectado en Fase 19 (T19.3/T19.5). TIER 1 en espíritu. |
 | DT-041 | Cobertura de `domain/` en el gate rápido = 69% (< 80% PRIME §6.1). La orquestación N1/N3 (`generate_n1.py` 0%, `generate_informe.py` 34%) solo se cubre con E2E `@slow`. Añadir unit tests de orquestación con dependencias mockeadas para subir el gate sin depender de servicios reales. | 22 | ⬜ Línea base medida en Fase 19 (pytest-cov añadido). |
 | DT-042 | Acoplamiento LCEL en `domain/`: las 12 chains importan `langchain_core` (`Runnable`, `ChatPromptTemplate`, `StrOutputParser`) directamente, en tensión con ADR-004 (L49-50: "el wrapper aísla al dominio del framework"). Decidir: documentar la excepción explícita (LCEL como sustrato de orquestación, no "librería envuelta") o introducir una interfaz de cadena en `infrastructure/`. | 22 | ⬜ Divergencia documentada en Fase 19. Severidad Baja (acoplamiento aceptado de facto). |
+| DT-043 | **Sesgo sectorial hardcodeado** en system prompts: `chain_03` ("bienes de consumo/FoodTech"), `chain_04` ("agroindustriales") + ecuaciones de búsqueda food-céntricas. Para empresas fuera de alimentos (avianca/bancolombia) el Cap 2 sale plano y con 0 tablas. Parametrizar rol/sector por GICS. | 21 | ⬜ Detectado en Fase 20 (matriz §3.4: Alpina 11–13/cap vs Avianca/Bancolombia 5–7/cap). |
+| DT-044 | **Cap 2.3 Mercado ausente**: `source_prompts 4/5` (Mercado) nunca se implementaron como chain; el patrón Noel tiene 2.3 Mercado + tabla de mercado por región (T10). | 21 | ⬜ Detectado en Fase 20 (T20.3/T20.4). |
+| DT-045 | **Metodología + Aviso de uso de IA ausentes**: el patrón Noel los tiene como secciones formales (Heading 1 + Heading 2); hoy solo hay un `disclaimer` de una línea (Caption). Añadir sección en `assembler.py`. | 21 | ⬜ Detectado en Fase 20 (T20.4). |
+| DT-046 | **Cap 4 estructura divergente**: `chain_05_ecosistema` produce Local/Global/Disruptores en vez de 4.1 Inversiones / 4.2 Integraciones verticales / 4.3 M&A / 4.4 Joint ventures / 4.5 Alianzas, con eventos (Título + capacidad estratégica adquirida + vulnerabilidad mitigada). Es la mayor divergencia de contenido. | 21 | ⬜ Detectado en Fase 20 (T20.3, brecha 🔴). |
+| DT-047 | **Deriva del nº de áreas en Cap 5**: la variante paralela `chain_06a` (RN-009) permite que el LLM improvise áreas (avianca 5.1–5.7 vs 4 fijas del distrito). Restringir a las 4 áreas del patrón. | 22 | ⬜ Detectado en Fase 20 (T20.2). |
+| DT-048 | **Score de calidad no automatizado**: `docs/eval/RUBRICA_CALIDAD.md` es manual. Cablear un LLM-judge (temperatura 0) que la aplique sobre el `.docx` y emita score por capítulo, para medir regresión de calidad entre fases. | 22 | ⬜ Propuesto en Fase 20 (T20.1). Severidad Baja. |
 
 > **Nota de numeración DT-035 (Fase 19):** `FASE18_HALLAZGOS.md §9` reutilizó el ID "DT-035"
 > para "verificación E2E de Alpina" (que el §7 de esa misma fase marca ✅ 4/4). El **DT-035
@@ -1495,8 +1501,10 @@ Confirma el mensaje de commit conmigo; mergea a develop con --no-ff.
 
 # FASE 21 — Calidad de Contenido — Sprint A (ex-F19 en v2.5)
 
-**Prioridad:** P0 · **Estimación:** ~1 día · **Estado:** ⬜ Pendiente
-**Deuda:** DT-035 (competidores Cap 2 sin datos), DT-036 (casos locales off-topic Cap 3)
+**Prioridad:** P0 · **Estimación:** ~1 día (Sprint A) + ~2 días (Sprint A' contenido) · **Estado:** ⬜ Pendiente
+**Deuda:** DT-035 (competidores Cap 2 sin datos), DT-036 (casos locales off-topic Cap 3),
+**DT-043** (sesgo sectorial), **DT-044** (2.3 Mercado), **DT-045** (Metodología+Aviso IA),
+**DT-046** (rediseño Cap 4) — estas cuatro añadidas por Fase 20
 
 ### Objetivo
 
@@ -1544,12 +1552,37 @@ globales sin filtro sectorial en el prompt. Además, documentar las ecuaciones d
       Corrida con Alpina S.A.S. (sector 3020): verificar que Cap 2 tiene al menos 1 tabla de
       competidor con datos reales (no "Dato no disponible"); Cap 3 no cita KPO ni turismo.
 
+#### Sprint A' — Acercamiento al patrón Noel (añadido en Fase 20)
+
+- [ ] **T21.5 (DT-043) — Des-sesgar los prompts por sector.** Parametrizar el rol y el
+      vocabulario sectorial de `chain_03`/`chain_04` (y las ecuaciones de búsqueda) por el
+      `{sector_gics}` en lugar de "bienes de consumo/FoodTech/agroindustrial". El rol pasa a ser
+      genérico ("consultor senior en el sector {sector_gics}"). Verificar con avianca (2030) y
+      bancolombia (4010) que el Cap 2 deja de salir food-céntrico. Sin hardcodear modelos.
+- [ ] **T21.6 (DT-044) — Implementar Cap 2.3 Mercado.** Nueva chain (`chain_03b_mercado` o
+      sección en `chain_03`) que genere 2.3 Mercado a partir de los `source_prompts 4/5`
+      (tamaño de mercado, segmentos, tabla de mercado por región tipo Noel T10). Ensamblar entre
+      2.2 y 2.4 en `assembler.py`. Documentar en `docs/prompts/`.
+- [ ] **T21.7 (DT-045) — Metodología + Aviso de uso de IA.** Añadir en `assembler.py` una sección
+      "Metodología" (fuentes consultadas, proceso, alcance) y elevar el disclaimer a una sección
+      formal "Aviso sobre el uso de inteligencia artificial", como en el patrón Noel.
+- [ ] **T21.8 (DT-046) — Rediseñar Cap 4 al patrón.** Reescribir `chain_05_ecosistema` para
+      producir 4.1 Inversiones / 4.2 Integraciones verticales / 4.3 M&A / 4.4 Joint ventures /
+      4.5 Alianzas, con 3 eventos por subcap (Título + ejecución + capacidad estratégica adquirida
+      + vulnerabilidad mitigada). Actualizar `prompt-05-ecosistema.md`. Plan Mode obligatorio.
+
+> **Nota de alcance (Fase 20):** T21.5–T21.8 elevan F21 de "2 arreglos" a "Sprint de contenido".
+> Si el tamaño lo justifica, dividir en F21 (T21.1–T21.4, arreglos rápidos) y F21b (T21.5–T21.8,
+> contenido) al planificar. Detalle en `FASE20_HALLAZGOS.md §5–§7`.
+
 ### Criterios de aceptación
 
 1. `WebConnector.search()` acepta `search_depth` sin cambio de firma pública (default `"basic"`).
 2. Cap 2 de la corrida E2E tiene ≥1 ficha de competidor con datos (no solo "no disponible").
 3. Cap 3 de la corrida E2E no menciona sectores ajenos a la empresa analizada en casos locales.
-4. Gate verde: ruff 0 + `pytest -m "not slow"` (≥305 fast tests).
+4. (T21.5–T21.8) El informe de una empresa **no alimentaria** alcanza ≥ 11/15 en Cap 2 y Cap 4
+   según `docs/eval/RUBRICA_CALIDAD.md`; el ensamblado incluye 2.3 Mercado + Metodología + Aviso IA.
+5. Gate verde: ruff 0 + `pytest -m "not slow"` (≥305 fast tests).
 
 ### PROMPT DE ARRANQUE — Fase 21
 
@@ -1571,11 +1604,20 @@ CONTEXTO CRÍTICO — comparativa Alpina (identificado en sesión 2026-07-23):
 - Cap 3 version Fase 18 cita "KPO en Medellín" y "Turismo Inteligente" para Alpina (alimentos)
   → chunks globales cross-sector recuperados sin constraint de sector GICS en el prompt.
 
-OBJETIVOS DE FASE 21 (Sprint A):
+OBJETIVOS DE FASE 21 (Sprint A — arreglos rápidos):
 - T21.1 (DT-035): WebConnector.search() con search_depth="advanced" para queries de competidores.
 - T21.2 (DT-036): constraint sectorial en prompt de casos locales Cap 3.
 - T21.3: docs/runbooks/BUSQUEDA_FUENTES.md (ecuaciones de búsqueda EMIS → analista).
 - T21.4: E2E Alpina S.A.S. validando Cap 2 y Cap 3.
+
+OBJETIVOS DE FASE 21 (Sprint A' — acercamiento al patrón Noel, añadido por Fase 20):
+- T21.5 (DT-043): des-sesgar prompts por {sector_gics} (quitar "FoodTech/agroindustrial").
+- T21.6 (DT-044): implementar Cap 2.3 Mercado (source_prompts 4/5) + tabla mercado por región.
+- T21.7 (DT-045): sección Metodología + Aviso de uso de IA en assembler.py.
+- T21.8 (DT-046): rediseñar Cap 4 a 4.1–4.5 (Inversiones/Integraciones/M&A/JV/Alianzas con eventos).
+- Validar con una empresa NO alimentaria (avianca 2030 o bancolombia 4010) contra
+  docs/eval/RUBRICA_CALIDAD.md (Cap 2 y Cap 4 ≥ 11/15).
+- Rúbrica y matriz de brechas de partida: docs/eval/RUBRICA_CALIDAD.md + FASE20_HALLAZGOS.md §3.
 
 REGLAS DURAS (CLAUDE.md TIER 1):
 - No hardcodear nombres de modelo (van en .env).
@@ -1653,6 +1695,12 @@ Las corridas de Fase 17/18 evidencian tres problemas que requieren código, no s
       de la barrera N1, antes de N2).
 - [ ] **T22.5 — E2E de validación.** 2 corridas: una exitosa (verifica coherencia y radar),
       una con fallo simulado en Cap 6 → reanudación sin regenerar caps previos.
+- [ ] **T22.6 (DT-047) — Fijar 4 áreas en Cap 5.** Restringir `chain_06`/`chain_06a` a las 4
+      áreas del distrito (Sostenibilidad / Transf. Digital / Social-Humano / Económico); la
+      síntesis debe rechazar áreas improvisadas (avianca produjo 5.1–5.7). Test de estructura.
+- [ ] **T22.7 (DT-048) — LLM-judge de la rúbrica.** Cadena que aplica
+      `docs/eval/RUBRICA_CALIDAD.md` (temperatura 0) sobre el `.docx` generado y emite el score
+      por capítulo. Sirve como métrica de regresión de calidad entre fases. Fallback si no hay LLM.
 
 ### Criterios de aceptación
 
@@ -2005,7 +2053,13 @@ transiciones narrativas, figuras adicionales y QA visual sistemático.
       con color (datos ausentes / accionables), colores de headings, portada pulida. Todo
       en `infrastructure/render/` (domain/ no conoce python-docx).
 - [ ] **T26.2 — Secciones del patrón pendientes de F20.** Metodología + aviso de uso de IA
-      y cualquier subcap estructural que F20 haya asignado aquí.
+      (si F21/T21.7 no las dejó ya con estilo final) y cualquier subcap estructural que F20 haya
+      asignado aquí.
+- [ ] **T26.6 — Brechas de formato de FASE20 (§5).** (a) Fichas de competidor 2.1 como **tablas
+      reales** de 7 columnas (patrón Noel T3–T8), no markdown pipe suelto; (b) nivel de headings
+      consistente (los subcaps de Cap 4/5 se renderizaban a veces como `##` en vez de `###`);
+      (c) reforzar prohibiciones de estilo del Resumen Ejecutivo ("es importante", "se recomienda",
+      "se observa", "hay oportunidades"). Todo en `infrastructure/render/` + `assembler.py`.
 - [ ] **T26.3 — Figuras adicionales.** Según brechas de F20 (p. ej. gráfico de tendencias,
       mapa de ecosistema), con el patrón de `radar_chart.py` (matplotlib Agg vía
       infrastructure/charts/).
@@ -2091,6 +2145,7 @@ de tamaño→DT-039; ADR-014 tabla de estado obsoleta→corrección documental).
 
 | Fecha | Versión | Cambio |
 |-------|---------|--------|
+| 2026-07-24 | 3.2 | **Fase 20 (Gap Analysis vs patrón Noel) cerrada.** T20.1: rúbrica versionada `docs/eval/RUBRICA_CALIDAD.md` v1.0 (5 dimensiones E/P/V/F/T × 0–3 por capítulo, manual + LLM-judge). T20.2: matriz de brechas de 3 informes — hallazgo raíz: **variabilidad brutal por sector** (Alpina food ≈11–13/cap dentro del corpus; Avianca/Bancolombia fuera del corpus ≈5–7/cap y **0 tablas**). T20.3: auditoría de fidelidad — `docs/prompts/` completado a **8/8 chains + README** (mapa de los 17 source_prompts); `prompt-05-convergencia`→`prompt-06`. Divergencias: `chain_05` reescribió Cap 4 (🔴), sesgo "FoodTech/agroindustrial" hardcodeado (🔴), 2.3 Mercado nunca implementado (🔴). T20.4: **Metodología + Aviso de uso de IA ausentes** del ensamblado. Bug numeración 5.x confirmado **pre-fix** (DT-032 cerrado). Nuevas DT-043..048. F21 ampliada a Sprint A' de contenido (T21.5–T21.8: des-sesgo, 2.3 Mercado, Metodología/Aviso IA, rediseño Cap 4); F22 +T22.6/T22.7 (áreas Cap 5, LLM-judge); F26 +T26.6 (fichas-tabla, headings, estilo). Sin cambios en `src/`; gate verde (305 fast, ruff 0). `FASE20_HALLAZGOS.md`. |
 | 2026-07-24 | 3.1 | **Fase 19 (Auditoría) cerrada.** T19.1: 3 archivos > 300 L confirmados + `_run_n3`=157 L; cobertura `domain/` (gate rápido) = **69%** (< 80%; pytest-cov añadido como dev-dep). T19.3: 15 ADR + 13 RN auditados con evidencia `archivo:línea` — divergencias ADR-004 (LCEL en domain), ADR-009 (regresión tamaño), ADR-014 (tabla obsoleta), RN-013 (`search_depth` no implementado). T19.4: **DT-018 cerrado** (`check-ruff.sh` cableado en `settings.json`); DT-027 retarget→F22; colisión DT-035 documentada. Nuevas DT-037..042 (particiones + pricing/hook + cobertura + LCEL). Re-priorización: F22 absorbe DT-027/037/039/040/041/042; F26 absorbe DT-038. Sin cambios en código de aplicación; gate verde (305 fast, ruff 0). `FASE19_HALLAZGOS.md`. |
 | 2026-07-24 | 3.0 | **Re-secuenciación completa post-Fase 18 ("alto en el camino").** Nuevas fases: F19 Auditoría de arquitectura/código/docs (señales: gateway.py 503 L, app.py 487 L, generate_informe.py 438 L > red flag 300 L; docs/prompts con 4/13 source_prompts) y F20 Gap Analysis vs informe patrón Noel (rúbrica medible por capítulo). Renumeradas: F21=Sprint A (ex-F19), F22=Coherencia (ex-F20, +T22.4 enriquecimiento dirigido post-N1: entidades de Cap 2/3 → búsquedas de contraste para Cap 5/6), F24=HITL Gap Auditor (ex-F21), F25=HITL Consistency (ex-F22, +T25.6 pruebas UI HITL con AppTest + sesión manual). Nuevas: F23 Fuentes (DT-034 lote EMIS completo + evaluación servicios de búsqueda pagos, techo ≤20 USD/mes → ADR-016) y F26 Estilo y Visualización (Q7). ADR-015 conserva numeración v2.5 (nota de mapeo en §6). DT-030→F22, DT-034→F23, DT-035/036→F21. |
 | 2026-07-23 | 2.3 | Fase 17 cerrada (`7e6ec20`..`6927063`): T17.1 CacheCounter ✅ (DT-026), T17.4 Open Sans ✅ (DT-024), DT-029 fallback red transitoria ✅ (validado en prod, corrida Alpina), T17.3 cross-sector EPM→5510 ✅, T17.2 N=5 corridas → radar 50% → DT-027 🔴 cadena dedicada. Nuevas DT-030..033 (checkpoint, doc global convergencia, numeración, citación APA PDFs). §6 reordenado: F18 Evidencia y Citación → F19 Coherencia y Robustez → F20 Estilo y Visualización → F21+ operación. Sección FASE 18 detallada. 289 tests fast, ruff 0. |
