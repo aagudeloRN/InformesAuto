@@ -168,6 +168,7 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-046 | **Cap 4 estructura divergente**: `chain_05_ecosistema` produce Local/Global/Disruptores en vez de 4.1 Inversiones / 4.2 Integraciones verticales / 4.3 M&A / 4.4 Joint ventures / 4.5 Alianzas, con eventos (Título + capacidad estratégica adquirida + vulnerabilidad mitigada). Es la mayor divergencia de contenido. | 21 | ✅ **Cerrada F21 (T21.8, `beecd9c`)**: `chain_05` reescrita a 4.1–4.5 (movimientos corporativos), 3 eventos por subcap con los 4 campos del patrón. Doc `prompt-05` actualizado. |
 | DT-047 | **Deriva del nº de áreas en Cap 5**: la variante paralela `chain_06a` (RN-009) permite que el LLM improvise áreas (avianca 5.1–5.7 vs 4 fijas del distrito). Restringir a las 4 áreas del patrón. | 22 | ⬜ Detectado en Fase 20 (T20.2). |
 | DT-048 | **Score de calidad no automatizado**: `docs/eval/RUBRICA_CALIDAD.md` es manual. Cablear un LLM-judge (temperatura 0) que la aplique sobre el `.docx` y emita score por capítulo, para medir regresión de calidad entre fases. | 22 | ⬜ Propuesto en Fase 20 (T20.1). Severidad Baja. |
+| DT-049 | **Evidencia RAG delgada / baja diversidad de fuentes**: en el E2E de cierre F21 (Alpina 3020) el informe citó **solo 3 referencias** (2 documentos compilados + 1 web) con **18 "Dato no disponible"** y Cap 2.1 (fichas de competidor) ausente. Diagnóstico en BD: 2687 chunks totales, 3020 con 44 chunks sectoriales + 594 globales, pero los 44 provienen de **un único documento compilado** por sector → poca diversidad de fuentes citables. La búsqueda web devolvió 122 chunks pero solo **1 se citó** (resultados poco relevantes tipo `todolicitaciones.cl`; el resto lo purga ADR-013 "solo citado"). Las secciones granulares nuevas (fichas de competidor, 2.3 tabla de mercado, Cap 4 eventos M&A/JV) exigen datos que el corpus compilado no contiene. **Acciones:** (F23) enriquecer el corpus con documentos **diversos y atribuibles por fuente** (perfiles de competidor reales, informes de mercado con cifras, trackers de M&A) + evaluar búsqueda paga; (F22) afinar retrieval/breadth — investigar por qué solo 1 de 122 chunks web se cita, mejorar queries web por competidor con entidades extraídas de Cap 1/2 (T22.5 enriquecimiento dirigido), y revisar si la reserva sectorial y la purga ADR-013 son demasiado agresivas cuando el corpus es concentrado. | 23 (corpus) / 22 (retrieval) | ⬜ **Detectado en el E2E de cierre F21** (2026-07-24). Evidencia: `FASE21_HALLAZGOS.md §5`. |
 
 > **Nota de numeración DT-035 (Fase 19):** `FASE18_HALLAZGOS.md §9` reutilizó el ID "DT-035"
 > para "verificación E2E de Alpina" (que el §7 de esa misma fase marca ✅ 4/4). El **DT-035
@@ -1688,12 +1689,18 @@ Las corridas de Fase 17/18 evidencian tres problemas que requieren código, no s
       capítulo completado (columna JSONB en `historial_informes` o tabla `caps_cache`).
       Flag `--resume <session_id>` en `run_pilot.py` que recarga los caps cacheados y salta
       su generación. Gate: si Cap 6 falla, relanzar solo Cap 6 sin perder Caps 1–5.
-- [ ] **T22.4 (visión producto) — Enriquecimiento dirigido post-N1.** Tras completar
-      los caps N1, extraer las entidades clave halladas (competidores del Cap 2,
-      tendencias del Cap 3) y lanzar búsquedas dirigidas de contraste cuyo resultado
-      alimente el contexto de Cap 5/6 y el pase de coherencia. Diseñar en Plan Mode:
-      alcance mínimo viable, sin romper la paralelización de N1 (el pase corre DESPUÉS
+- [ ] **T22.4 (visión producto + DT-049) — Enriquecimiento dirigido post-N1 y breadth de
+      retrieval.** Tras completar los caps N1, extraer las entidades clave halladas
+      (competidores del Cap 2, tendencias del Cap 3) y lanzar búsquedas dirigidas de contraste
+      cuyo resultado alimente el contexto de Cap 5/6 y el pase de coherencia. Diseñar en Plan
+      Mode: alcance mínimo viable, sin romper la paralelización de N1 (el pase corre DESPUÉS
       de la barrera N1, antes de N2).
+      **Incluir el diagnóstico DT-049** (E2E de cierre F21): investigar por qué de 122 chunks
+      web ingestados solo 1 se cita (Alpina) — ¿ranking domina la reserva sectorial?, ¿las
+      queries web no traen perfiles de competidor?, ¿la purga ADR-013 "solo citado" es
+      demasiado agresiva con corpus concentrado? Medir nº de fuentes distintas citadas antes/
+      después. Objetivo: subir la diversidad de fuentes citadas sin violar RN-001. La parte de
+      **corpus** (documentos diversos por sector) es F23.
 - [ ] **T22.5 — E2E de validación.** 2 corridas: una exitosa (verifica coherencia y radar),
       una con fallo simulado en Cap 6 → reanudación sin regenerar caps previos.
 - [ ] **T22.6 (DT-047) — Fijar 4 áreas en Cap 5.** Restringir `chain_06`/`chain_06a` a las 4
@@ -1716,17 +1723,25 @@ Las corridas de Fase 17/18 evidencian tres problemas que requieren código, no s
 Eres Claude Code trabajando en el proyecto InformesAuto (~/Test/InformesAuto).
 Branch de trabajo: feature/fase22-coherencia (crear desde develop).
 
-ESTADO DE ENTRADA (Fase 21 cerrada, tests fast en verde, ruff 0):
-- DT-035 y DT-036 cerrados (Sprint A). WebConnector.search() con search_depth parametrizable.
+ESTADO DE ENTRADA (Fase 21 cerrada, 321 tests fast en verde, ruff 0):
+- F21 completa: DT-035/036 (Sprint A) + DT-043/044/045/046 (Sprint A') cerrados.
+  search_depth parametrizable; Cap 2/3 des-sesgados; 2.3 Mercado + Metodología + Aviso IA
+  ensamblados; Cap 4 reescrito a 4.1–4.5. E2E Alpina validó los criterios estructurales.
 - DT-031/032/033 cerrados. Reservas empresa/sector/global operativas.
+- DEUDA NUEVA CRÍTICA — DT-049 (evidencia RAG delgada): el E2E de cierre de F21 mostró que
+  Alpina citó solo 3 fuentes con 18 "Dato no disponible" y Cap 2.1 (competidores) ausente.
+  Diagnóstico: 44 chunks/sector pero de UN documento compilado (poca diversidad); 122 chunks
+  web ingestados, solo 1 citado. Parte retrieval/breadth → F22 (T22.4); parte corpus → F23.
 - Deuda pendiente: DT-027 (radar 50%), DT-030 (checkpoint), Q1 (coherencia).
 
 OBJETIVOS DE FASE 22:
 - T22.1 (Q1): contexto caps previos para Cap 6 y N3.
 - T22.2 (DT-027): cadena radar dedicada temperatura 0.
 - T22.3 (DT-030): checkpoint caps N0/N1/N2 + --resume.
-- T22.4: enriquecimiento dirigido post-N1 (entidades Cap 2/3 → búsquedas de contraste).
-- T22.5: E2E de validación (coherencia + radar + reanudación).
+- T22.4 (DT-049): enriquecimiento dirigido post-N1 (entidades Cap 2/3 → búsquedas de
+  contraste) + investigar breadth de retrieval (por qué solo 1/122 chunks web se cita).
+- T22.6 (DT-047): fijar 4 áreas en Cap 5. T22.7 (DT-048): LLM-judge de la rúbrica.
+- T22.5: E2E de validación (coherencia + radar + reanudación + nº de fuentes citadas).
 
 REGLAS DURAS (CLAUDE.md TIER 1):
 - No hardcodear nombres de modelo (van en .env).
@@ -1764,8 +1779,16 @@ gratuitos se quedan cortos (perfiles de competidores, noticias LatAm, datos de m
 - DT-034: el índice `documentos_sectoriales/FuentesEMIS/indice_emis.csv` está listo; la
   corrida completa (~2–4 h) sigue pendiente. Es la palanca directa contra los "información
   no disponible" (Q5).
+- **DT-049 (E2E de cierre F21):** el problema no es solo el *volumen* de chunks (3020 ya tiene
+  44 sectoriales + 594 globales) sino la **diversidad de fuentes**: esos 44 provienen de UN
+  documento compilado por sector, así que el informe cita 2-3 fuentes distintas y deja 18
+  "Dato no disponible" (fichas de competidor, cifras de mercado, eventos M&A/JV). La ingesta
+  EMIS debe priorizar **documentos atribuibles y variados** (perfiles de competidor reales,
+  informes de mercado con cifras, trackers de M&A), no solo más chunks del mismo compilado.
 - Tavily free con `search_depth="basic"` fue causa raíz de DT-035 (Cap 2 vacío). F21 mitiga
-  con `advanced` y mejores queries; esta fase mide si un proveedor pago aporta más.
+  con `advanced` y mejores queries; el E2E de cierre mostró que aún así el web trae resultados
+  poco relevantes (todolicitaciones.cl) y solo 1/122 chunks se cita → esta fase mide si un
+  proveedor pago aporta perfiles de competidor y datos de mercado citables.
 - Decisión de sesión 2026-07-24: evaluar proveedores pagos "no muy costosos"; techo inicial
   acordado 20 USD/mes.
 
@@ -2146,7 +2169,7 @@ de tamaño→DT-039; ADR-014 tabla de estado obsoleta→corrección documental).
 
 | Fecha | Versión | Cambio |
 |-------|---------|--------|
-| 2026-07-24 | 3.3 | **Fase 21 (Calidad de Contenido — Sprint A + A') cerrada** (`1a96d7b`..`9a27820`). T21.1 (DT-035): `search_depth` parametrizable en WebConnector + CachedWebConnector, queries de competidor `advanced` (firma pública intacta). T21.2 (DT-036): constraint sectorial en casos locales `chain_04` + query web dedicada en `generate_tendencias`. T21.5 (DT-043): `chain_03`/`chain_04` **des-sesgados** por `{sector_gics}` (fuera FoodTech/agroindustrial). T21.7 (DT-045): secciones formales **Metodología** + **Aviso de uso de IA** en `assembler`. T21.8 (DT-046): **Cap 4 reescrito** a 4.1–4.5 (movimientos corporativos, 3 eventos/subcap). T21.6 (DT-044): **Cap 2.3 Mercado** — `chain_03b_mercado` + `CapMercado` + `GenerateMercado` + cableado N1 (max_workers=4) + interleave 2.2↔2.4. T21.3: runbook `BUSQUEDA_FUENTES.md` reconciliado con scripts reales. Las 6 DT de contenido (035/036/043/044/045/046) **cerradas**. `docs/prompts/` = 9/9 chains. **321 fast tests** (+16), ruff 0. `FASE21_HALLAZGOS.md`. |
+| 2026-07-24 | 3.3 | **Fase 21 (Calidad de Contenido — Sprint A + A') cerrada** (`1a96d7b`..`9a27820`). T21.1 (DT-035): `search_depth` parametrizable en WebConnector + CachedWebConnector, queries de competidor `advanced` (firma pública intacta). T21.2 (DT-036): constraint sectorial en casos locales `chain_04` + query web dedicada en `generate_tendencias`. T21.5 (DT-043): `chain_03`/`chain_04` **des-sesgados** por `{sector_gics}` (fuera FoodTech/agroindustrial). T21.7 (DT-045): secciones formales **Metodología** + **Aviso de uso de IA** en `assembler`. T21.8 (DT-046): **Cap 4 reescrito** a 4.1–4.5 (movimientos corporativos, 3 eventos/subcap). T21.6 (DT-044): **Cap 2.3 Mercado** — `chain_03b_mercado` + `CapMercado` + `GenerateMercado` + cableado N1 (max_workers=4) + interleave 2.2↔2.4. T21.3: runbook `BUSQUEDA_FUENTES.md` reconciliado con scripts reales. Las 6 DT de contenido (035/036/043/044/045/046) **cerradas**. `docs/prompts/` = 9/9 chains. **321 fast tests** (+16), ruff 0. **E2E Alpina** validó los 5 criterios estructurales (2.3 Mercado+tabla, Metodología, Aviso IA, Cap 4 en 4.1–4.5, Cap 3 sin KPO/turismo). **Hallazgo nuevo DT-049**: evidencia RAG delgada (Alpina citó 3 refs, 18 "Dato no disponible", 1/122 chunks web citados) por baja diversidad de fuentes en el corpus compilado → retrieval/breadth a F22 (T22.4), corpus diverso + búsqueda paga a F23. `FASE21_HALLAZGOS.md`. |
 | 2026-07-24 | 3.2 | **Fase 20 (Gap Analysis vs patrón Noel) cerrada.** T20.1: rúbrica versionada `docs/eval/RUBRICA_CALIDAD.md` v1.0 (5 dimensiones E/P/V/F/T × 0–3 por capítulo, manual + LLM-judge). T20.2: matriz de brechas de 3 informes — hallazgo raíz: **variabilidad brutal por sector** (Alpina food ≈11–13/cap dentro del corpus; Avianca/Bancolombia fuera del corpus ≈5–7/cap y **0 tablas**). T20.3: auditoría de fidelidad — `docs/prompts/` completado a **8/8 chains + README** (mapa de los 17 source_prompts); `prompt-05-convergencia`→`prompt-06`. Divergencias: `chain_05` reescribió Cap 4 (🔴), sesgo "FoodTech/agroindustrial" hardcodeado (🔴), 2.3 Mercado nunca implementado (🔴). T20.4: **Metodología + Aviso de uso de IA ausentes** del ensamblado. Bug numeración 5.x confirmado **pre-fix** (DT-032 cerrado). Nuevas DT-043..048. F21 ampliada a Sprint A' de contenido (T21.5–T21.8: des-sesgo, 2.3 Mercado, Metodología/Aviso IA, rediseño Cap 4); F22 +T22.6/T22.7 (áreas Cap 5, LLM-judge); F26 +T26.6 (fichas-tabla, headings, estilo). Sin cambios en `src/`; gate verde (305 fast, ruff 0). `FASE20_HALLAZGOS.md`. |
 | 2026-07-24 | 3.1 | **Fase 19 (Auditoría) cerrada.** T19.1: 3 archivos > 300 L confirmados + `_run_n3`=157 L; cobertura `domain/` (gate rápido) = **69%** (< 80%; pytest-cov añadido como dev-dep). T19.3: 15 ADR + 13 RN auditados con evidencia `archivo:línea` — divergencias ADR-004 (LCEL en domain), ADR-009 (regresión tamaño), ADR-014 (tabla obsoleta), RN-013 (`search_depth` no implementado). T19.4: **DT-018 cerrado** (`check-ruff.sh` cableado en `settings.json`); DT-027 retarget→F22; colisión DT-035 documentada. Nuevas DT-037..042 (particiones + pricing/hook + cobertura + LCEL). Re-priorización: F22 absorbe DT-027/037/039/040/041/042; F26 absorbe DT-038. Sin cambios en código de aplicación; gate verde (305 fast, ruff 0). `FASE19_HALLAZGOS.md`. |
 | 2026-07-24 | 3.0 | **Re-secuenciación completa post-Fase 18 ("alto en el camino").** Nuevas fases: F19 Auditoría de arquitectura/código/docs (señales: gateway.py 503 L, app.py 487 L, generate_informe.py 438 L > red flag 300 L; docs/prompts con 4/13 source_prompts) y F20 Gap Analysis vs informe patrón Noel (rúbrica medible por capítulo). Renumeradas: F21=Sprint A (ex-F19), F22=Coherencia (ex-F20, +T22.4 enriquecimiento dirigido post-N1: entidades de Cap 2/3 → búsquedas de contraste para Cap 5/6), F24=HITL Gap Auditor (ex-F21), F25=HITL Consistency (ex-F22, +T25.6 pruebas UI HITL con AppTest + sesión manual). Nuevas: F23 Fuentes (DT-034 lote EMIS completo + evaluación servicios de búsqueda pagos, techo ≤20 USD/mes → ADR-016) y F26 Estilo y Visualización (Q7). ADR-015 conserva numeración v2.5 (nota de mapeo en §6). DT-030→F22, DT-034→F23, DT-035/036→F21. |

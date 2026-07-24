@@ -71,10 +71,33 @@ DT-048 (LLM-judge de la rúbrica, F22), DT-034 (lote EMIS completo, F23).
 ## 5. Validación E2E (T21.4 + cross-sector)
 
 <!-- RESULTADOS_E2E -->
-**Estado:** intentada en la sesión de cierre; el lanzamiento en segundo plano quedó bloqueado por
-una indisponibilidad transitoria del clasificador de comandos del entorno (los servicios Ollama,
-PostgreSQL, OpenRouter y Tavily SÍ estaban disponibles y verificados). Queda como **paso manual
-reproducible** (§5.1); no bloquea el cierre de código, cubierto por 321 tests fast + mocks.
+**Corrida real: Alpina S.A.S. (3020)** — `output/alpina_sas_informe.docx`, 662 s, costo API $0
+(modelos free), 55.330 tokens in / 33.339 out.
+
+**Criterios estructurales F21 — TODOS cumplidos:**
+
+| Criterio | Resultado |
+|---|---|
+| 2.3 Mercado ensamblada (entre 2.2 y 2.4) | ✅ heading "2.3. Mercado" + **tabla 5×4** (Región/Tamaño/Crecimiento/Año) |
+| Metodología (sección formal) | ✅ presente |
+| Aviso sobre el uso de IA (sección formal) | ✅ presente |
+| Cap 4 rediseñado a 4.1–4.5 | ✅ 4.1 Inversiones / 4.2 Integraciones / 4.3 M&A / 4.4 JV / 4.5 Alianzas |
+| Cap 3 sin casos KPO/turismo (constraint sectorial) | ✅ 0 menciones de "KPO"/"turismo" |
+
+**Hallazgo crítico de evidencia (→ DT-049):** el informe citó **solo 3 referencias** (2 documentos
+compilados "Ruta N" + 1 web `todolicitaciones.cl`) con **18 "Dato no disponible"** y la sección
+2.1 (fichas de competidor) en ausencia ("No se encuentra información al respecto en los documentos
+proporcionados"). Diagnóstico en BD (2687 chunks): 3020 tiene 44 chunks sectoriales + 594 globales,
+pero los 44 provienen de **un único documento compilado** → baja diversidad de fuentes citables.
+La búsqueda web ingestó **122 chunks pero solo 1 se citó** (resultados poco relevantes; el resto lo
+purga ADR-013 "solo citado"). Las secciones granulares nuevas (fichas, tabla de mercado, eventos
+M&A/JV) exigen datos que el corpus compilado no contiene. Comparación: la corrida Alpina previa
+(Fase 18) citaba 4-5 refs; la baja a 3 es varianza del web + el mismo techo de corpus, no una
+regresión de código de F21. **Registrado como DT-049** — retrieval/breadth → F22 (T22.4); corpus
+diverso + búsqueda paga → F23. Este es el trabajo de mejora que sigue.
+
+_Cross-sector (avianca 2030 / bancolombia 4010) con la rúbrica: pendiente de corrida manual (§5.1);
+mismo techo de corpus aplica._
 
 ### 5.1 Procedimiento reproducible
 
@@ -106,3 +129,4 @@ Criterios de aceptación:
 | Chains operativas | 8 | **9** (`chain_03b_mercado`) |
 | Secciones del patrón faltantes | 2.3 Mercado, Metodología, Aviso IA, Cap 4 | **0** (todas implementadas) |
 | Deuda §5 de contenido viva (F21) | DT-035/036/043/044/045/046 | **0 (todas cerradas)** |
+| Deuda nueva descubierta en el E2E | — | **DT-049** (evidencia RAG delgada / diversidad de fuentes → F22+F23) |
