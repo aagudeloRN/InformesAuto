@@ -110,7 +110,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 18 | Evidencia y Citación | ✅ | 2026-07-23 | `8c6b8c2`..`7dcd676` | `FASE18_HALLAZGOS.md` |
 | 19 | Auditoría de Arquitectura, Código y Docs | ✅ | 2026-07-24 | _pendiente_ | `FASE19_HALLAZGOS.md` |
 | 20 | Gap Analysis de Calidad vs Informe Patrón (Noel) | ✅ | 2026-07-24 | `f08fc53` | `FASE20_HALLAZGOS.md` |
-| 21 | Calidad de Contenido — Sprint A + A' (ex-F19) | ✅ | 2026-07-24 | `1a96d7b`..`9a27820` | `FASE21_HALLAZGOS.md` |
+| 21 | Calidad de Contenido — Sprint A + A' (ex-F19) | ✅ | 2026-07-24 | `1a96d7b`..`17a9a91` (merge `307ec4b`) | `FASE21_HALLAZGOS.md` |
 | 22 | Coherencia y Robustez del Informe (ex-F20) | ⬜ | — | — | — |
 | 23 | Fuentes: Corpus EMIS completo + Búsqueda paga | ⬜ | — | — | — |
 | 24 | HITL Módulo 1 — Gap Auditor (ex-F21) | ⬜ | — | — | — |
