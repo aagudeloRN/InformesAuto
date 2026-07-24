@@ -143,12 +143,13 @@ Editar el CSV a mano para documentos multi-sector antes de la ingesta.
 
 ### Paso 3 — Ingestar
 
-```bash
-# Ingestar un sector específico (subset):
-uv run python scripts/ingest_batch.py --sector 3020
+`ingest_batch.py` recibe la carpeta de PDFs y el índice CSV (columnas: `archivo`,
+`sector_gics`, `tipo`, `autor`, `año`). Ingesta todas las filas del CSV; para cargar solo
+un sector, prepara un CSV filtrado a ese sector.
 
-# Ingestar todos los sectores (lote completo, ~2–4 h):
-uv run python scripts/ingest_batch.py --all
+```bash
+# Lote completo desde el índice CSV:
+uv run python scripts/ingest_batch.py --dir documentos_sectoriales --csv documentos_sectoriales/indice.csv
 
 # Ingestar un PDF global (aplica a todos los sectores):
 uv run python scripts/ingest_global.py \
@@ -160,12 +161,9 @@ uv run python scripts/ingest_global.py \
 
 ### Paso 4 — Verificar
 
-```bash
-# Ver chunks por sector tras la ingesta:
-uv run python scripts/eval_coverage.py --sector 3020
-```
-
-El panel Repositorio de la UI también muestra la lista de documentos ingestados.
+El panel "Repositorio" de la UI Streamlit muestra la lista de documentos ingestados y el
+nº de chunks por documento; permite activar/desactivar (`activo` en `DocumentoLocal`) sin
+borrar chunks (ADR-012).
 
 ---
 
