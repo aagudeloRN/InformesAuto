@@ -7,6 +7,7 @@ del chunk, keep_alive:0 tras cada lote.
 import hashlib
 import logging
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -29,6 +30,17 @@ logger = logging.getLogger(__name__)
 def _ensure_metadatos_column() -> None:
     """Migración idempotente de columnas de DocumentoLocal (metadatos, sector_gics, activo)."""
     ensure_documento_columns(engine)
+
+
+# Caracteres de control C0 que PostgreSQL TEXT no admite (sobre todo NUL 0x00). Se conservan
+# tab (0x09), salto de línea (0x0a) y retorno de carro (0x0d). Algunos PDFs (p. ej. Euromonitor
+# "Sector Capsule") inyectan 0x00 en el texto extraído, lo que rompía la ingesta (DT-051).
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _sanitize_text(text: str) -> str:
+    """Elimina bytes NUL y otros controles C0 que PostgreSQL rechaza en columnas TEXT."""
+    return _CONTROL_CHARS_RE.sub("", text)
 
 
 def _sha256_text(text: str) -> str:
@@ -154,9 +166,9 @@ class PdfIngestor:
         for batch_idx in range(n_batches):
             start_page = batch_idx * batch_size
             end_page = min(start_page + batch_size, total_pages)
-            batch_text = "\n".join(
+            batch_text = _sanitize_text("\n".join(
                 page.extract_text() or "" for page in reader.pages[start_page:end_page]
-            ).strip()
+            )).strip()
 
             if not batch_text:
                 logger.info("Lote %d/%d: sin texto — saltando", batch_idx + 1, n_batches)

@@ -165,3 +165,16 @@ def test_release_vram_handles_connection_error():
         side_effect=Exception("Connection refused"),
     ):
         _release_vram("http://127.0.0.1:11434", "nomic-embed-text")  # no debe lanzar
+
+
+def test_sanitize_text_elimina_nul_y_controles(fake_settings):
+    """DT-051: PDFs con bytes NUL (Euromonitor) rompían la ingesta en PostgreSQL."""
+    from ic.infrastructure.sources.pdf_ingestor import _sanitize_text
+
+    sucio = "Mercado\x00 de café\x07 en\x1f Colombia\tOK\nlínea2\r"
+    limpio = _sanitize_text(sucio)
+    assert "\x00" not in limpio
+    assert "\x07" not in limpio and "\x1f" not in limpio
+    # Conserva tab, salto de línea y retorno de carro y el texto legible.
+    assert "\t" in limpio and "\n" in limpio and "\r" in limpio
+    assert limpio.startswith("Mercado de café en Colombia")
