@@ -1415,10 +1415,14 @@ F23 (fuentes) y F26 (estilo).
   con 5 subcaps de movimientos del ecosistema (inversiones, integraciones, M&A, joint
   ventures, alianzas), Cap 5 por áreas estratégicas del distrito, **Metodología + aviso de
   uso de IA**, y 10 tablas.
-- Los prompts operativos viven en las chains; `docs/prompts/` solo tiene 4 de los 13
-  `source_prompts/` originales → no hay verificación de fidelidad chain↔prompt original.
-- En `output/` hay ≥6 informes generados (Alpina, Avianca, Bancolombia, Comfama, Nestlé,
-  Noel) para evaluar sin necesidad de nuevas corridas.
+- Los prompts operativos viven en las chains; `docs/prompts/` solo tiene 4 md (prompts
+  01, 02, 03, 05) frente a **17 archivos** en `source_prompts/` (los 13 prompts numerados
+  1–13 + `0. Ecuaciones de búsqueda` + 3 variantes de `4. Mercado`) → no hay verificación
+  de fidelidad chain↔prompt original. *(Conteo confirmado en Fase 19; el roadmap v3.0 decía
+  "4 de 13" — la cifra correcta es 4 de 17 archivos.)*
+- En `output/` hay ≥6 informes generados para evaluar sin nuevas corridas. Rutas verificadas:
+  `output/alpina_informe.docx`, `output/avianca_informe.docx`, `output/bancolombia_informe.docx`,
+  `output/comfama_informe.docx`, `output/nestle_colombia_informe.docx`, `output/noel_sas_informe.docx`.
 
 ### Tareas
 
@@ -1430,9 +1434,9 @@ F23 (fuentes) y F26 (estilo).
 - [ ] **T20.2 — Evaluación de ≥3 informes generados** (Alpina, Avianca, Bancolombia)
       contra la rúbrica. Matriz de brechas por capítulo con severidad.
 - [ ] **T20.3 — Auditoría de fidelidad de prompts.** Comparar cada chain contra su
-      source_prompt (13 docx): qué instrucciones se perdieron en la migración, qué
-      divergencias son deliberadas. Completar `docs/prompts/` como espejo versionado en
-      markdown de los 13 prompts.
+      source_prompt (17 docx: 13 numerados + Ecuaciones + 3 variantes Mercado): qué
+      instrucciones se perdieron en la migración, qué divergencias son deliberadas.
+      Completar `docs/prompts/` como espejo versionado en markdown de los prompts numerados.
 - [ ] **T20.4 — Secciones faltantes del patrón.** Verificar en el ensamblado actual:
       ¿existen Metodología + aviso de IA? ¿subcaps 2.x/4.x completos? Registrar faltantes
       como tareas en F21/F26.
@@ -1459,7 +1463,7 @@ ESTADO DE ENTRADA (Fase 19 cerrada — leer FASE19_HALLAZGOS.md):
 - Auditoría de arquitectura/código/docs hecha; deuda §5 revalidada.
 
 OBJETIVOS (T20.1–T20.5): rúbrica por capítulo derivada del patrón Noel; evaluación de ≥3
-informes de output/; fidelidad chains ↔ source_prompts (13 docx) + completar docs/prompts/;
+informes de output/; fidelidad chains ↔ source_prompts (17 docx) + completar docs/prompts/;
 secciones faltantes del patrón (Metodología, aviso IA, subcaps 2.x/4.x); hallazgos +
 actualización de F21+.
 
@@ -1468,12 +1472,17 @@ HERRAMIENTA: para leer los .docx usa python-docx (ya en el entorno, vía uv run 
 REGLAS DURAS: no hardcodear modelos; los prompts de las chains NO se modifican en esta fase
 (solo se documentan divergencias — los cambios se agendan en F21/F26).
 
+CONTEXTO DE FASE 19 (leer FASE19_HALLAZGOS.md primero): auditoría cerrada. NO abrir refactors
+agendados en F22/F26 (DT-037..042); F20 es solo análisis. La brecha docs/prompts (4 de 17
+archivos) y las secciones faltantes del patrón son el foco. Gate de entrada: ruff 0 + 305 fast.
+
 LECTURAS OBLIGATORIAS al arrancar:
 - docs/architecture/ROADMAP_FASE9+.md §FASE20 (esta sección)
 - docs/decisions/FASE19_HALLAZGOS.md
 - InformeSectoryCompetitivoNoel.docx (patrón, raíz) — extraer estructura y tablas
 - output/alpina_informe.docx, output/avianca_informe.docx, output/bancolombia_informe.docx
-- source_prompts/*.docx (13 prompts originales) y docs/prompts/*.md (4 migrados)
+- source_prompts/*.docx (17 archivos: 13 numerados + Ecuaciones + 3 variantes Mercado)
+  y docs/prompts/*.md (4 migrados: 01, 02, 03, 05)
 - src/ic/domain/chains/ (prompts operativos actuales)
 - docs/business-rules/REGLAS_NEGOCIO.md (RN-001 datos ausentes, RN-002 trazabilidad)
 
