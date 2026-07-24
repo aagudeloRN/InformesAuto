@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'git commit'; then bash .claude/hooks/check-secrets.sh && bash .claude/hooks/check-hardcoded-models.sh; fi"
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'git commit'; then bash .claude/hooks/check-ruff.sh && bash .claude/hooks/check-secrets.sh && bash .claude/hooks/check-hardcoded-models.sh; fi"
           }
         ]
       }

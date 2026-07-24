@@ -8,7 +8,7 @@
 > **Este documento se consulta y se actualiza en cada ejecución.** No es inmutable (a
 > diferencia de los ADR). Cada fase se refina con los hallazgos de la anterior.
 
-**Versión del roadmap:** 3.0 · **Creado:** 2026-07-21 · **Última actualización:** 2026-07-24
+**Versión del roadmap:** 3.1 · **Creado:** 2026-07-21 · **Última actualización:** 2026-07-24
 
 ---
 
@@ -108,7 +108,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 16 | Presentación del Contenido | ✅ | 2026-07-22 | `aadd99e` | `FASE16_HALLAZGOS.md` |
 | 17 | Instrumentación, Radar y Pulido E2E | ✅ | 2026-07-23 | `7e6ec20`..`6927063` | `FASE17_HALLAZGOS.md` |
 | 18 | Evidencia y Citación | ✅ | 2026-07-23 | `8c6b8c2`..`7dcd676` | `FASE18_HALLAZGOS.md` |
-| 19 | Auditoría de Arquitectura, Código y Docs | ⬜ | — | — | — |
+| 19 | Auditoría de Arquitectura, Código y Docs | ✅ | 2026-07-24 | _pendiente_ | `FASE19_HALLAZGOS.md` |
 | 20 | Gap Analysis de Calidad vs Informe Patrón (Noel) | ⬜ | — | — | — |
 | 21 | Calidad de Contenido — Sprint A (ex-F19) | ⬜ | — | — | — |
 | 22 | Coherencia y Robustez del Informe (ex-F20) | ⬜ | — | — | — |
@@ -138,7 +138,7 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-016 | Formato .docx pobre (sin tablas/imágenes/TOC/portada) + salida única | 11 | ✅ Cerrado — portada, TOC, tablas, figuras, PDF vía LibreOffice |
 | DT-019 | Datos estructurados del LLM para radar chart real (actualmente placeholder) | 16 | ✅ bloque `radar_json` en prompt + `_extract_radar()` en `generate_benchmarking`; fallback garantizado |
 | DT-017 | Acoplamientos "piloto" (PDF hardcodeado en `_run_pdf`, footer NOEL) | 10 / 13 | ✅ footer parametrizable + `_run_pdf` retirado (corpus vía UI/lote, ADR-012) |
-| DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | 🟡 script listo; settings.json actualizado en Fase 10 |
+| DT-018 | Hook check-ruff.sh creado; settings.json pendiente registro manual | 9 | ✅ **Cerrado en Fase 19**: la nota "settings.json actualizado en Fase 10" era falsa (el hook nunca se registró). Cableado en `.claude/settings.json` (PreToolUse `git commit`, antes de secrets/models); verificado exit 0. |
 | DT-020 | Persistencia web indiscriminada: se ingesta todo lo buscado (usado o no). Objetivo: persistir **solo lo citado** (`chunks_usados`) + purgar el backlog no usado | 14 | ✅ ADR-013: session ingest + `promote_cited_web` + `sweep_stale` + purga única (backlog 1202→0); la purga subió la evidencia sectorial 3.20→3.68 chunks/consulta |
 | DT-021 | Resiliencia OpenRouter free: rate-limits transitorios (`ResourceExhausted 32/32`) sin backoff/reintento dedicado | 15 | ✅ `is_rate_limit_error` + `ResilientChatModel` (free→free_alt→synth→paid); timeouts por tier. Ver `FASE15_HALLAZGOS.md` §4 |
 | DT-022 | Reranking/afinado de retrieval: MMR completo + evaluación, `chunk_size` 500→1000, índice parcial/GIN sobre `metadatos->>'sector_gics'` | 14 | ✅ harness T14.1 (métricas propias); MMR medido y **revertido** (degrada mono-doc); `chunk_size` 1000/200 (neutral, se mantiene por eficiencia); índice **descartado** (SQL 15ms). Ver `FASE14_HALLAZGOS.md` + addendum ADR-012 |
@@ -146,7 +146,7 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-024 | Estilo Normal del documento no fijado: objetivo Source Sans Pro 11 pt, justificado, interlineado 1,16, espacio después 8 pt, control de viudas/huérfanas | 16/17 | ✅ `_apply_normal_style()` con **Open Sans** 11 pt (Fase 17; Source Sans Pro no empaquetado en Ubuntu 24.04, instalados `fonts-open-sans` + Carlito) |
 | DT-025 | Medición real de latencia `--bench --warm`: los números en `FASE15_HALLAZGOS.md §2` son estimados teóricos (Ollama no disponible en sesión de Fase 15/16) | 17 | ✅ cold 1527.8 ms / warm 158.3 ms → 9.6× mejora. FASE15_HALLAZGOS §2 actualizado con datos reales (E2E post-Fase 16, 2026-07-22) |
 | DT-026 | Hit-rate de caché no instrumentado: `CachedWebConnector`/`CachedOpenAlexConnector` no emiten métricas de hits/misses en el log del informe | 17 | ✅ `CacheCounter` thread-safe compartido + log `Cache web: N HITs / M MISSes` al cierre de `_run_n3` + campos en `InformeResult` (commit `7e6ec20`) |
-| DT-027 | Hit-rate del bloque `radar_json`: qué % de corridas emiten JSON parseable. Umbral de decisión: ≥ 80% | 17→18 | 🔴 Tasa confirmada 50% (Nestlé ✅, Avianca ❌ placeholder; N=2 observables de 5 corridas). **Decisión: cadena dedicada de extracción de scores** (LLM separado, temperatura 0) en Fase 19 |
+| DT-027 | Hit-rate del bloque `radar_json`: qué % de corridas emiten JSON parseable. Umbral de decisión: ≥ 80% | 17→**22** | 🔴 Tasa confirmada 50% (Nestlé ✅, Avianca ❌ placeholder). Sigue con regex inline (`generate_benchmarking.py:21 _RADAR_RE`); la cadena dedicada temp 0 no se hizo en F18/F19. **Retarget a Fase 22** (robustez). Verificado en Fase 19. |
 | DT-028 | `RetrievalCache` no importado en `models/__init__.py`: `create_schema.py` no creaba la tabla `retrieval_cache` (rompe arranque en BD vacía) | E2E post-16 | ✅ import añadido en `src/ic/data/models/__init__.py`. Fix en commit `e2e-post-fase16` |
 | DT-029 | `ResilientChatModel` solo hacía fallback ante rate-limit: un `RemoteProtocolError` transitorio abortaba el pipeline completo (incidente EPM, se perdieron Caps 1–5) | 17 | ✅ `is_transient_network_error()` + fallback de tier en `_generate`/`_stream` ante red transitoria; +9 tests; **validado en producción** (corrida Alpina sobrevivió al mismo error) (commit `7c1fec1`) |
 | DT-030 | Sin checkpoint antes de barreras de sincronización (Cap 6 / N3): CLAUDE.md TIER 3 exige persistir estado antes de cruzarlas; un fallo tardío descarta Caps 1–5 (~13 min) | 22 | ⬜ Persistir Caps N0/N1/N2 (BD) y permitir **reanudar** una corrida fallida |
@@ -156,6 +156,17 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-034 | Ingesta completa del lote EMIS (250 PDFs, 25 sectores). El índice CSV (`indice_emis.csv`) está generado; el lote completo toma ~2–4 h. | 18→23 | ⬜ Pendiente corrida larga fuera del E2E. Índice listo en `documentos_sectoriales/FuentesEMIS/indice_emis.csv`. |
 | DT-035 | Cap 2 — Competidores sin datos: `WebConnector.search()` usa `search_depth="basic"` y queries genéricas de sector → solo overviews, no perfiles de competidores individuales. Solución: parámetro `search_depth` en `WebConnector.search()` + `search_depth="advanced"` en `generate_benchmarking.py` + queries targeted por empresa/competidor. | 21 | ⬜ Causa raíz confirmada por comparativa Alpina (mañana vs Fase 18). |
 | DT-036 | Cap 3 — Casos locales off-topic: 594 chunks del InformeConvergenciaLocal2026 contienen casos Medellín/Antioquia multi-sector (KPO, turismo inteligente) que se recuperan para cualquier empresa independientemente de su sector GICS. Causa: reserva global sin constraint sectorial en el prompt de casos locales. Solución: añadir instrucción explícita en `chain_04_tendencias.py` que restrinja los casos locales al sector de la empresa analizada + query web de casos locales sectoriales. | 21 | ⬜ Causa raíz confirmada: chunks globales recuperados para Alpina (sector 3020 Alimentos) devolvieron "KPO en Medellín" y "Turismo Inteligente" por similitud vectorial temática. |
+| DT-037 | `gateway.py` = 503 L (red flag > 300). Partición en paquete `infrastructure/llm/` (`cost.py`, `ollama.py`, `openrouter.py`, `errors.py`, `resilient.py`, `factory.py`) con `gateway.py` como fachada de re-export para no romper importadores. | 22 | ⬜ Detectado en Fase 19 (T19.2). Riesgo Medio. |
+| DT-038 | `presentation/app.py` = 487 L (red flag) **y** violación SoC §3.4: la UI importa `data/` directamente (`SessionLocal`, `EmpresaRepository`, `DocumentoRepository`, `InformeRepository` en L60/132/212). Partir en `presentation/views/` y enrutar el acceso a datos por casos de uso del `domain/`. | 26 | ⬜ Detectado en Fase 19. F26 ya reabre `app.py` para estilo. Riesgo Medio. |
+| DT-039 | `generate_informe.py` = 438 L / `_run_n3()` = 157 L. Regresión respecto a ADR-009 (347 L, métodos < 65 L); el crecimiento vino de la lógica APA/ensamblado de Fase 18. Extraer N3 a `domain/use_cases/generate_n3.py` (mismo patrón que `generate_n1.py`, DT-004). | 22 | ⬜ Detectado en Fase 19. Candidato de partición más limpio (precedente existente). |
+| DT-040 | `gateway.py:23-29` `_PRICING` hardcodea IDs de modelo (`nvidia/nemotron-…`, `google/gemma-3-…`); el hook `check-hardcoded-models.sh` no los bloquea porque sus patrones exigen dígito pegado (`gemma[0-9]`) y omiten `nemotron`/`gpt-oss`. Decidir: mover la tabla de precios a config/`.env` o declararla excepción explícita, **y** endurecer los patrones del hook (formas con guion + familias faltantes). | 22 | ⬜ Detectado en Fase 19 (T19.3/T19.5). TIER 1 en espíritu. |
+| DT-041 | Cobertura de `domain/` en el gate rápido = 69% (< 80% PRIME §6.1). La orquestación N1/N3 (`generate_n1.py` 0%, `generate_informe.py` 34%) solo se cubre con E2E `@slow`. Añadir unit tests de orquestación con dependencias mockeadas para subir el gate sin depender de servicios reales. | 22 | ⬜ Línea base medida en Fase 19 (pytest-cov añadido). |
+| DT-042 | Acoplamiento LCEL en `domain/`: las 12 chains importan `langchain_core` (`Runnable`, `ChatPromptTemplate`, `StrOutputParser`) directamente, en tensión con ADR-004 (L49-50: "el wrapper aísla al dominio del framework"). Decidir: documentar la excepción explícita (LCEL como sustrato de orquestación, no "librería envuelta") o introducir una interfaz de cadena en `infrastructure/`. | 22 | ⬜ Divergencia documentada en Fase 19. Severidad Baja (acoplamiento aceptado de facto). |
+
+> **Nota de numeración DT-035 (Fase 19):** `FASE18_HALLAZGOS.md §9` reutilizó el ID "DT-035"
+> para "verificación E2E de Alpina" (que el §7 de esa misma fase marca ✅ 4/4). El **DT-035
+> canónico** es el de esta tabla (competidores Cap 2 / `search_depth`, Fase 21). La entrada de
+> Fase 18 se considera cerrada/histórica; no se renumera el hallazgo pasado.
 
 ---
 
@@ -1298,7 +1309,7 @@ autocontenido vive también en `FASE17_HALLAZGOS.md` §9.)
 
 # FASE 19 — Auditoría de Arquitectura, Código y Documentación
 
-**Prioridad:** P0 (el "alto en el camino" — su salida re-prioriza F20–F26) · **Estimación:** ~1–2 días · **Estado:** ⬜ Pendiente
+**Prioridad:** P0 (el "alto en el camino" — su salida re-prioriza F20–F26) · **Estimación:** ~1–2 días · **Estado:** ✅ Completada (2026-07-24) · **Hallazgos:** `docs/decisions/FASE19_HALLAZGOS.md`
 
 ### Objetivo
 
@@ -1320,25 +1331,22 @@ priorizadas que ajusta las fases siguientes de este roadmap.
 
 ### Tareas
 
-- [ ] **T19.1 — Inventario y métricas.** Líneas por archivo/función, cobertura real de
-      `domain/` (≥80% exigido), grafo de imports (dependencias circulares), imports de
-      librerías externas en `domain/` y `presentation/` (violaciones SoC / Dependency
-      Agnosticism), código muerto.
-- [ ] **T19.2 — Red flags de tamaño.** Plan de partición para `gateway.py`, `app.py` y
-      `generate_informe.py` (responsabilidades, módulos destino, riesgo). Ejecutar solo
-      particiones de bajo riesgo en esta fase; el resto se agenda con fase destino.
-- [ ] **T19.3 — Coherencia docs↔código.** Para cada ADR-001..015 y RN-001..013: veredicto
-      fiel / divergente / obsoleto, con evidencia `archivo:línea`. Las divergencias se
-      registran como deuda nueva (los ADR no se reescriben: son inmutables).
-- [ ] **T19.4 — Revalidación de deuda §5.** Confirmar estado real de las DT abiertas
-      (DT-018, DT-027, DT-030, DT-034, DT-035, DT-036) y de cerradas sospechosas;
-      actualizar §5 con evidencia.
-- [ ] **T19.5 — Higiene de repo.** Hooks de `.claude/settings.json` operativos, `output/`
-      (¿gitignored?), archivos huérfanos en raíz, `docs/prompts/` incompleto (4 de 13
-      source_prompts — la brecha se ejecuta en F20, aquí solo se confirma el alcance).
-- [ ] **T19.6 — Informe y re-priorización.** `docs/decisions/FASE19_HALLAZGOS.md` con
-      formato hallazgo → severidad → acción → fase destino. Actualizar F20–F26 de este
-      roadmap con lo encontrado.
+- [x] **T19.1 — Inventario y métricas.** ✅ 3 archivos > 300 L (gateway 503, app 487,
+      generate_informe 438); `_run_n3`=157 L. Cobertura `domain/` (gate rápido) = **69%**
+      (< 80%; pytest-cov añadido). Sin ciclos reales (38 imports diferidos = smell aceptado).
+      SoC: `app.py`→`data/` y chains→`langchain_core` (divergencias, DT-038/042).
+- [x] **T19.2 — Red flags de tamaño.** ✅ Plan de partición documentado (FASE19 §4):
+      DT-037 (gateway→paquete `llm/`, F22), DT-039 (generate_n3, F22), DT-038 (app.py→views + SoC, F26).
+      Ninguna ejecutada (riesgo Medio+); todas agendadas.
+- [x] **T19.3 — Coherencia docs↔código.** ✅ 15 ADR + 13 RN con veredicto y evidencia
+      `archivo:línea` (FASE19 §5). Divergencias: ADR-004 (LCEL en domain), ADR-009 (regresión
+      tamaño), ADR-014 (tabla obsoleta), RN-013 (`search_depth` no implementado).
+- [x] **T19.4 — Revalidación de deuda §5.** ✅ DT-018 cerrado; DT-027 retarget→F22;
+      DT-030/034/035/036 confirmadas; colisión DT-035 (Fase 18 §9) documentada.
+- [x] **T19.5 — Higiene de repo.** ✅ `check-ruff` cableado; hook models con puntos ciegos
+      (DT-040); `output/`+raíz gitignored; `docs/prompts/` 4 de 17 (alcance F20).
+- [x] **T19.6 — Informe y re-priorización.** ✅ `FASE19_HALLAZGOS.md` + tablero §4, deuda §5,
+      changelog §8 actualizados; F20–F26 re-priorizadas (FASE19 §10).
 
 ### Criterios de aceptación
 
@@ -2064,7 +2072,9 @@ Se resuelven en la fase indicada (o antes si se puede).
   deduplicación SHA-256 + complement-not-replace; (3) usuario controla el cierre del loop;
   (4) UI en tab Historial. Documentadas en ADR-015.
 
-**ADRs vigentes:** ADR-001 … ADR-013 + **ADR-015** (HITL post-generación).
+**ADRs vigentes:** ADR-001 … ADR-015 (15 ADR). Auditados en Fase 19 (ver `FASE19_HALLAZGOS.md §5`):
+todos fieles salvo divergencias registradas como deuda (ADR-004 LCEL→DT-042; ADR-009 regresión
+de tamaño→DT-039; ADR-014 tabla de estado obsoleta→corrección documental).
 
 ---
 
@@ -2072,6 +2082,7 @@ Se resuelven en la fase indicada (o antes si se puede).
 
 | Fecha | Versión | Cambio |
 |-------|---------|--------|
+| 2026-07-24 | 3.1 | **Fase 19 (Auditoría) cerrada.** T19.1: 3 archivos > 300 L confirmados + `_run_n3`=157 L; cobertura `domain/` (gate rápido) = **69%** (< 80%; pytest-cov añadido como dev-dep). T19.3: 15 ADR + 13 RN auditados con evidencia `archivo:línea` — divergencias ADR-004 (LCEL en domain), ADR-009 (regresión tamaño), ADR-014 (tabla obsoleta), RN-013 (`search_depth` no implementado). T19.4: **DT-018 cerrado** (`check-ruff.sh` cableado en `settings.json`); DT-027 retarget→F22; colisión DT-035 documentada. Nuevas DT-037..042 (particiones + pricing/hook + cobertura + LCEL). Re-priorización: F22 absorbe DT-027/037/039/040/041/042; F26 absorbe DT-038. Sin cambios en código de aplicación; gate verde (305 fast, ruff 0). `FASE19_HALLAZGOS.md`. |
 | 2026-07-24 | 3.0 | **Re-secuenciación completa post-Fase 18 ("alto en el camino").** Nuevas fases: F19 Auditoría de arquitectura/código/docs (señales: gateway.py 503 L, app.py 487 L, generate_informe.py 438 L > red flag 300 L; docs/prompts con 4/13 source_prompts) y F20 Gap Analysis vs informe patrón Noel (rúbrica medible por capítulo). Renumeradas: F21=Sprint A (ex-F19), F22=Coherencia (ex-F20, +T22.4 enriquecimiento dirigido post-N1: entidades de Cap 2/3 → búsquedas de contraste para Cap 5/6), F24=HITL Gap Auditor (ex-F21), F25=HITL Consistency (ex-F22, +T25.6 pruebas UI HITL con AppTest + sesión manual). Nuevas: F23 Fuentes (DT-034 lote EMIS completo + evaluación servicios de búsqueda pagos, techo ≤20 USD/mes → ADR-016) y F26 Estilo y Visualización (Q7). ADR-015 conserva numeración v2.5 (nota de mapeo en §6). DT-030→F22, DT-034→F23, DT-035/036→F21. |
 | 2026-07-23 | 2.3 | Fase 17 cerrada (`7e6ec20`..`6927063`): T17.1 CacheCounter ✅ (DT-026), T17.4 Open Sans ✅ (DT-024), DT-029 fallback red transitoria ✅ (validado en prod, corrida Alpina), T17.3 cross-sector EPM→5510 ✅, T17.2 N=5 corridas → radar 50% → DT-027 🔴 cadena dedicada. Nuevas DT-030..033 (checkpoint, doc global convergencia, numeración, citación APA PDFs). §6 reordenado: F18 Evidencia y Citación → F19 Coherencia y Robustez → F20 Estilo y Visualización → F21+ operación. Sección FASE 18 detallada. 289 tests fast, ruff 0. |
 | 2026-07-21 | 1.0 | Creación del roadmap Fase 9–13 con prompts de arranque autocontenidos. |
