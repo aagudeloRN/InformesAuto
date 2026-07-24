@@ -13,7 +13,7 @@
 
 ```
 Eres un analista estratégico senior especializado en inteligencia de mercado y análisis
-sectorial, con más de 10 años asesorando grandes corporaciones agroindustriales en
+sectorial, con más de 10 años asesorando grandes corporaciones del sector {sector_gics} en
 América Latina.
 
 REGLAS DE CONTENIDO:
@@ -41,7 +41,9 @@ REGLAS DE ESTILO:
 - **3.2 MECE:** exactamente 4 tendencias asignadas (Crecimiento / Optimización / Innovación /
   Mitigación de riesgos); datos post-2026 + horizonte temporal + implicaciones imperativas.
 - **3.3 Casos de éxito:** globales (1 por MECE, ≥150 palabras) + locales (1 por tendencia
-  tecnológica, ≥150 palabras).
+  tecnológica, ≥150 palabras). Los casos locales llevan **restricción sectorial** (F21, T21.2):
+  deben pertenecer al sector `{sector_gics}`; si no hay, "Dato no disponible en fuentes
+  consultadas." — no se usan casos de otros sectores aunque sean de Medellín/Colombia.
 
 ---
 
@@ -52,9 +54,10 @@ REGLAS DE ESTILO:
 | Estructura 3.1/3.2/3.3 | Idéntica | Idéntica | ✅ fiel |
 | Refinamientos "editor humano" + mini-checklist + partir párrafos | Presentes (iterativo) | Colapsados al system prompt (una sola llamada) | ✅ deliberado |
 | "quita prefijos Tecnológica 1/2…" | Paso posterior | Se pide directamente el título en negrilla | ✅ deliberado |
-| **Sesgo sectorial** | "corporaciones agroindustriales" (era Noel) | **Hardcodeado** en el system prompt | 🟠 divergente → F21 |
-| Casos locales del mismo sector | "reflejar la realidad, no tendencias globales" | Sin constraint sectorial (DT-036) | 🟠 → F21 |
+| **Sesgo sectorial** | "corporaciones agroindustriales" (era Noel) | **Des-sesgado** por `{sector_gics}` (F21, T21.5) | ✅ resuelto |
+| Casos locales del mismo sector | "reflejar la realidad, no tendencias globales" | **Constraint sectorial** añadido (F21, T21.2) | ✅ resuelto |
 | Fuentes académicas (OpenAlex) | No existía | Añadido (`{fuentes_academicas}`) | ✅ mejora |
 
-> **No se modifica la chain en Fase 20** (solo se documenta). Los cambios de sesgo sectorial y
-> constraint de casos locales están agendados en **F21** (T21.2, DT-036).
+> **Actualizado en Fase 21:** el sesgo sectorial (DT-043) y el constraint de casos locales
+> (DT-036) quedaron resueltos. `generate_tendencias` añade además una query web dedicada a
+> casos locales del sector.
