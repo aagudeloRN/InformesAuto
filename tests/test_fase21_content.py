@@ -178,3 +178,34 @@ def test_generate_benchmarking_pasa_sector_gics_al_invoke():
 
     payload = chain.invoke.call_args.args[0]
     assert payload["sector_gics"] == "Transporte (GICS 2030)"
+
+
+# ---------------------------------------------------------------------------
+# T21.7 (DT-045) — Metodología + Aviso de uso de IA en el ensamblado
+# ---------------------------------------------------------------------------
+
+
+def _informe_minimo():
+    from ic.shared.types import (
+        CapBenchmarking,
+        ClasificacionGICS,
+        DescripcionEmpresa,
+        InformePiloto,
+    )
+
+    empresa = DescripcionEmpresa(nombre_empresa="ACME S.A.", actividad_ciiu=None, texto="**ACME**")
+    gics = ClasificacionGICS(grupo_gics="Bancos (GICS 4010)", justificacion="j", texto_raw="r")
+    cap = CapBenchmarking(
+        texto="## 2.1. Jugadores\nTexto.", n_chunks_usados=1, retrieval_suficiente=True,
+    )
+    return InformePiloto(empresa=empresa, gics=gics, cap_benchmarking=cap)
+
+
+def test_assembler_incluye_metodologia_y_aviso_ia():
+    from ic.domain.assembler import PilotAssembler
+    from ic.domain.report_model import Heading
+
+    report = PilotAssembler().build(_informe_minimo())
+    headings = [b.text for b in report.blocks if isinstance(b, Heading)]
+    assert "Metodología" in headings
+    assert "Aviso sobre el uso de inteligencia artificial" in headings

@@ -23,6 +23,32 @@ _ABSENT_MSG = (
     "Se recomienda ingresar documentos adicionales o ampliar la consulta web."
 )
 
+# Secciones formales del patrón Noel (T21.7, DT-045). El estilo fino se pule en F26.
+_METODOLOGIA_PARRAFOS = (
+    "Este informe se elabora mediante un sistema de inteligencia competitiva asistido por "
+    "modelos de lenguaje bajo una estrategia de recuperación aumentada (RAG). El proceso "
+    "prioriza modelos locales y escala a modelos por API solo cuando la calidad lo exige. "
+    "Cada capítulo se genera a partir de fragmentos recuperados de un índice vectorial que "
+    "combina documentos sectoriales, fuentes académicas (OpenAlex) y búsqueda web.",
+    "Alcance y trazabilidad: toda afirmación proveniente de fuentes se cita en formato APA y "
+    "es trazable hasta el fragmento que la sustenta. Cuando la recuperación no supera el umbral "
+    "de relevancia, el sistema no genera contenido: reporta \"Dato no disponible en fuentes "
+    "consultadas\" e invita a incorporar documentos adicionales. Ninguna afirmación se apoya en "
+    "el conocimiento paramétrico del modelo.",
+    "Limitaciones: la profundidad de cada capítulo depende de la cobertura de fuentes para el "
+    "sector analizado. Los resultados deben ser verificados por un analista antes de su uso en "
+    "decisiones estratégicas.",
+)
+
+_AVISO_IA_PARRAFOS = (
+    "Este documento fue generado de forma automática con apoyo de modelos de inteligencia "
+    "artificial. La inteligencia artificial se empleó como herramienta de recuperación, síntesis "
+    "y redacción a partir de fuentes verificables, no como fuente autónoma de información.",
+    "Los contenidos pueden incluir imprecisiones y deben ser revisados y validados por un "
+    "analista humano antes de su publicación o uso en la toma de decisiones. La responsabilidad "
+    "sobre las decisiones derivadas de este informe recae en el equipo que lo utiliza.",
+)
+
 
 class PilotAssembler:
     def __init__(self, disclaimer: str = _DEFAULT_DISCLAIMER) -> None:
@@ -91,14 +117,25 @@ class PilotAssembler:
                 blocks.append(Callout(_ABSENT_MSG, kind="absent_data"))
             blocks.append(Paragraph(""))
 
+        # Metodología (patrón Noel): sección formal antes de Referencias (T21.7, DT-045).
         blocks.append(PageBreak())
+        blocks.append(Heading("Metodología", level=2))
+        blocks.append(Paragraph(
+            f"Fuentes consultadas y citadas en este informe: {len(informe.referencias)}."
+        ))
+        for parrafo in _METODOLOGIA_PARRAFOS:
+            blocks.append(Paragraph(parrafo))
+        blocks.append(Paragraph(""))
+
         blocks.append(Heading("Referencias", level=2))
         for ref in informe.referencias:
             blocks.append(CitationBlock(ref.apa_string))
 
-        if self._disclaimer:
-            blocks.append(Paragraph(""))
-            blocks.append(Paragraph(self._disclaimer, style="Caption"))
+        # Aviso sobre el uso de IA: sección formal (antes era un disclaimer de una línea).
+        blocks.append(Paragraph(""))
+        blocks.append(Heading("Aviso sobre el uso de inteligencia artificial", level=2))
+        for parrafo in _AVISO_IA_PARRAFOS:
+            blocks.append(Paragraph(parrafo))
 
         empresa_nombre = informe.empresa.nombre_empresa
         return ReportDocument(
