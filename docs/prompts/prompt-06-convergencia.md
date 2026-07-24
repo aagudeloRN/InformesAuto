@@ -1,4 +1,14 @@
-# Prompt-05: Capítulo 5 — Convergencia Empresarial en Áreas Estratégicas
+# Prompt-06 (chain_06): Capítulo 5 — Convergencia Empresarial en Áreas Estratégicas
+
+> **Numeración:** el archivo se renombró `05→06` en Fase 20 para alinear con `chain_06_convergencia`
+> (la numeración de `docs/prompts/` sigue el número de la **chain**, no el del capítulo del informe
+> ni el del `source_prompt`). Mapa completo en `docs/prompts/README.md`.
+> **Fuente original:** `source_prompts/8. Prompt - Capítulo 5 - Convergencia.docx`.
+>
+> **Divergencia clave (Fase 20):** la cadena implementada respeta las **4 áreas** del patrón
+> (5.1–5.4). Existe una variante paralela `chain_06a_convergencia_eje` (RN-009, divide-y-vencerás
+> en 3 ejes) que reagrupa las mismas 4 áreas; puede provocar deriva del nº de áreas si el LLM
+> improvisa (observado en `avianca_informe.docx`: 5.1–5.7). Ver `FASE20_HALLAZGOS.md`.
 
 **Rol:** Consultor senior en estrategia empresarial y transformación digital  
 **Entrada:** `{descripcion_empresa}`, `{sector_gics}`, `{retrieval_caps_anteriores}`,
