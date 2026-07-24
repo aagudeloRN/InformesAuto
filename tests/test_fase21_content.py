@@ -122,3 +122,59 @@ def test_generate_tendencias_lanza_query_casos_locales_sectorial():
 
     queries = [c.args[0] for c in web.search.call_args_list]
     assert any("caso de éxito" in q and "Medellín" in q for q in queries)
+
+
+# ---------------------------------------------------------------------------
+# T21.5 (DT-043) — des-sesgar prompts por {sector_gics}
+# ---------------------------------------------------------------------------
+
+_SESGO = ["FoodTech", "agroindustrial", "bienes de consumo"]
+
+
+def test_chain_03_sin_sesgo_sectorial_y_parametrizado():
+    from ic.domain.chains.chain_03_benchmarking import SYSTEM_PROMPT_03, USER_PROMPT_03
+
+    combinado = SYSTEM_PROMPT_03 + USER_PROMPT_03
+    for termino in _SESGO:
+        assert termino not in combinado
+    assert "{sector_gics}" in SYSTEM_PROMPT_03
+    assert "{sector_gics}" in USER_PROMPT_03
+
+
+def test_chain_04_sin_sesgo_sectorial():
+    from ic.domain.chains.chain_04_tendencias import SYSTEM_PROMPT_04
+
+    for termino in _SESGO:
+        assert termino not in SYSTEM_PROMPT_04
+    assert "{sector_gics}" in SYSTEM_PROMPT_04
+
+
+def _chunk(i):
+    from ic.shared.types import ChunkResult
+
+    return ChunkResult(
+        chunk_texto=f"perfil competidor {i}", fuente_tipo="web",
+        fuente_url="http://x", score=0.8, metadatos={"autor": "X", "año": "2025"},
+        chunk_id=f"id-{i}",
+    )
+
+
+def test_generate_benchmarking_pasa_sector_gics_al_invoke():
+    from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
+
+    web = MagicMock()
+    web.search.return_value = []
+    store = MagicMock()
+    store.search.return_value = [_chunk(i) for i in range(6)]  # retrieval suficiente
+    chain = MagicMock()
+    chain.invoke.return_value = "## 2.1 texto sin radar"
+    gb = GenerateBenchmarking(chain=chain, store=store, web_connector=web)
+
+    gb.execute(
+        nombre_empresa="ACME",
+        descripcion_empresa="desc",
+        sector_gics="Transporte (GICS 2030)",
+    )
+
+    payload = chain.invoke.call_args.args[0]
+    assert payload["sector_gics"] == "Transporte (GICS 2030)"

@@ -91,6 +91,7 @@ class GenerateBenchmarking:
         context = format_chunks_as_context(chunks)
         texto_raw = self._chain.invoke({
             "descripcion_empresa": descripcion_empresa,
+            "sector_gics": sector_gics,
             "retrieval_competidores": context,
         })
 
