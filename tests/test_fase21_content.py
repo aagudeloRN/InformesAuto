@@ -209,3 +209,27 @@ def test_assembler_incluye_metodologia_y_aviso_ia():
     headings = [b.text for b in report.blocks if isinstance(b, Heading)]
     assert "Metodología" in headings
     assert "Aviso sobre el uso de inteligencia artificial" in headings
+
+
+# ---------------------------------------------------------------------------
+# T21.8 (DT-046) — rediseño Cap 4 a 4.1–4.5 (movimientos corporativos)
+# ---------------------------------------------------------------------------
+
+
+def test_chain_05_estructura_movimientos_4_1_a_4_5():
+    from ic.domain.chains.chain_05_ecosistema import SYSTEM_PROMPT_05, USER_PROMPT_05
+
+    for subcap in [
+        "## 4.1. Inversiones",
+        "## 4.2. Integraciones Verticales",
+        "## 4.3. Fusiones y Adquisiciones",
+        "## 4.4. Joint Ventures",
+        "## 4.5. Alianzas de Compra",
+    ]:
+        assert subcap in USER_PROMPT_05
+    # Campos por evento (patrón Noel).
+    assert "Capacidad estratégica adquirida" in USER_PROMPT_05
+    assert "Vulnerabilidad mitigada" in USER_PROMPT_05
+    assert "{sector_gics}" in SYSTEM_PROMPT_05
+    # Ya no mapea actores estáticos (estructura vieja).
+    assert "Actores Disruptores" not in USER_PROMPT_05
