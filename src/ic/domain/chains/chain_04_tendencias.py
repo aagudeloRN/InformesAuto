@@ -70,7 +70,11 @@ USER_PROMPT_04 = (
     "### Casos Locales\n"
     "Un caso de startup/scaleup en Medellín, Antioquia o Colombia por cada tendencia Tecnológica "
     "(2 casos). "
-    "Mismo formato que los globales. Profundidad: al menos 150 palabras por caso."
+    "Mismo formato que los globales. Profundidad: al menos 150 palabras por caso.\n"
+    "RESTRICCIÓN SECTORIAL OBLIGATORIA: los casos locales deben pertenecer al sector GICS "
+    "{sector_gics} de la empresa analizada. Si no hay casos locales del mismo sector en las "
+    "fuentes, escribe exactamente: \"Dato no disponible en fuentes consultadas.\" — NO uses casos "
+    "de otros sectores aunque sean de Medellín, Antioquia o Colombia."
 )
 
 

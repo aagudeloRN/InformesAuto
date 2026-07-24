@@ -86,3 +86,39 @@ def test_generate_benchmarking_usa_advanced_en_queries_competidores():
     assert all(
         c.kwargs.get("search_depth") == "advanced" for c in web.search.call_args_list
     )
+
+
+# ---------------------------------------------------------------------------
+# T21.2 (DT-036) — constraint sectorial en casos locales Cap 3
+# ---------------------------------------------------------------------------
+
+
+def test_chain_04_casos_locales_tiene_constraint_sectorial():
+    from ic.domain.chains.chain_04_tendencias import USER_PROMPT_04
+
+    assert "RESTRICCIÓN SECTORIAL OBLIGATORIA" in USER_PROMPT_04
+    assert "{sector_gics}" in USER_PROMPT_04
+    assert "NO uses casos de otros sectores" in USER_PROMPT_04
+
+
+def test_generate_tendencias_lanza_query_casos_locales_sectorial():
+    from ic.domain.use_cases.generate_tendencias import GenerateTendencias
+
+    web = MagicMock()
+    web.search.return_value = []
+    openalex = MagicMock()
+    openalex.search.return_value = []
+    store = MagicMock()
+    store.search.return_value = []  # corta tras las queries web
+    gt = GenerateTendencias(
+        chain=MagicMock(), store=store, web_connector=web, openalex_connector=openalex
+    )
+
+    gt.execute(
+        nombre_empresa="ACME",
+        descripcion_empresa="desc",
+        sector_gics="Bancos (GICS 4010)",
+    )
+
+    queries = [c.args[0] for c in web.search.call_args_list]
+    assert any("caso de éxito" in q and "Medellín" in q for q in queries)
