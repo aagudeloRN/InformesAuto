@@ -153,7 +153,7 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-031 | Cap 5/6 inconclusos: falta ingestar `InformeConvergenciaLocal2026RvADAA.pdf` como fuente **global** (aplica a todo sector) cableada al retrieval de Convergencia/Accionables | 18 | ✅ `es_global=True` + reserva global (`rag_global_reserve=2`) + `scripts/ingest_global.py`; 594 chunks globales ingestados. Ver addendum ADR-012 Fase 18. |
 | DT-032 | Bug de numeración: tras el capítulo 4 aparecen subcapítulos numerados `5.x` (desfase en headings del renderer o en la estructura del ReportDocument) | 18 | ✅ `chain_05` corregido a 4.1/4.2/4.3 + `renumber_subheadings()` en `markdown_parser.py` como defensa en profundidad; 6 tests. |
 | DT-033 | Citación no-APA para PDFs locales: el texto cita el nombre crudo del archivo ("El InformeConvergenciaLocal2026V3RvADAA.pdf destaca…") en vez de (Autor, año). Faltan metadatos APA en la ingesta y en el bloque de fuentes inyectado al prompt | 18 | ✅ `format_chunks_with_meta` omite rutas locales; `_apa_report` solo emite URLs `http`; `pdf_ingestor` con fallback "Ruta N" y título sin `.pdf`; chains 04-07 unificadas; 8 tests de contrato. |
-| DT-034 | Ingesta completa del lote EMIS (250 PDFs, 25 sectores). El índice CSV (`indice_emis.csv`) está generado; el lote completo toma ~2–4 h. | 18→23 | ⬜ Pendiente corrida larga fuera del E2E. Índice listo en `documentos_sectoriales/FuentesEMIS/indice_emis.csv`. |
+| DT-034 | Ingesta completa del lote EMIS (**250 PDFs, 25 sectores**). El corpus **ya está en disco** en `documentos_sectoriales/FuentesEMIS/<Sector>/` con su índice `documentos_sectoriales/FuentesEMIS/indice_emis.csv` (columnas: archivo, sector_gics, sectores_adicionales, tipo, autor, año, titulo, empresa). Corrida (~2–4 h): `uv run python scripts/ingest_batch.py --dir documentos_sectoriales --csv documentos_sectoriales/FuentesEMIS/indice_emis.csv` (idempotente por título; NO colisiona con los compilados de Fase 13). | 18→23 | ⬜ **Corpus listo, ingesta pendiente.** Es la palanca directa de DT-049 (diversidad de fuentes). Verificado 2026-07-24: 250 filas en el CSV, rutas y columnas compatibles con `ingest_batch.py`. |
 | DT-035 | Cap 2 — Competidores sin datos: `WebConnector.search()` usa `search_depth="basic"` y queries genéricas de sector → solo overviews, no perfiles de competidores individuales. Solución: parámetro `search_depth` en `WebConnector.search()` + `search_depth="advanced"` en `generate_benchmarking.py` + queries targeted por empresa/competidor. | 21 | ✅ **Cerrada F21 (T21.1, `1a96d7b`)**: `search_depth` propagado (WebConnector + CachedWebConnector) + queries de competidor `advanced`. Firma pública intacta (default `basic`). |
 | DT-036 | Cap 3 — Casos locales off-topic: 594 chunks del InformeConvergenciaLocal2026 contienen casos Medellín/Antioquia multi-sector (KPO, turismo inteligente) que se recuperan para cualquier empresa independientemente de su sector GICS. Causa: reserva global sin constraint sectorial en el prompt de casos locales. Solución: añadir instrucción explícita en `chain_04_tendencias.py` que restrinja los casos locales al sector de la empresa analizada + query web de casos locales sectoriales. | 21 | ✅ **Cerrada F21 (T21.2, `e64c107`)**: constraint sectorial en `chain_04` + query web dedicada de casos locales en `generate_tendencias`. |
 | DT-037 | `gateway.py` = 503 L (red flag > 300). Partición en paquete `infrastructure/llm/` (`cost.py`, `ollama.py`, `openrouter.py`, `errors.py`, `resilient.py`, `factory.py`) con `gateway.py` como fachada de re-export para no romper importadores. | 22 | ⬜ Detectado en Fase 19 (T19.2). Riesgo Medio. |
@@ -168,7 +168,7 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-046 | **Cap 4 estructura divergente**: `chain_05_ecosistema` produce Local/Global/Disruptores en vez de 4.1 Inversiones / 4.2 Integraciones verticales / 4.3 M&A / 4.4 Joint ventures / 4.5 Alianzas, con eventos (Título + capacidad estratégica adquirida + vulnerabilidad mitigada). Es la mayor divergencia de contenido. | 21 | ✅ **Cerrada F21 (T21.8, `beecd9c`)**: `chain_05` reescrita a 4.1–4.5 (movimientos corporativos), 3 eventos por subcap con los 4 campos del patrón. Doc `prompt-05` actualizado. |
 | DT-047 | **Deriva del nº de áreas en Cap 5**: la variante paralela `chain_06a` (RN-009) permite que el LLM improvise áreas (avianca 5.1–5.7 vs 4 fijas del distrito). Restringir a las 4 áreas del patrón. | 22 | ⬜ Detectado en Fase 20 (T20.2). |
 | DT-048 | **Score de calidad no automatizado**: `docs/eval/RUBRICA_CALIDAD.md` es manual. Cablear un LLM-judge (temperatura 0) que la aplique sobre el `.docx` y emita score por capítulo, para medir regresión de calidad entre fases. | 22 | ⬜ Propuesto en Fase 20 (T20.1). Severidad Baja. |
-| DT-049 | **Evidencia RAG delgada / baja diversidad de fuentes**: en el E2E de cierre F21 (Alpina 3020) el informe citó **solo 3 referencias** (2 documentos compilados + 1 web) con **18 "Dato no disponible"** y Cap 2.1 (fichas de competidor) ausente. Diagnóstico en BD: 2687 chunks totales, 3020 con 44 chunks sectoriales + 594 globales, pero los 44 provienen de **un único documento compilado** por sector → poca diversidad de fuentes citables. La búsqueda web devolvió 122 chunks pero solo **1 se citó** (resultados poco relevantes tipo `todolicitaciones.cl`; el resto lo purga ADR-013 "solo citado"). Las secciones granulares nuevas (fichas de competidor, 2.3 tabla de mercado, Cap 4 eventos M&A/JV) exigen datos que el corpus compilado no contiene. **Acciones:** (F23) enriquecer el corpus con documentos **diversos y atribuibles por fuente** (perfiles de competidor reales, informes de mercado con cifras, trackers de M&A) + evaluar búsqueda paga; (F22) afinar retrieval/breadth — investigar por qué solo 1 de 122 chunks web se cita, mejorar queries web por competidor con entidades extraídas de Cap 1/2 (T22.5 enriquecimiento dirigido), y revisar si la reserva sectorial y la purga ADR-013 son demasiado agresivas cuando el corpus es concentrado. | 23 (corpus) / 22 (retrieval) | ⬜ **Detectado en el E2E de cierre F21** (2026-07-24). Evidencia: `FASE21_HALLAZGOS.md §5`. |
+| DT-049 | **Evidencia RAG delgada / baja diversidad de fuentes**: en el E2E de cierre F21 (Alpina 3020) el informe citó **solo 3 referencias** (2 documentos compilados + 1 web) con **18 "Dato no disponible"** y Cap 2.1 (fichas de competidor) ausente. Diagnóstico en BD: 2687 chunks totales, 3020 con 44 chunks sectoriales + 594 globales, pero los 44 provienen de **un único documento compilado** por sector → poca diversidad de fuentes citables. **Causa confirmada 2026-07-24:** el lote EMIS diverso (250 PDFs, p. ej. 3020 tiene 13 fuentes: CFA, EMIS, Euromonitor, GlobalData…) **está en disco pero NUNCA se ingestó** (DT-034); la BD solo tiene los compilados de Fase 13. La búsqueda web devolvió 122 chunks pero solo **1 se citó** (resultados poco relevantes tipo `todolicitaciones.cl`; el resto lo purga ADR-013 "solo citado"). Las secciones granulares nuevas (fichas de competidor, 2.3 tabla de mercado, Cap 4 eventos M&A/JV) exigen datos que el corpus compilado no contiene. **Acciones:** (F23) **ingestar el lote EMIS de `documentos_sectoriales/FuentesEMIS/` (ver DT-034)** — es la palanca directa; luego evaluar búsqueda paga; (F22) afinar retrieval/breadth — investigar por qué solo 1 de 122 chunks web se cita, mejorar queries web por competidor con entidades extraídas de Cap 1/2 (T22.4 enriquecimiento dirigido), y revisar si la reserva sectorial y la purga ADR-013 son demasiado agresivas cuando el corpus es concentrado. | 23 (corpus/DT-034) / 22 (retrieval) | ⬜ **Detectado en el E2E de cierre F21** (2026-07-24). Evidencia: `FASE21_HALLAZGOS.md §5`. La mitad de corpus se resuelve ingestando el lote EMIS ya disponible. |
 
 > **Nota de numeración DT-035 (Fase 19):** `FASE18_HALLAZGOS.md §9` reutilizó el ID "DT-035"
 > para "verificación E2E de Alpina" (que el §7 de esa misma fase marca ✅ 4/4). El **DT-035
@@ -1732,6 +1732,13 @@ ESTADO DE ENTRADA (Fase 21 cerrada, 321 tests fast en verde, ruff 0):
   Alpina citó solo 3 fuentes con 18 "Dato no disponible" y Cap 2.1 (competidores) ausente.
   Diagnóstico: 44 chunks/sector pero de UN documento compilado (poca diversidad); 122 chunks
   web ingestados, solo 1 citado. Parte retrieval/breadth → F22 (T22.4); parte corpus → F23.
+- CORPUS EMIS LISTO EN DISCO (resuelve la mitad de corpus de DT-049 / DT-034): 250 PDFs
+  diversos por sector en `documentos_sectoriales/FuentesEMIS/<Sector>/` + índice
+  `documentos_sectoriales/FuentesEMIS/indice_emis.csv`. Ingesta (~2–4 h, corrida larga
+  independiente del código, se puede lanzar YA en tmux/nohup):
+  `uv run python scripts/ingest_batch.py --dir documentos_sectoriales --csv documentos_sectoriales/FuentesEMIS/indice_emis.csv`.
+  Es la ingesta de T23.1; se recomienda lanzarla antes/durante F22 para que T22.4 (breadth)
+  se mida sobre el corpus enriquecido y no sobre los compilados de Fase 13.
 - Deuda pendiente: DT-027 (radar 50%), DT-030 (checkpoint), Q1 (coherencia).
 
 OBJETIVOS DE FASE 22:
@@ -1794,10 +1801,25 @@ gratuitos se quedan cortos (perfiles de competidores, noticias LatAm, datos de m
 
 ### Tareas
 
-- [ ] **T23.1 (DT-034) — Ingesta del lote EMIS completo.** `ingest_batch.py` con
-      `indice_emis.csv` en corrida larga (nohup/tmux, fuera del pipeline). Verificar
-      conteos por sector (panel Repositorio + SQL). Medir cobertura antes/después con el
-      harness (`scripts/eval_retrieval.py`) y la tabla de cobertura de FASE18_HALLAZGOS §5.
+- [ ] **T23.1 (DT-034 + mitad de DT-049) — Ingesta del lote EMIS completo.** El corpus **ya
+      está en disco**: `documentos_sectoriales/FuentesEMIS/<Sector>/` (25 carpetas de sector) +
+      índice `documentos_sectoriales/FuentesEMIS/indice_emis.csv` (**250 documentos**; columnas
+      archivo/sector_gics/sectores_adicionales/tipo/autor/año/titulo/empresa). Cada sector GICS
+      tiene múltiples fuentes distintas y atribuibles (p. ej. 3020: CFA, EMIS H2 2025,
+      Euromonitor Sector Capsules, GlobalData) — esto ataca directamente la **baja diversidad
+      de fuentes** de DT-049. Corrida larga (nohup/tmux, fuera del pipeline, ~2–4 h):
+      ```bash
+      uv run python scripts/ingest_batch.py \
+        --dir documentos_sectoriales \
+        --csv documentos_sectoriales/FuentesEMIS/indice_emis.csv
+      ```
+      Idempotente por título (no colisiona con los compilados de Fase 13; conviven). Nota: la
+      columna `tipo="INFORME_EMIS"` cae a `PDF_SECTORIAL` si el enum no la tiene — evaluar añadir
+      `INFORME_EMIS` a `TipoDocumento` para trazabilidad. Verificar conteos por sector (panel
+      Repositorio + SQL sobre `informes_ic.embeddings_vectoriales`); medir cobertura y nº de
+      fuentes distintas citadas antes/después (harness `scripts/eval_retrieval.py` + rúbrica F20).
+      **Re-correr el E2E de Alpina** tras la ingesta y comparar contra `FASE21_HALLAZGOS.md §5`
+      (objetivo: bajar los 18 "Dato no disponible" y subir de 3 a >8 fuentes citadas).
 - [ ] **T23.2 — Matriz de proveedores de búsqueda.** Candidatos mínimos: Tavily tier pago,
       Serper.dev, Brave Search API, Exa, SerpAPI; opcional APIs de datos empresariales.
       Columnas: costo por 1k consultas, tier gratuito, cobertura noticias/LatAm/español,

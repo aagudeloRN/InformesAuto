@@ -89,12 +89,17 @@ compilados "Ruta N" + 1 web `todolicitaciones.cl`) con **18 "Dato no disponible"
 2.1 (fichas de competidor) en ausencia ("No se encuentra información al respecto en los documentos
 proporcionados"). Diagnóstico en BD (2687 chunks): 3020 tiene 44 chunks sectoriales + 594 globales,
 pero los 44 provienen de **un único documento compilado** → baja diversidad de fuentes citables.
+**Causa confirmada:** el lote EMIS diverso (250 PDFs, p. ej. 3020 con 13 fuentes: CFA, EMIS,
+Euromonitor, GlobalData…) **está en disco en `documentos_sectoriales/FuentesEMIS/` con su
+`indice_emis.csv`, pero nunca se ingestó** (DT-034); la BD solo tiene los compilados de Fase 13.
 La búsqueda web ingestó **122 chunks pero solo 1 se citó** (resultados poco relevantes; el resto lo
 purga ADR-013 "solo citado"). Las secciones granulares nuevas (fichas, tabla de mercado, eventos
 M&A/JV) exigen datos que el corpus compilado no contiene. Comparación: la corrida Alpina previa
 (Fase 18) citaba 4-5 refs; la baja a 3 es varianza del web + el mismo techo de corpus, no una
-regresión de código de F21. **Registrado como DT-049** — retrieval/breadth → F22 (T22.4); corpus
-diverso + búsqueda paga → F23. Este es el trabajo de mejora que sigue.
+regresión de código de F21. **Registrado como DT-049** — la mitad de corpus se resuelve
+**ingestando el lote EMIS ya disponible** (T23.1/DT-034:
+`uv run python scripts/ingest_batch.py --dir documentos_sectoriales --csv documentos_sectoriales/FuentesEMIS/indice_emis.csv`);
+la mitad de retrieval/breadth → F22 (T22.4). Este es el trabajo de mejora que sigue.
 
 _Cross-sector (avianca 2030 / bancolombia 4010) con la rúbrica: pendiente de corrida manual (§5.1);
 mismo techo de corpus aplica._
