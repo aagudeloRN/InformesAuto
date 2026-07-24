@@ -79,18 +79,30 @@ class CachedWebConnector:
         if self._counter is not None:
             self._counter.miss()
 
-    def search(self, query: str, max_results: int = 5, force_ddg: bool = False) -> list[WebResult]:
+    def search(
+        self,
+        query: str,
+        max_results: int = 5,
+        force_ddg: bool = False,
+        search_depth: str = "basic",
+    ) -> list[WebResult]:
+        # La profundidad de búsqueda cambia el contenido devuelto: se incorpora a la
+        # clave de caché solo cuando no es "basic", para no invalidar las claves ya
+        # cacheadas de las búsquedas básicas.
+        cache_query = query if search_depth == "basic" else f"{query} [depth={search_depth}]"
         if not force_ddg:
-            cached = self._repo.get_fresh("web", query, max_results)
+            cached = self._repo.get_fresh("web", cache_query, max_results)
             if cached is not None:
-                logger.debug("Cache HIT web: %r", query[:60])
+                logger.debug("Cache HIT web: %r", cache_query[:60])
                 self._hit()
                 return _from_payload(cached)
             self._miss()
 
-        results = self._connector.search(query, max_results=max_results, force_ddg=force_ddg)
+        results = self._connector.search(
+            query, max_results=max_results, force_ddg=force_ddg, search_depth=search_depth
+        )
         if results and not force_ddg:
-            self._repo.upsert("web", query, max_results, _to_payload(results), self._ttl)
+            self._repo.upsert("web", cache_query, max_results, _to_payload(results), self._ttl)
         return results
 
     def extract_ciiu(self, results: list[WebResult]) -> str | None:

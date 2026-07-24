@@ -40,20 +40,30 @@ class WebConnector:
         self._use_tavily = bool(self._tavily_key)
 
     def search(
-        self, query: str, max_results: int = 5, force_ddg: bool = False
+        self,
+        query: str,
+        max_results: int = 5,
+        force_ddg: bool = False,
+        search_depth: str = "basic",
     ) -> list[WebResult]:
         """Busca en la web. force_ddg=True omite Tavily aunque esté configurado
-        (útil en tests para no gastar créditos del free tier)."""
+        (útil en tests para no gastar créditos del free tier).
+
+        search_depth: "basic" (default, snippets cortos) o "advanced" (Tavily hace
+        una recuperación más profunda; útil para perfiles de competidor / mercado).
+        Solo aplica a Tavily; DDG lo ignora. Firma pública compatible (default basic)."""
         if self._use_tavily and not force_ddg:
-            return self._search_tavily(query, max_results)
+            return self._search_tavily(query, max_results, search_depth)
         return self._search_ddg(query, max_results)
 
-    def _search_tavily(self, query: str, max_results: int) -> list[WebResult]:
+    def _search_tavily(
+        self, query: str, max_results: int, search_depth: str = "basic"
+    ) -> list[WebResult]:
         payload = {
             "api_key": self._tavily_key,
             "query": query,
             "max_results": max_results,
-            "search_depth": "basic",
+            "search_depth": search_depth,
         }
         resp = httpx.post("https://api.tavily.com/search", json=payload, timeout=15)
         resp.raise_for_status()

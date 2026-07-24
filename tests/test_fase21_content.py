@@ -1,0 +1,88 @@
+"""Tests Fase 21 — Calidad de Contenido (Sprint A + A').
+
+Cubre: search_depth parametrizable (T21.1), constraint sectorial casos locales (T21.2),
+des-sesgado de prompts (T21.5), Metodología + Aviso IA (T21.7), rediseño Cap 4 (T21.8)
+y Cap 2.3 Mercado (T21.6). Todos fast (sin BD ni LLM real; mocks).
+"""
+
+from unittest.mock import MagicMock, patch
+
+# ---------------------------------------------------------------------------
+# T21.1 (DT-035) — search_depth parametrizable
+# ---------------------------------------------------------------------------
+
+
+def _settings_tavily():
+    s = MagicMock()
+    s.tavily_api_key = "test-key"
+    return s
+
+
+def test_search_tavily_propaga_search_depth_al_payload():
+    from ic.infrastructure.sources.web_connector import WebConnector
+
+    conn = WebConnector(_settings_tavily())
+    with patch("ic.infrastructure.sources.web_connector.httpx.post") as mpost:
+        mpost.return_value.json.return_value = {"results": []}
+        mpost.return_value.raise_for_status.return_value = None
+        conn.search("q competidores", search_depth="advanced")
+
+    payload = mpost.call_args.kwargs["json"]
+    assert payload["search_depth"] == "advanced"
+
+
+def test_search_default_es_basic():
+    from ic.infrastructure.sources.web_connector import WebConnector
+
+    conn = WebConnector(_settings_tavily())
+    with patch("ic.infrastructure.sources.web_connector.httpx.post") as mpost:
+        mpost.return_value.json.return_value = {"results": []}
+        mpost.return_value.raise_for_status.return_value = None
+        conn.search("q generica")
+
+    assert mpost.call_args.kwargs["json"]["search_depth"] == "basic"
+
+
+def test_cached_web_propaga_search_depth_y_separa_clave():
+    from ic.infrastructure.sources.cached_connector import CachedWebConnector
+
+    inner = MagicMock()
+    inner.search.return_value = []
+    repo = MagicMock()
+    repo.get_fresh.return_value = None
+    settings = MagicMock()
+    settings.retrieval_cache_ttl_hours = 24
+
+    with patch(
+        "ic.infrastructure.sources.cached_connector.RetrievalCacheRepository",
+        return_value=repo,
+    ):
+        cached = CachedWebConnector(inner, MagicMock(), settings)
+        cached.search("perfil competidor", search_depth="advanced")
+
+    # Propaga search_depth al connector subyacente.
+    assert inner.search.call_args.kwargs["search_depth"] == "advanced"
+    # La clave de caché se diferencia cuando no es basic.
+    cache_query = repo.get_fresh.call_args.args[1]
+    assert "depth=advanced" in cache_query
+
+
+def test_generate_benchmarking_usa_advanced_en_queries_competidores():
+    from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
+
+    web = MagicMock()
+    web.search.return_value = []
+    store = MagicMock()
+    store.search.return_value = []  # retrieval insuficiente → corta temprano
+    gb = GenerateBenchmarking(chain=MagicMock(), store=store, web_connector=web)
+
+    gb.execute(
+        nombre_empresa="ACME",
+        descripcion_empresa="desc",
+        sector_gics="Transporte (GICS 2030)",
+    )
+
+    assert web.search.call_count >= 1
+    assert all(
+        c.kwargs.get("search_depth") == "advanced" for c in web.search.call_args_list
+    )

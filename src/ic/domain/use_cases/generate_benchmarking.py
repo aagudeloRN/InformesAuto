@@ -58,13 +58,16 @@ class GenerateBenchmarking:
         sector_gics_code: str | None = None,
         empresa_id=None,
     ) -> CapBenchmarking:
+        # Queries específicas de perfil de empresa (no overviews de sector) con
+        # search_depth="advanced": Tavily recupera contenido más profundo, necesario
+        # para poblar las fichas de competidor de la sección 2.1 (DT-035).
         queries = [
-            f"{sector_gics} competidores líderes globales",
-            f"{sector_gics} referentes regionales LatAm Colombia",
-            f"{sector_gics} startups FoodTech disruptivas",
+            f"{sector_gics} principales empresas competidoras Colombia cuota de mercado 2025",
+            f"{sector_gics} líderes globales del sector perfil estratégico portafolio",
+            f"{sector_gics} referentes regionales LatAm empresas emergentes disruptores",
         ]
         for query in queries:
-            web_results = self._web_connector.search(query)
+            web_results = self._web_connector.search(query, search_depth="advanced")
             if web_results:
                 self._store.ingest(
                     texts=[r.content for r in web_results],
