@@ -233,3 +233,86 @@ def test_chain_05_estructura_movimientos_4_1_a_4_5():
     assert "{sector_gics}" in SYSTEM_PROMPT_05
     # Ya no mapea actores estáticos (estructura vieja).
     assert "Actores Disruptores" not in USER_PROMPT_05
+
+
+# ---------------------------------------------------------------------------
+# T21.6 (DT-044) — Cap 2.3 Mercado
+# ---------------------------------------------------------------------------
+
+
+def test_chain_03b_mercado_pide_seccion_y_tabla_region():
+    from ic.domain.chains.chain_03b_mercado import SYSTEM_PROMPT_03B, USER_PROMPT_03B
+
+    assert "## 2.3. Mercado" in USER_PROMPT_03B
+    assert "Tabla de mercado por región" in USER_PROMPT_03B
+    assert "| Región |" in USER_PROMPT_03B
+    assert "{sector_gics}" in SYSTEM_PROMPT_03B
+
+
+def test_generate_mercado_suficiente_invoca_chain():
+    from ic.domain.use_cases.generate_mercado import GenerateMercado
+
+    web = MagicMock()
+    web.search.return_value = []
+    store = MagicMock()
+    store.search.return_value = [_chunk(i) for i in range(4)]
+    chain = MagicMock()
+    chain.invoke.return_value = "## 2.3. Mercado\n| Región | ... |"
+    gm = GenerateMercado(chain=chain, store=store, web_connector=web)
+
+    cap = gm.execute(nombre_empresa="ACME", descripcion_empresa="d", sector_gics="Bancos (4010)")
+
+    assert cap.retrieval_suficiente is True
+    assert chain.invoke.call_args.args[0]["sector_gics"] == "Bancos (4010)"
+    # Usa search_depth advanced para datos de mercado.
+    assert all(c.kwargs.get("search_depth") == "advanced" for c in web.search.call_args_list)
+
+
+def test_generate_mercado_insuficiente_devuelve_ausencia():
+    from ic.domain.use_cases.generate_mercado import GenerateMercado
+
+    web = MagicMock()
+    web.search.return_value = []
+    store = MagicMock()
+    store.search.return_value = []  # < min_chunks
+    gm = GenerateMercado(chain=MagicMock(), store=store, web_connector=web)
+
+    cap = gm.execute(nombre_empresa="ACME", descripcion_empresa="d", sector_gics="Bancos (4010)")
+    assert cap.retrieval_suficiente is False
+    assert "Dato no disponible" in cap.texto
+
+
+def test_assembler_intercala_2_3_mercado_antes_de_2_4():
+    from ic.domain.assembler import PilotAssembler
+    from ic.domain.report_model import Heading
+    from ic.shared.types import CapMercado
+
+    informe = _informe_minimo()
+    informe.cap_benchmarking.texto = (
+        "## 2.1. Jugadores\nTexto.\n\n## 2.2. División\nTexto.\n\n"
+        "## 2.4. Módulos\nTexto."
+    )
+    informe.cap_mercado = CapMercado(
+        texto="## 2.3. Mercado\nTamaño del mercado.", n_chunks_usados=3,
+        retrieval_suficiente=True,
+    )
+
+    report = PilotAssembler().build(informe)
+    headings = [b.text.strip() for b in report.blocks if isinstance(b, Heading)]
+    idx_23 = next(i for i, h in enumerate(headings) if h.startswith("2.3"))
+    idx_24 = next(i for i, h in enumerate(headings) if h.startswith("2.4"))
+    assert idx_23 < idx_24
+
+
+def test_assembler_omite_mercado_si_ausente():
+    from ic.domain.assembler import PilotAssembler
+    from ic.domain.report_model import Heading
+    from ic.shared.types import CapMercado
+
+    informe = _informe_minimo()
+    informe.cap_mercado = CapMercado(
+        texto="x", n_chunks_usados=0, retrieval_suficiente=False,
+    )
+    report = PilotAssembler().build(informe)
+    headings = [b.text.strip() for b in report.blocks if isinstance(b, Heading)]
+    assert not any(h.startswith("2.3") for h in headings)

@@ -66,6 +66,15 @@ class CostReport:
 
 
 @dataclass
+class CapMercado:
+    """Cap 2.3 Mercado (T21.6, DT-044): tamaño de mercado, segmentos y tabla por región."""
+    texto: str
+    n_chunks_usados: int
+    retrieval_suficiente: bool
+    chunks_usados: list["ChunkResult"] = field(default_factory=list)
+
+
+@dataclass
 class CapTendencias:
     texto: str
     n_chunks_usados: int
@@ -110,6 +119,7 @@ class InformePiloto:
     empresa: DescripcionEmpresa
     gics: ClasificacionGICS
     cap_benchmarking: CapBenchmarking
+    cap_mercado: "CapMercado | None" = None
     cap_tendencias: "CapTendencias | None" = None
     cap_ecosistema: "CapEcosistema | None" = None
     cap_convergencia: "CapConvergencia | None" = None

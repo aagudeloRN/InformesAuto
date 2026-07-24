@@ -50,6 +50,18 @@ _AVISO_IA_PARRAFOS = (
 )
 
 
+def _insert_before_subheading(blocks: list, insert: list, prefix: str) -> list:
+    """Inserta `insert` justo antes del primer Heading cuyo texto empiece por `prefix`.
+
+    Si no se encuentra el ancla, `insert` se añade al final. Usado para intercalar la
+    sección 2.3 Mercado entre 2.2 y 2.4 dentro del Capítulo 2 (T21.6, DT-044).
+    """
+    for i, blk in enumerate(blocks):
+        if isinstance(blk, Heading) and blk.text.lstrip().startswith(prefix):
+            return blocks[:i] + insert + blocks[i:]
+    return blocks + insert
+
+
 class PilotAssembler:
     def __init__(self, disclaimer: str = _DEFAULT_DISCLAIMER) -> None:
         self._disclaimer = disclaimer
@@ -77,7 +89,14 @@ class PilotAssembler:
 
         blocks.append(Heading("Capítulo 2. Análisis Competitivo", level=2))
         if informe.cap_benchmarking.retrieval_suficiente:
-            blocks.extend(parse_markdown(informe.cap_benchmarking.texto))
+            bench_blocks = parse_markdown(informe.cap_benchmarking.texto)
+            # 2.3 Mercado (T21.6, DT-044): se intercala entre 2.2 y 2.4 dentro del Cap 2.
+            cap_mercado = getattr(informe, "cap_mercado", None)
+            if cap_mercado is not None and cap_mercado.retrieval_suficiente:
+                bench_blocks = _insert_before_subheading(
+                    bench_blocks, parse_markdown(cap_mercado.texto), prefix="2.4"
+                )
+            blocks.extend(bench_blocks)
         else:
             blocks.append(Callout(_ABSENT_MSG, kind="absent_data"))
         if figura_benchmarking:

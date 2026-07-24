@@ -16,11 +16,11 @@ originales (creados en NotebookLM para el informe patrón Noel).
 | 0. Ecuaciones de búsqueda | — (queries de conectores) | *(→ runbook F21, T21.3)* | — (insumo corpus) | ⬜ no es chain |
 | 1. Descripción Empresa | `chain_01_descripcion` | `prompt-01-descripcion-empresa.md` | Cap 1 | ✅ |
 | 2. Sector GIS (GICS) | `chain_02_gics` | `prompt-02-sector-gics.md` | Cap 1 (clasif.) | ✅ |
-| 3. Cap 2 Benchmarking | `chain_03_benchmarking` | `prompt-03-benchmarking.md` | Cap 2 | ✅ |
-| 4. Mercado (1/2/3/Único) | — **no implementado** | *(pendiente)* | **Cap 2.3 Mercado** | 🔴 brecha (F21) |
-| 5. Mercado Gestiones Anexas | — no implementado | *(pendiente)* | Cap 2.3 (anexo) | 🔴 brecha (F21) |
-| 6. Cap 3 Análisis tendencial | `chain_04_tendencias` | `prompt-04-tendencias.md` | Cap 3 | ✅ |
-| 7. Cap 4 Panorama Ecosistema | `chain_05_ecosistema` | `prompt-05-ecosistema.md` | Cap 4 | ⚠️ divergencia mayor (F21) |
+| 3. Cap 2 Benchmarking | `chain_03_benchmarking` | `prompt-03-benchmarking.md` | Cap 2 | ✅ (des-sesgado F21) |
+| 4. Mercado (1/2/3/Único) | `chain_03b_mercado` | `prompt-03b-mercado.md` | **Cap 2.3 Mercado** | ✅ (F21, T21.6) |
+| 5. Mercado Gestiones Anexas | `chain_03b_mercado` (integrado) | `prompt-03b-mercado.md` | Cap 2.3 (anexo) | ✅ (F21, T21.6) |
+| 6. Cap 3 Análisis tendencial | `chain_04_tendencias` | `prompt-04-tendencias.md` | Cap 3 | ✅ (des-sesgado F21) |
+| 7. Cap 4 Panorama Ecosistema | `chain_05_ecosistema` | `prompt-05-ecosistema.md` | Cap 4 | ✅ (rediseñado F21, T21.8) |
 | 8. Cap 5 Convergencia | `chain_06_convergencia` (+`06a`) | `prompt-06-convergencia.md` | Cap 5 | ✅ (deriva de áreas → F22) |
 | 9. Cap 6 Accionables | `chain_07_accionables` | `prompt-07-accionables.md` | Cap 6 | ✅ (coherencia → F22) |
 | 10. Párrafos Introductorios | `chain_intro` | `prompt-intro-parrafos.md` | Caps 2–6 | ✅ |
@@ -28,8 +28,9 @@ originales (creados en NotebookLM para el informe patrón Noel).
 | 12. Referencias | — (`apa_formatter`, infra) | *(no es prompt LLM)* | Referencias | ✅ vía código |
 | 13. Evaluar Informe (opcional) | — HITL, no implementado | *(pendiente)* | — (auditoría) | ⬜ F24/F25 |
 
-**Cobertura:** 8 de 8 chains operativas documentadas (100%). Los `source_prompts` sin chain
-(Mercado, Ecuaciones, Referencias, Evaluar) están explicados arriba con su fase destino.
+**Cobertura:** 9 de 9 chains operativas documentadas (100%; `chain_03b_mercado` añadida en F21).
+Los `source_prompts` sin chain (Ecuaciones → runbook, Referencias → código, Evaluar → HITL) están
+explicados arriba con su fase destino.
 
 Detalle de brechas y asignación de fases: `docs/decisions/FASE20_HALLAZGOS.md`.
 Rúbrica de calidad derivada del patrón: `docs/eval/RUBRICA_CALIDAD.md`.

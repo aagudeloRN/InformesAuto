@@ -18,10 +18,12 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.data.database import SessionLocal
     from ic.data.repositories.embedding_repo import EmbeddingRepository
     from ic.domain.chains.chain_03_benchmarking import build_chain_03
+    from ic.domain.chains.chain_03b_mercado import build_chain_03b
     from ic.domain.chains.chain_04_tendencias import build_chain_04
     from ic.domain.chains.chain_05_ecosistema import build_chain_05
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
     from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
+    from ic.domain.use_cases.generate_mercado import GenerateMercado
     from ic.domain.use_cases.generate_tendencias import GenerateTendencias
     from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
     from ic.infrastructure.sources.cached_connector import (
@@ -55,6 +57,16 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,
         )
 
+    def _fn_mercado(store, web, _oal):
+        if ctx.api_llm is None:
+            return None
+        return GenerateMercado(
+            chain=build_chain_03b(ctx.api_llm), store=store, web_connector=web
+        ).execute(
+            nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
+            sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+        )
+
     def _fn_cap3(store, web, oal):
         if ctx.api_llm is None:
             return None
@@ -76,11 +88,13 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,
         )
 
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    with ThreadPoolExecutor(max_workers=4) as pool:
         f2 = pool.submit(_store, _fn_cap2)
+        f_mkt = pool.submit(_store, _fn_mercado)
         f3 = pool.submit(_store, _fn_cap3)
         f4 = pool.submit(_store, _fn_cap4)
-    ctx.cap, ctx.cap_tend, ctx.cap_eco = f2.result(), f3.result(), f4.result()
+    ctx.cap, ctx.cap_mercado = f2.result(), f_mkt.result()
+    ctx.cap_tend, ctx.cap_eco = f3.result(), f4.result()
 
     ctx.step_fn(4, "Párrafos introductorios N1")
     if ctx.intro_chain is not None:

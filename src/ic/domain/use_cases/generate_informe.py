@@ -63,6 +63,7 @@ class _PipelineContext:
     empresa: Any = None
     gics: Any = None
     cap: Any = None
+    cap_mercado: Any = None  # Cap 2.3 Mercado (T21.6, DT-044)
     cap_tend: Any = None
     cap_eco: Any = None
     cap_conv: Any = None
@@ -318,7 +319,7 @@ class GenerateInforme:
 
         ctx.step_fn(10, "Referencias + Ensamblado .docx")
         todos_chunks = list(ctx.cap.chunks_usados)
-        for cap_obj in [ctx.cap_tend, ctx.cap_eco, ctx.cap_conv, ctx.cap_acc]:
+        for cap_obj in [ctx.cap_mercado, ctx.cap_tend, ctx.cap_eco, ctx.cap_conv, ctx.cap_acc]:
             if cap_obj and cap_obj.chunks_usados:
                 todos_chunks += cap_obj.chunks_usados
         refs = build_references_section(todos_chunks)
@@ -329,7 +330,10 @@ class GenerateInforme:
 
         texto_completo = " ".join(
             c.texto
-            for c in [ctx.cap, ctx.cap_tend, ctx.cap_eco, ctx.cap_conv, ctx.cap_acc, ctx.resumen]
+            for c in [
+                ctx.cap, ctx.cap_mercado, ctx.cap_tend, ctx.cap_eco,
+                ctx.cap_conv, ctx.cap_acc, ctx.resumen,
+            ]
             if c is not None
         )
         orphans = find_orphan_citations(texto_completo, refs)
@@ -360,6 +364,7 @@ class GenerateInforme:
 
         informe = InformePiloto(
             empresa=ctx.empresa, gics=ctx.gics, cap_benchmarking=ctx.cap,
+            cap_mercado=ctx.cap_mercado,
             cap_tendencias=ctx.cap_tend, cap_ecosistema=ctx.cap_eco,
             cap_convergencia=ctx.cap_conv, cap_accionables=ctx.cap_acc,
             resumen_ejecutivo=ctx.resumen, referencias=refs,
