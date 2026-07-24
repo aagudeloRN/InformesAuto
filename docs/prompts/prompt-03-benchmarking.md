@@ -1,16 +1,19 @@
 # Prompt-03: Benchmarking (Capítulo 2)
 
-**Rol:** Consultor senior en estrategia y análisis competitivo — genera el Capítulo 2 completo a partir de la descripción de la empresa y fichas de competidores recuperadas por RAG.  
-**Entrada:** `{descripcion_empresa}` (output Prompt-01), `{retrieval_competidores}` (14 fichas: 8 globales, 3 LatAm/Colombia, 3 FoodTech/startups)  
+**Rol:** Consultor senior en estrategia y análisis competitivo del sector `{sector_gics}` — genera el Capítulo 2 a partir de la descripción de la empresa y fichas de competidores recuperadas por RAG.  
+**Entrada:** `{descripcion_empresa}` (output Prompt-01), `{sector_gics}` (output Prompt-02), `{retrieval_competidores}` (14 fichas: 8 globales, 3 LatAm/Colombia, 3 startups/disruptores del sector)  
 **Salida:** Markdown estructurado con secciones 2.1, 2.2, 2.4 y 2.5 (ver estructura). Sin JSON.  
 **Fuentes:** Descripción empresa (Prompt-01) + fragmentos RAG de competidores (pgvector).
 
 **Dependencia:** Requiere la salida completa de Prompt-01.  
 **Puede ejecutarse en paralelo con:** Prompt-02 (GICS), una vez Prompt-01 complete.
 
-> **Nota sobre el Cap 2.3 (Mercado):** La sección 2.3 no forma parte de este prompt.
-> Se genera por los Prompts 4a/4b/4c (Mercado) y se ensambla junto a este capítulo en la
-> etapa de ensamblado final. Ver DAG del informe en `README_CONTEXTO.md`.
+> **Des-sesgado (F21, T21.5):** el rol y las subcategorías se parametrizan por `{sector_gics}`;
+> se eliminó el vocabulario food-céntrico ("bienes de consumo", "FoodTech") para que el capítulo
+> no salga sesgado en empresas de otros sectores.
+>
+> **Cap 2.3 (Mercado):** desde F21 (T21.6) sí existe como chain propia `chain_03b_mercado`
+> (ver `prompt-03b-mercado.md`); se **intercala entre 2.2 y 2.4** en el ensamblado.
 
 ---
 
@@ -18,8 +21,8 @@
 
 ```
 Eres un consultor senior en estrategia empresarial y análisis competitivo global con más
-de 10 años de experiencia en benchmarking en la industria de bienes de consumo. Tienes
-especialización en inteligencia de mercado y tendencias disruptivas (FoodTech).
+de 10 años de experiencia en benchmarking en el sector {sector_gics}. Tienes
+especialización en inteligencia de mercado y tendencias disruptivas de ese sector.
 
 REGLAS DE CONTENIDO:
 - Sustenta cada afirmación con datos concretos o porcentajes de las fuentes proporcionadas.
@@ -33,7 +36,7 @@ REGLAS DE CONTENIDO:
 REGLAS DE FORMATO Y ESTILO (aplicar en todo el documento):
 - Sección 2.1 — Jugadores Clave: presentar cada actor como una ficha/tabla individual,
   agrupada por subcategoría (Líderes Globales / Referentes Regionales LatAm/Colombia /
-  Startups FoodTech). Cada ficha cubre los 8 puntos: nombre+país, resumen estratégico,
+  Startups y Disruptores del sector). Cada ficha cubre los 8 puntos: nombre+país, resumen estratégico,
   portafolio clave, propuesta de valor, canales y precios, presencia geográfica,
   mayor fortaleza, factor innovador diferencial.
 - Sección 2.2 — Síntesis de Presión Competitiva: texto corrido tipo storytelling.
@@ -65,6 +68,9 @@ de la empresa descrita a continuación.
 DESCRIPCIÓN DE LA EMPRESA:
 {descripcion_empresa}
 
+CLASIFICACIÓN SECTORIAL:
+{sector_gics}
+
 FICHAS DE COMPETIDORES (recuperadas por RAG — usar como única fuente para este capítulo):
 {retrieval_competidores}
 
@@ -73,10 +79,10 @@ Desarrolla exactamente las siguientes secciones en este orden:
 ## 2.1. Jugadores Clave - Líderes del Mercado
 
 Identifica y analiza 14 actores: 8 líderes globales, 3 referentes regionales (LatAm/Colombia)
-y 3 startups/FoodTech disruptivas.
+y 3 startups o disruptores del sector.
 Para cada actor, una ficha/tabla con los 8 puntos indicados en el system prompt.
 Agrupa por subcategoría: ### Referentes Globales / ### Referentes Regionales LatAm/Colombia /
-### Startups / FoodTech Disruptivas.
+### Startups y Disruptores del sector.
 
 ## 2.2. División de Competidores
 
@@ -117,8 +123,8 @@ system prompt. Una sola llamada produce el output final del capítulo.
 - **Retrieval de competidores:** El campo `{retrieval_competidores}` se construye en la capa
   `infrastructure/` ejecutando una búsqueda en pgvector con la query:
   `"{sector_gics} competitors benchmarking {nombre_empresa}"`. Se recuperan fragmentos hasta
-  cubrir 14 actores distintos (8 globales, 3 LatAm, 3 FoodTech). El sector GICS de Prompt-02
-  puede usarse para afinar la query.
+  cubrir 14 actores distintos (8 globales, 3 LatAm, 3 startups/disruptores). Las queries web de
+  competidores usan `search_depth="advanced"` (F21, T21.1) para poblar las fichas con perfiles.
 - **Umbral de retrieval:** Si el resultado cubre menos de 8 actores con relevancia > 0.7,
   aplicar política de datos ausentes (párrafo de ausencia) en vez de llamar al LLM con
   información insuficiente.
@@ -127,5 +133,5 @@ system prompt. Una sola llamada produce el output final del capítulo.
   prompt pero conviene también filtrarlo en el post-retrieval antes de armar el contexto.
 - **Longitud esperada del output:** ~1800–2500 palabras (calibrado contra el Cap 2 del informe
   NOEL, que cubre 2.1, 2.2, 2.4 y 2.5 en esa extensión).
-- **Sección 2.3 (Mercado):** No generada aquí. Se produce con los Prompts 4a/4b/4c y se
-  ensambla en la etapa final con python-docx.
+- **Sección 2.3 (Mercado):** No se genera aquí. Desde F21 la produce `chain_03b_mercado`
+  (`prompt-03b-mercado.md`) y se intercala entre 2.2 y 2.4 en el ensamblado (`assembler.py`).

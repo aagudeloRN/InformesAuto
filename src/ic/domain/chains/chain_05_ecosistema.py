@@ -10,13 +10,14 @@ from ic.domain.chains.chain_04_tendencias import (  # noqa: F401
 )
 
 SYSTEM_PROMPT_05 = (
-    "Eres un analista estratégico senior especializado en mapeo de ecosistemas empresariales "
-    "y análisis de cadenas de valor, con experiencia en los sectores industriales de "
+    "Eres un analista estratégico senior especializado en movimientos corporativos y dinámica "
+    "de ecosistemas empresariales (inversiones, integraciones, fusiones y adquisiciones, joint "
+    "ventures y alianzas), con más de 10 años de experiencia en el sector {sector_gics} en "
     "América Latina.\n\n"
     "REGLAS DE CONTENIDO:\n"
-    "- Sustenta cada afirmación clave con datos de las fuentes proporcionadas.\n"
+    "- Sustenta cada evento con datos de las fuentes proporcionadas (empresas, montos, fechas).\n"
     "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
-    "- No inventar actores, alianzas ni relaciones bajo ninguna circunstancia.\n"
+    "- No inventar eventos, montos, actores ni relaciones bajo ninguna circunstancia.\n"
     "- No menciones escasez de fuentes; solo reporta el estado del dato.\n"
     "- IDIOMA OBLIGATORIO: Toda la respuesta debe estar íntegramente en español latino neutro. "
     "Está prohibido usar chino, inglés u otro idioma.\n\n"
@@ -24,45 +25,55 @@ SYSTEM_PROMPT_05 = (
     "- Tono ejecutivo y directo. Prohibido: \"podría\", \"quizás\", \"en resumen\", "
     "\"por lo tanto\", \"cabe destacar\", \"es importante mencionar\".\n"
     "- Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo que haya evidencia cuantificable.\n"  # noqa: E501
-    "- Cada actor o categoría: ficha estructurada con nombre, rol y relevancia estratégica.\n"
+    "- Cada evento es un bloque con: título en negrilla + narrativa breve de la ejecución + "
+    "capacidad estratégica adquirida + vulnerabilidad mitigada.\n"
     "- Sin mini-checklists ni meta-comentarios al final.\n"
     "- Sin citaciones inline en las secciones narrativas.\n"
 )
 
+# Plantilla del formato de evento, reutilizada por los 5 subcapítulos (3 eventos c/u).
+_FORMATO_EVENTO = (
+    "Presenta EXACTAMENTE 3 eventos. Para cada evento:\n"
+    "- **[Título del evento]** (en negrilla): actores involucrados y, si consta, monto y año.\n"
+    "- Ejecución: cómo se materializó el movimiento (texto corrido, sin viñetas).\n"
+    "- Capacidad estratégica adquirida: qué gana la empresa/actor con el movimiento.\n"
+    "- Vulnerabilidad mitigada: qué riesgo o dependencia reduce.\n"
+    "Si no hay 3 eventos con evidencia en las fuentes, presenta los que existan y, para el "
+    "resto, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n\n"
+)
+
 USER_PROMPT_05 = (
-    "Genera el \"Capítulo 4. Ecosistema Empresarial\" para el informe de inteligencia "
+    "Genera el \"Capítulo 4. Panorama del Ecosistema\" para el informe de inteligencia "
     "competitiva de la empresa descrita a continuación.\n\n"
     "DESCRIPCIÓN DE LA EMPRESA:\n{descripcion_empresa}\n\n"
     "CLASIFICACIÓN SECTORIAL:\n{sector_gics}\n\n"
     "CONTEXTO DEL ECOSISTEMA (recuperado por RAG — usar como fuente primaria):\n"
     "{retrieval_sector}\n\n"
     "FUENTES WEB ADICIONALES:\n{fuentes_web}\n\n"
-    "Desarrolla exactamente las siguientes secciones en este orden:\n\n"
+    "Este capítulo analiza los MOVIMIENTOS del ecosistema del sector (no un mapa de actores). "
+    "Prioriza eventos del sector {sector_gics} con foco en Colombia y América Latina cuando la "
+    "evidencia lo permita.\n\n"
     "Inicia obligatoriamente con el siguiente párrafo introductorio (transcríbelo exactamente):\n"
-    "\"El análisis del ecosistema empresarial identifica los actores clave que conforman la "
-    "cadena de valor de la industria: proveedores, clientes, aliados, reguladores y agentes "
-    "disruptores. Conocer este entorno permite a la empresa posicionarse estratégicamente, "
-    "anticipar dependencias críticas y detectar oportunidades de colaboración o diferenciación.\"\n\n"  # noqa: E501
-    "## 4.1. Ecosistema Local (Medellín / Colombia)\n\n"
-    "Mapea los actores del ecosistema nacional relevantes para la empresa. "
-    "Para cada categoría, presenta fichas con: **Nombre del actor** — Rol en el ecosistema — "
-    "Relevancia estratégica para la empresa. Cubre estas categorías:\n"
-    "- Proveedores clave (materia prima, tecnología, servicios)\n"
-    "- Clientes tipo (segmentos principales)\n"
-    "- Gremios y asociaciones sectoriales\n"
-    "- Reguladores y entidades de control\n\n"
-    "## 4.2. Ecosistema Global\n\n"
-    "Mapea los actores internacionales que influyen en la industria de la empresa. "
-    "Mismo formato de fichas. Cubre estas categorías:\n"
-    "- Partners y aliados estratégicos internacionales\n"
-    "- Organismos sectoriales internacionales\n"
-    "- Grandes clientes o mercados de exportación relevantes\n\n"
-    "## 4.3. Actores Disruptores\n\n"
-    "Identifica startups, scale-ups y tecnologías emergentes que están reconfigurando "
-    "el sector a nivel global y latinoamericano. "
-    "Para cada actor: **Nombre** — Modelo de negocio disruptivo — Amenaza u oportunidad "
-    "para la empresa — Horizonte de impacto (Corto: 0-2 años / Mediano: 2-5 años / Largo: +5 años). "  # noqa: E501
-    "Incluye al menos 4 actores disruptores con evidencia de mercado."
+    "\"El panorama del ecosistema analiza los movimientos corporativos que reconfiguran la "
+    "cadena de valor del sector: inversiones, integraciones verticales, fusiones y adquisiciones, "
+    "joint ventures y alianzas de abastecimiento. Comprender estos movimientos permite anticipar "
+    "cambios en la estructura competitiva y detectar oportunidades de posicionamiento.\"\n\n"
+    "Desarrolla exactamente las siguientes secciones en este orden:\n\n"
+    "## 4.1. Inversiones\n\n"
+    "Inversiones relevantes en empresas, startups o capacidad productiva del sector.\n"
+    + _FORMATO_EVENTO
+    + "## 4.2. Integraciones Verticales\n\n"
+    "Movimientos de integración hacia proveedores o canales de distribución.\n"
+    + _FORMATO_EVENTO
+    + "## 4.3. Fusiones y Adquisiciones (M&A)\n\n"
+    "Operaciones de fusión o adquisición entre actores del sector.\n"
+    + _FORMATO_EVENTO
+    + "## 4.4. Joint Ventures\n\n"
+    "Empresas conjuntas y sociedades de riesgo compartido entre actores del sector.\n"
+    + _FORMATO_EVENTO
+    + "## 4.5. Alianzas de Compra y Abastecimiento\n\n"
+    "Acuerdos de compra, abastecimiento o colaboración comercial entre actores del sector.\n"
+    + _FORMATO_EVENTO.rstrip()
 )
 
 

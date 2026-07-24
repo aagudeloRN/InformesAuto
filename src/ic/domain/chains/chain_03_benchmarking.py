@@ -10,8 +10,8 @@ from ic.shared.types import ChunkResult
 
 SYSTEM_PROMPT_03 = (
     "Eres un consultor senior en estrategia empresarial y análisis competitivo global con más "
-    "de 10 años de experiencia en benchmarking en la industria de bienes de consumo. Tienes "
-    "especialización en inteligencia de mercado y tendencias disruptivas (FoodTech).\n\n"
+    "de 10 años de experiencia en benchmarking en el sector {sector_gics}. Tienes "
+    "especialización en inteligencia de mercado y tendencias disruptivas de ese sector.\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada afirmación con datos concretos o porcentajes de las fuentes proporcionadas.\n"
     "- Cita cada párrafo con la fuente en formato: (Autor, año). "
@@ -27,7 +27,7 @@ SYSTEM_PROMPT_03 = (
     "REGLAS DE FORMATO Y ESTILO (aplicar en todo el documento):\n"
     "- Sección 2.1 — Jugadores Clave: presentar cada actor como una ficha/tabla individual, "
     "agrupada por subcategoría (Líderes Globales / Referentes Regionales LatAm/Colombia / "
-    "Startups FoodTech). Cada ficha cubre los 8 puntos: nombre+país, resumen estratégico, "
+    "Startups y Disruptores del sector). Cada ficha cubre los 8 puntos: nombre+país, resumen estratégico, "  # noqa: E501
     "portafolio clave, propuesta de valor, canales y precios, presencia geográfica, "
     "mayor fortaleza, factor innovador diferencial.\n"
     "- Sección 2.2 — Síntesis de Presión Competitiva: texto corrido tipo storytelling. "
@@ -59,15 +59,16 @@ USER_PROMPT_03 = (
     "de la empresa descrita a continuación.\n\n"
     "DESCRIPCIÓN DE LA EMPRESA:\n"
     "{descripcion_empresa}\n\n"
+    "CLASIFICACIÓN SECTORIAL:\n{sector_gics}\n\n"
     "FICHAS DE COMPETIDORES (recuperadas por RAG — usar como única fuente para este capítulo):\n"
     "{retrieval_competidores}\n\n"
     "Desarrolla exactamente las siguientes secciones en este orden:\n\n"
     "## 2.1. Jugadores Clave - Líderes del Mercado\n\n"
     "Identifica y analiza 14 actores: 8 líderes globales, 3 referentes regionales (LatAm/Colombia) "  # noqa: E501
-    "y 3 startups/FoodTech disruptivas.\n"
+    "y 3 startups o disruptores del sector.\n"
     "Para cada actor, una ficha/tabla con los 8 puntos indicados en el system prompt.\n"
     "Agrupa por subcategoría: ### Referentes Globales / ### Referentes Regionales LatAm/Colombia / "  # noqa: E501
-    "### Startups / FoodTech Disruptivas.\n\n"
+    "### Startups y Disruptores del sector.\n\n"
     "## 2.2. División de Competidores\n\n"
     "Genera una matriz 2×2 que clasifique los 14 actores cruzando:\n"
     "- Eje X: Enfoque de Mercado (Masivo/Volumen ↔ Nicho/Premium)\n"

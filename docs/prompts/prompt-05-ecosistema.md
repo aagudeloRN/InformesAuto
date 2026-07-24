@@ -1,66 +1,43 @@
-# Prompt-05 (chain_05): Capítulo 4 — Ecosistema Empresarial
+# Prompt-05 (chain_05): Capítulo 4 — Panorama del Ecosistema
 
 > **Chain operativa:** `src/ic/domain/chains/chain_05_ecosistema.py` (`build_chain_05`).
 > **Fuente original:** `source_prompts/7. Prompt - Capítulo 4 - Panorama Ecosistema.docx`.
-> **Rol:** Analista senior en mapeo de ecosistemas empresariales y cadenas de valor.
+> **Rol:** Analista senior en movimientos corporativos y dinámica de ecosistemas.
 > **Entrada:** `{descripcion_empresa}`, `{sector_gics}`, `{retrieval_sector}`, `{fuentes_web}`.
-> **Salida:** Markdown con párrafo intro fijo + 4.1 + 4.2 + 4.3.
+> **Salida:** Markdown con párrafo intro fijo + 4.1 + 4.2 + 4.3 + 4.4 + 4.5.
 > **N1** en el DAG (paralelizable con Cap 2/3).
 
 ---
 
-## ⚠️ Divergencia MAYOR vs el patrón Noel (Fase 20 — brecha 🔴)
+## ✅ Divergencia MAYOR vs el patrón Noel — CERRADA en Fase 21 (T21.8, DT-046)
 
-La cadena **reescribió por completo** la estructura del capítulo respecto al `source_prompt` y al
-patrón `InformeSectoryCompetitivoNoel.docx`:
+Hasta Fase 20 la chain mapeaba **actores** del ecosistema (Local/Global/Disruptores) en lugar de
+analizar los **movimientos** que pide el patrón. En Fase 21 se reescribió al patrón Noel:
 
-| | Patrón Noel / `source_prompt 7` | Chain operativa actual |
+| | Patrón Noel / `source_prompt 7` | Chain operativa (F21) |
 |---|---|---|
-| 4.1 | **Inversiones** en startups/empresas locales | Ecosistema Local (Medellín/Colombia) |
-| 4.2 | **Integraciones verticales** y acuerdos proveedores | Ecosistema Global |
-| 4.3 | **Fusiones y adquisiciones (M&A)** | Actores Disruptores |
-| 4.4 | **Joint ventures** | — (no existe) |
-| 4.5 | **Alianzas de compra y abastecimiento** | — (no existe) |
-| Unidad de análisis | **Evento** (3 por subcap): Título + ejecución + *capacidad estratégica adquirida* + *vulnerabilidad mitigada* | Ficha de actor (nombre/rol/relevancia) |
-| Foco geográfico | Local **obligatorio** (Medellín/Antioquia/Colombia) | Local + Global |
+| 4.1 | **Inversiones** | ✅ Inversiones |
+| 4.2 | **Integraciones verticales** | ✅ Integraciones Verticales |
+| 4.3 | **Fusiones y adquisiciones (M&A)** | ✅ Fusiones y Adquisiciones (M&A) |
+| 4.4 | **Joint ventures** | ✅ Joint Ventures |
+| 4.5 | **Alianzas de compra y abastecimiento** | ✅ Alianzas de Compra y Abastecimiento |
+| Unidad de análisis | **Evento** (3 por subcap): Título + ejecución + *capacidad estratégica adquirida* + *vulnerabilidad mitigada* | ✅ mismo formato de evento |
+| Foco geográfico | Colombia / América Latina cuando la evidencia lo permita | ✅ |
 
-**Consecuencia:** el capítulo actual mapea actores del ecosistema (proveedores, gremios,
-reguladores, disruptores) en lugar de analizar los **movimientos del ecosistema** (inversiones,
-M&A, JV, alianzas) que pide el patrón. Es la mayor divergencia de contenido detectada en Fase 20.
-
-**Decisión:** rediseño agendado en **F21** (nueva tarea T21.5, ver `FASE20_HALLAZGOS.md`).
-La chain **no se toca en Fase 20**.
+El rol se des-sesga por `{sector_gics}` (coherente con T21.5) y RN-001 se preserva: si no hay 3
+eventos con evidencia, se emiten los que existan y el resto reporta "Dato no disponible en
+fuentes consultadas".
 
 ---
 
-## System Prompt (constante — transcrito de la chain)
+## Estructura del capítulo (user prompt vigente)
 
-```
-Eres un analista estratégico senior especializado en mapeo de ecosistemas empresariales
-y análisis de cadenas de valor, con experiencia en los sectores industriales de América Latina.
+- **Párrafo introductorio fijo** (enfoque de movimientos corporativos).
+- **4.1 Inversiones** — 3 eventos (formato Título + ejecución + capacidad + vulnerabilidad).
+- **4.2 Integraciones Verticales** — 3 eventos.
+- **4.3 Fusiones y Adquisiciones (M&A)** — 3 eventos.
+- **4.4 Joint Ventures** — 3 eventos.
+- **4.5 Alianzas de Compra y Abastecimiento** — 3 eventos.
 
-REGLAS DE CONTENIDO:
-- Sustenta cada afirmación clave con datos de las fuentes proporcionadas.
-- Si un dato no está disponible: "Dato no disponible en fuentes consultadas."
-- No inventar actores, alianzas ni relaciones bajo ninguna circunstancia.
-- No menciones escasez de fuentes; solo reporta el estado del dato.
-- IDIOMA OBLIGATORIO: español latino neutro.
-
-REGLAS DE ESTILO:
-- Tono ejecutivo y directo. Prohibido: "podría", "quizás", "en resumen", "por lo tanto",
-  "cabe destacar", "es importante mencionar".
-- Sin adjetivos vacíos salvo evidencia cuantificable.
-- Cada actor/categoría: ficha con nombre, rol y relevancia estratégica.
-- Sin mini-checklists ni meta-comentarios. Sin citaciones inline.
-```
-
-## Estructura del capítulo (user prompt actual)
-
-- **Párrafo introductorio fijo.**
-- **4.1 Ecosistema Local (Medellín/Colombia):** fichas de proveedores, clientes, gremios, reguladores.
-- **4.2 Ecosistema Global:** partners internacionales, organismos, mercados de exportación.
-- **4.3 Actores Disruptores:** ≥4 startups/tecnologías emergentes con horizonte de impacto.
-
-> Nota: la chain emite `## 4.1/4.2/4.3`. `renumber_subheadings()` (DT-032) corrige cualquier
-> prefijo mal numerado en el ensamblado. Los outputs de `output/` con `5.x` bajo Cap 4 son
-> **previos** a ese fix (verificado en Fase 20).
+> Nota: la chain emite `## 4.1–4.5`. `renumber_subheadings()` (DT-032) corrige cualquier prefijo
+> mal numerado en el ensamblado.

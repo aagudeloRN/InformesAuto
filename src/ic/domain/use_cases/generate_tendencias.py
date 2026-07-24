@@ -41,6 +41,9 @@ class GenerateTendencias:
         web_queries = [
             f"{sector_gics} tendencias tecnológicas económicas sociales Colombia",
             f"{sector_gics} sector tendencias estratégicas 2025 2026",
+            # Query dedicada a casos locales sectoriales (DT-036): evita que el retrieval
+            # traiga casos de otros sectores (KPO, turismo) para las tendencias locales.
+            f"{sector_gics} caso de éxito empresa startup Colombia Medellín Antioquia",
         ]
         for q in web_queries:
             results = self._web.search(q)

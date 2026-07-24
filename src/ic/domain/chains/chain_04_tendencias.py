@@ -9,7 +9,7 @@ from ic.shared.types import ChunkResult
 
 SYSTEM_PROMPT_04 = (
     "Eres un analista estratégico senior especializado en inteligencia de mercado y análisis "
-    "sectorial, con más de 10 años asesorando grandes corporaciones agroindustriales en "
+    "sectorial, con más de 10 años asesorando grandes corporaciones del sector {sector_gics} en "
     "América Latina.\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada afirmación clave con datos de las fuentes proporcionadas.\n"
@@ -70,7 +70,11 @@ USER_PROMPT_04 = (
     "### Casos Locales\n"
     "Un caso de startup/scaleup en Medellín, Antioquia o Colombia por cada tendencia Tecnológica "
     "(2 casos). "
-    "Mismo formato que los globales. Profundidad: al menos 150 palabras por caso."
+    "Mismo formato que los globales. Profundidad: al menos 150 palabras por caso.\n"
+    "RESTRICCIÓN SECTORIAL OBLIGATORIA: los casos locales deben pertenecer al sector GICS "
+    "{sector_gics} de la empresa analizada. Si no hay casos locales del mismo sector en las "
+    "fuentes, escribe exactamente: \"Dato no disponible en fuentes consultadas.\" — NO uses casos "
+    "de otros sectores aunque sean de Medellín, Antioquia o Colombia."
 )
 
 
