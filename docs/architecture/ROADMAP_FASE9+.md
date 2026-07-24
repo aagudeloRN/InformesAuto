@@ -169,6 +169,7 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-047 | **Deriva del nº de áreas en Cap 5**: la variante paralela `chain_06a` (RN-009) permite que el LLM improvise áreas (avianca 5.1–5.7 vs 4 fijas del distrito). Restringir a las 4 áreas del patrón. | 22 | ⬜ Detectado en Fase 20 (T20.2). |
 | DT-048 | **Score de calidad no automatizado**: `docs/eval/RUBRICA_CALIDAD.md` es manual. Cablear un LLM-judge (temperatura 0) que la aplique sobre el `.docx` y emita score por capítulo, para medir regresión de calidad entre fases. | 22 | ⬜ Propuesto en Fase 20 (T20.1). Severidad Baja. |
 | DT-049 | **Evidencia RAG delgada / baja diversidad de fuentes**: en el E2E de cierre F21 (Alpina 3020) el informe citó **solo 3 referencias** (2 documentos compilados + 1 web) con **18 "Dato no disponible"** y Cap 2.1 (fichas de competidor) ausente. Diagnóstico en BD: 2687 chunks totales, 3020 con 44 chunks sectoriales + 594 globales, pero los 44 provienen de **un único documento compilado** por sector → poca diversidad de fuentes citables. **Causa confirmada 2026-07-24:** el lote EMIS diverso (250 PDFs, p. ej. 3020 tiene 13 fuentes: CFA, EMIS, Euromonitor, GlobalData…) **está en disco pero NUNCA se ingestó** (DT-034); la BD solo tiene los compilados de Fase 13. La búsqueda web devolvió 122 chunks pero solo **1 se citó** (resultados poco relevantes tipo `todolicitaciones.cl`; el resto lo purga ADR-013 "solo citado"). Las secciones granulares nuevas (fichas de competidor, 2.3 tabla de mercado, Cap 4 eventos M&A/JV) exigen datos que el corpus compilado no contiene. **Acciones:** (F23) **ingestar el lote EMIS de `documentos_sectoriales/FuentesEMIS/` (ver DT-034)** — es la palanca directa; luego evaluar búsqueda paga; (F22) afinar retrieval/breadth — investigar por qué solo 1 de 122 chunks web se cita, mejorar queries web por competidor con entidades extraídas de Cap 1/2 (T22.4 enriquecimiento dirigido), y revisar si la reserva sectorial y la purga ADR-013 son demasiado agresivas cuando el corpus es concentrado. | 23 (corpus/DT-034) / 22 (retrieval) | ⬜ **Detectado en el E2E de cierre F21** (2026-07-24). Evidencia: `FASE21_HALLAZGOS.md §5`. La mitad de corpus se resuelve ingestando el lote EMIS ya disponible. |
+| DT-050 | **Base de conocimiento de empresas (directorio + acumulación)**: los informes siempre buscan competidores/jugadores del mismo sector y hoy esa identificación se recomputa por web en cada corrida (y ADR-013 descarta casi todo). Propuesta: tabla `informes_ic.empresas_directorio` que (a) se **siembra** del corpus `documentos_sectoriales/FuentesEMIS/EmpresasColombia/` (~97.935 empresas colombianas de ISI Markets/WVB: nombre, sector local, actividad, ingreso, ciudad, empleados, descripción, NIT), (b) se **nutre** con las entidades identificadas en cada informe, y (c) se **cura con intervención humana** más adelante (`curado` bool; el usuario indicó "todavía no"). Inyectar jugadores locales como contexto estructurado en Cap 2/4 cierra la mitad "local" de DT-049. Retos: mapeo Sector-Local→GICS, volumen ~98k, dedup por NIT, ToS. Diseño completo en `docs/architecture/PROPUESTA_BASE_EMPRESAS.md`. | 23 (o mini-fase previa) | ⬜ **Propuesto 2026-07-24** (activos aportados por el usuario). No implementado; requiere Plan Mode. Curación humana → HITL (F24/F25). |
 
 > **Nota de numeración DT-035 (Fase 19):** `FASE18_HALLAZGOS.md §9` reutilizó el ID "DT-035"
 > para "verificación E2E de Alpina" (que el §7 de esa misma fase marca ✅ 4/4). El **DT-035
@@ -1833,6 +1834,16 @@ gratuitos se quedan cortos (perfiles de competidores, noticias LatAm, datos de m
 - [ ] **T23.4 — Decisión → ADR-016.** Proveedor(es), presupuesto mensual, routing de
       búsqueda por tipo de query (genérica → gratuito/caché; perfil de competidor →
       pago/advanced). Config en `.env` + tabla de routing; nunca hardcodear.
+- [ ] **T23.5 (DT-050) — Base de conocimiento de empresas (directorio + acumulación).**
+      Diseño completo en `docs/architecture/PROPUESTA_BASE_EMPRESAS.md`. Plan Mode obligatorio.
+      Alcance mínimo sugerido: (a) tabla `informes_ic.empresas_directorio` + migración idempotente;
+      (b) `scripts/seed_empresas_directorio.py` que siembra del corpus
+      `documentos_sectoriales/FuentesEMIS/EmpresasColombia/` (~98k empresas; header en fila 8;
+      dedup por NIT) con mapeo Sector-Local→GICS (reutilizar `ciiu_gics.py` o tabla de mapeo);
+      (c) gancho de **lectura** en Cap 2/4 que inyecta jugadores locales del sector como contexto
+      estructurado. La **escritura automática** (nutrir el directorio con hallazgos del informe) y
+      la **curación humana** (`curado` bool + panel UI → HITL F24/F25) son iteraciones siguientes.
+      Verificar ToS de los datos (ISI Markets/WVB) antes de persistir/usar.
 
 ### Criterios de aceptación
 
@@ -1841,7 +1852,9 @@ gratuitos se quedan cortos (perfiles de competidores, noticias LatAm, datos de m
 3. Piloto A/B con tabla antes/después (rúbrica F20 y/o métricas del harness).
 4. ADR-016 registrado; el proveedor pago (si se adopta) opera tras wrapper con caché
    (`CachedWebConnector`) y presupuesto en `CostTracker`.
-5. Gate verde: ruff 0 + `pytest -m "not slow"`.
+5. (T23.5/DT-050) Directorio sembrado y consultable por sector; Cap 2/4 reciben jugadores
+   locales del directorio (demo/test). Curación humana pospuesta.
+6. Gate verde: ruff 0 + `pytest -m "not slow"`.
 
 ### PROMPT DE ARRANQUE — Fase 23
 
