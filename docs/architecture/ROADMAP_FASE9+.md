@@ -109,7 +109,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 17 | Instrumentación, Radar y Pulido E2E | ✅ | 2026-07-23 | `7e6ec20`..`6927063` | `FASE17_HALLAZGOS.md` |
 | 18 | Evidencia y Citación | ✅ | 2026-07-23 | `8c6b8c2`..`7dcd676` | `FASE18_HALLAZGOS.md` |
 | 19 | Auditoría de Arquitectura, Código y Docs | ✅ | 2026-07-24 | _pendiente_ | `FASE19_HALLAZGOS.md` |
-| 20 | Gap Analysis de Calidad vs Informe Patrón (Noel) | ✅ | 2026-07-24 | `3d59a14` | `FASE20_HALLAZGOS.md` |
+| 20 | Gap Analysis de Calidad vs Informe Patrón (Noel) | ✅ | 2026-07-24 | `f08fc53` | `FASE20_HALLAZGOS.md` |
 | 21 | Calidad de Contenido — Sprint A (ex-F19) | ⬜ | — | — | — |
 | 22 | Coherencia y Robustez del Informe (ex-F20) | ⬜ | — | — | — |
 | 23 | Fuentes: Corpus EMIS completo + Búsqueda paga | ⬜ | — | — | — |
