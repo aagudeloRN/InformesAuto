@@ -122,6 +122,7 @@ def test_search_propaga_filtros_sector_y_activos():
     settings.rag_global_reserve = 0   # desactivar para este test
     settings.rag_empresa_reserve = 0  # desactivar para este test
     settings.rag_mmr_lambda = 1.0
+    settings.rag_min_distinct_docs = 0  # aísla la lógica de reservas del piso de diversidad (F22)
 
     embedder = MagicMock()
     embedder.embed.return_value = [0.1] * 768
@@ -157,6 +158,7 @@ def test_search_reserva_garantiza_chunks_sectoriales():
     settings.rag_global_reserve = 0   # desactivar para aislar comportamiento sectorial
     settings.rag_empresa_reserve = 0
     settings.rag_mmr_lambda = 1.0
+    settings.rag_min_distinct_docs = 0  # aísla la lógica de reservas del piso de diversidad (F22)
 
     def _chunk(cid, sector, tf):
         obj = MagicMock()
@@ -201,6 +203,7 @@ def test_search_reserva_global_garantiza_chunks_globales():
     settings.rag_global_reserve = 2
     settings.rag_empresa_reserve = 0
     settings.rag_mmr_lambda = 1.0
+    settings.rag_min_distinct_docs = 0  # aísla la lógica de reservas del piso de diversidad (F22)
 
     def _chunk(cid, es_global=False):
         obj = MagicMock()
@@ -246,6 +249,7 @@ def test_search_reserva_global_llama_con_flag_correcto():
     settings.rag_global_reserve = 2
     settings.rag_empresa_reserve = 0
     settings.rag_mmr_lambda = 1.0
+    settings.rag_min_distinct_docs = 0  # aísla la lógica de reservas del piso de diversidad (F22)
 
     embedder = MagicMock()
     embedder.embed.return_value = [0.1] * 768
