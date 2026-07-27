@@ -260,11 +260,26 @@ class GenerateInforme:
 
             ctx.step_fn(7, "Cap 6 — Accionables Estratégicos")
             if ctx.api_llm is not None:
+                # Coherencia (T22.1, Q1): pasar un resumen de los hallazgos de los caps ya
+                # generados (2/3/4/5) para que los accionables los referencien explícitamente,
+                # no solo el retrieval. Todos están disponibles en este punto del DAG.
+                from ic.domain.coherence import build_caps_summary
+                hallazgos = build_caps_summary([
+                    (etiqueta, obj.texto)
+                    for etiqueta, obj in [
+                        ("Cap 2 — Benchmarking", ctx.cap),
+                        ("Cap 3 — Tendencias", ctx.cap_tend),
+                        ("Cap 4 — Ecosistema", ctx.cap_eco),
+                        ("Cap 5 — Convergencia", ctx.cap_conv),
+                    ]
+                    if obj is not None and obj.retrieval_suficiente
+                ])
                 ctx.cap_acc = GenerateAccionables(
                     chain=build_chain_07(ctx.api_llm), store=store_n2,
                 ).execute(
                     nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
                     sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+                    hallazgos_caps_previos=hallazgos,
                 )
 
         ctx.step_fn(8, "Párrafos introductorios N2")
@@ -302,6 +317,7 @@ class GenerateInforme:
                 "Cap 2: Benchmarking": ctx.cap.texto,
             }
             for key, obj in [
+                ("Cap 2.3: Mercado", ctx.cap_mercado),
                 ("Cap 3: Tendencias", ctx.cap_tend),
                 ("Cap 4: Ecosistema", ctx.cap_eco),
                 ("Cap 5: Convergencia", ctx.cap_conv),

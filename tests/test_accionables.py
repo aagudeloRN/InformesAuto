@@ -70,6 +70,36 @@ class TestGenerateAccionables:
         assert "sector_gics" in call_kwargs
         assert "retrieval_cruzado" in call_kwargs
 
+    def test_execute_pasa_hallazgos_caps_previos(self):
+        """T22.1 (Q1): el resumen de caps previos llega al prompt de Cap 6."""
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = "OK"
+        mock_store = MagicMock()
+        mock_store.search.return_value = [_make_chunk(f"c{i}") for i in range(7)]
+
+        uc = GenerateAccionables(mock_chain, mock_store)
+        uc.execute(
+            "Noel", "Empresa.", "Alimentos",
+            hallazgos_caps_previos="## Cap 2\nAlpina lidera el sector lácteo.",
+        )
+
+        call_kwargs = mock_chain.invoke.call_args[0][0]
+        assert "hallazgos_caps_previos" in call_kwargs
+        assert "Alpina lidera" in call_kwargs["hallazgos_caps_previos"]
+
+    def test_execute_hallazgos_default_no_rompe(self):
+        """Sin hallazgos (default): usa un placeholder, no falla ni deja el campo ausente."""
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = "OK"
+        mock_store = MagicMock()
+        mock_store.search.return_value = [_make_chunk(f"c{i}") for i in range(7)]
+
+        uc = GenerateAccionables(mock_chain, mock_store)
+        uc.execute("Noel", "Empresa.", "Alimentos")
+
+        call_kwargs = mock_chain.invoke.call_args[0][0]
+        assert call_kwargs["hallazgos_caps_previos"]  # no vacío (placeholder)
+
     def test_execute_parrafo_ausencia_si_retrieval_insuficiente(self):
         uc = self._make_uc(chunks=[_make_chunk(f"c{i}") for i in range(3)])
         result = uc.execute("Empresa X", "Desc.", "Sector")
