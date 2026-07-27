@@ -291,6 +291,7 @@ class GenerateInforme:
         from ic.infrastructure.citation.apa_formatter import (
             build_references_section,
             find_orphan_citations,
+            strip_orphan_citations,
         )
         from ic.shared.types import InformePiloto
 
@@ -328,17 +329,29 @@ class GenerateInforme:
         # se promueven los efectivamente usados y se borra el resto de la búsqueda.
         self._promote_cited_web(ctx, todos_chunks)
 
+        # Saneamiento de citas huérfanas (T22.A2, DT-052): las citas (Autor, año) del texto sin
+        # referencia que las respalde se SUPRIMEN, no se inventa una fuente (RN-001). Se aplica a
+        # cada capítulo antes del ensamblado y de la detección residual.
+        caps_con_texto = [
+            ctx.cap, ctx.cap_mercado, ctx.cap_tend, ctx.cap_eco,
+            ctx.cap_conv, ctx.cap_acc, ctx.resumen,
+        ]
+        n_huerfanas_suprimidas = 0
+        for cap_obj in caps_con_texto:
+            if cap_obj is not None and getattr(cap_obj, "texto", None):
+                cap_obj.texto, n_sup = strip_orphan_citations(cap_obj.texto, refs)
+                n_huerfanas_suprimidas += n_sup
+        if n_huerfanas_suprimidas:
+            logger.info(
+                "Citas huérfanas suprimidas (sin referencia): %d", n_huerfanas_suprimidas
+            )
+
         texto_completo = " ".join(
-            c.texto
-            for c in [
-                ctx.cap, ctx.cap_mercado, ctx.cap_tend, ctx.cap_eco,
-                ctx.cap_conv, ctx.cap_acc, ctx.resumen,
-            ]
-            if c is not None
+            c.texto for c in caps_con_texto if c is not None
         )
         orphans = find_orphan_citations(texto_completo, refs)
         if orphans:
-            logger.warning("Citas huérfanas detectadas (sin referencia): %s", orphans)
+            logger.warning("Citas huérfanas residuales tras saneamiento: %s", orphans)
 
         caps_fiabilidad = [
             ("Cap 1 — Descripción", True),
@@ -359,6 +372,7 @@ class GenerateInforme:
             "caps_ausencia": [n for n, ok in caps_fiabilidad if not ok],
             "n_fuentes_total": len(refs),
             "n_citas_huerfanas": len(orphans),
+            "n_huerfanas_suprimidas": n_huerfanas_suprimidas,
             "tiempo_ollama_total_s": round(ctx.tracker.total_ollama_time_s(), 2),
         }
 
