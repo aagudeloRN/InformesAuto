@@ -4,6 +4,7 @@
 integradora (api_llm_synth). Tiempo estimado: ~15 min vs 79 min monolítico.
 """
 
+import logging
 from concurrent.futures import ThreadPoolExecutor
 
 from langchain_core.runnables import Runnable
@@ -11,10 +12,13 @@ from langchain_core.runnables import Runnable
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
 from ic.domain.chains.chain_06_convergencia import format_chunks_as_context
 from ic.domain.chains.chain_06a_convergencia_eje import EJE_MERCADO, EJE_SOCIAL, EJE_TECNOLOGICO
+from ic.domain.coherence import enforce_cap5_areas
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
 from ic.shared.text_utils import has_cjk_characters
 from ic.shared.types import CapConvergencia, ChunkResult
+
+logger = logging.getLogger(__name__)
 
 _MIN_CHUNKS = 5
 
@@ -107,6 +111,7 @@ class GenerateConvergencia:
                     retrieval_suficiente=False,
                     chunks_usados=unique_chunks,
                 )
+            texto = self._enforce_areas(texto)
             return CapConvergencia(texto=texto, n_chunks_usados=len(unique_chunks),
                                    retrieval_suficiente=True, chunks_usados=unique_chunks)
 
@@ -135,9 +140,20 @@ class GenerateConvergencia:
                 chunks_usados=unique_chunks,
             )
 
+        texto_final = self._enforce_areas(texto_final)
         return CapConvergencia(
             texto=texto_final,
             n_chunks_usados=len(unique_chunks),
             retrieval_suficiente=True,
             chunks_usados=unique_chunks,
         )
+
+    @staticmethod
+    def _enforce_areas(texto: str) -> str:
+        """Fija el Cap 5 a sus 4 áreas canónicas (T22.6, DT-047); loggea las eliminadas."""
+        saneado, eliminados = enforce_cap5_areas(texto)
+        if eliminados:
+            logger.info(
+                "Cap 5: subsecciones fuera de las 4 áreas canónicas eliminadas: %s", eliminados
+            )
+        return saneado
