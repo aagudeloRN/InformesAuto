@@ -100,3 +100,50 @@ _Pendiente de ejecutar (esperando fin de la indexación EMIS, por decisión del 
 ## 6. Métricas de cierre
 
 _Pendiente (se completa al cerrar Sprint A tras A3)._
+
+## 7. Sprint B adelantado (código, mientras indexa el corpus EMIS)
+
+Con Sprint A cerrado en código y la indexación EMIS de fondo (bloquea E2E/Ollama), se
+adelantaron dos tareas de Sprint B **solo-código + tests mockeados**:
+
+### T22.1 (Q1) — Coherencia: contexto de caps previos — commit `6e6e220`
+Cap 6 (Accionables) pedía "cruzar hallazgos de capítulos anteriores" pero su prompt solo
+recibía el retrieval RAG. Ahora recibe un resumen de Caps 2/3/4/5.
+- `domain/coherence.py` (nuevo): `build_caps_summary()` (helper puro que recorta/etiqueta).
+- `chain_07_accionables` + `generate_accionables`: variable `{hallazgos_caps_previos}` +
+  instrucción de referenciar un hallazgo concreto (retrocompatible con default).
+- `generate_informe`: `_run_n2` construye el resumen y lo pasa a Cap 6; `_run_n3` añade Cap 2.3
+  Mercado al `cap_textos` del Resumen (chain_08 ya recibía los demás caps → esa mitad de Q1
+  ya estaba resuelta). +6 tests.
+
+### T22.6 (DT-047) — Fijar 4 áreas en Cap 5 — commit `71d67d2`
+El Cap 5 generó 5.1–5.7 (avianca) en vez de las 4 áreas canónicas. La síntesis integraba los
+3 ejes sin prohibir inventar áreas.
+- `chain_06_convergencia`: prompt de síntesis endurecido a EXACTAMENTE 4 áreas (prohíbe 5.5+).
+- `coherence.py::enforce_cap5_areas()`: elimina subsecciones `## 5.N` con N>4 (defensa en
+  profundidad, RN-safe), aplicado en ambas rutas de `generate_convergencia`. +4 tests.
+
+Suite tras Sprint B: **343 fast tests**, ruff 0.
+
+## 8. Verificación multi-sector (DT-053) — 2026-07-27
+
+**Pregunta:** ¿un informe EMIS puede servir a varios sectores/subsectores? **Sí, y el diseño
+ya lo soporta** (Fase 18 T18.4):
+- **Ingesta** (`pdf_ingestor.py`): la columna CSV `sectores_adicionales` se guarda como
+  `metadatos["sectores"] = [sector_primario] + adicionales`.
+- **Retrieval** (`embedding_repo.search_similar`, rama sectorial no-estricta):
+  `sector_gics = :sector OR jsonb_exists(sectores, :sector)` → el doc aflora en todos sus sectores.
+
+**Pero hay 3 salvedades** (→ DT-053; no bloquean lo hecho hoy):
+1. **Datos:** la columna `sectores_adicionales` está **vacía en las 250 filas** del CSV → hoy
+   ningún doc está multi-etiquetado (capacidad dormida). Requiere un pase de curación.
+2. **Idempotencia:** el batch salta por título los docs ya ingeridos, así que re-etiquetar un
+   doc existente NO surte efecto sin borrar/re-ingerir ese doc (o un update path).
+3. **Medición:** el harness (`retrieval_metrics.py`) y el anti-mezcla de A3 leen solo
+   `sector_gics` (primario); con docs multi-sector marcarían "contaminación" falsa. Al poblar
+   `sectores`, deben honrar el array. Hoy, con la columna vacía, el chequeo por `sector_gics`
+   es correcto.
+
+Esto refuerza el objetivo de la base documental (reducir dependencia de la búsqueda web,
+ADR-001/003) sin duplicar PDFs: un mismo informe transversal se cita en todos los sectores a
+los que aplica, y la web sigue como complemento.
