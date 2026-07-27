@@ -1697,19 +1697,40 @@ de disponibilidad.
       Referencias; endurecer el prompt para que el LLM cite (Autor, año) de las fuentes del
       contexto; y tratar huérfanas (mapear a la referencia real o suprimir la cita). Preservar
       RN-001 (sin inventar atribuciones). Tests de contrato (chunks → refs; huérfanas = 0).
-- [ ] **T22.A3 — Validación E2E (tras terminar la indexación EMIS).** Re-correr Alpina (3020) y
-      una empresa no alimentaria (2030 o 4010) y comparar contra `FASE21_HALLAZGOS.md §5.2`:
-      objetivo referencias 3 → **≥ 8 fuentes distintas** citadas, **0 citas huérfanas**, y las
-      fuentes EMIS (Euromonitor/CFA/EMIS/GlobalData) presentes en Referencias.
+- [ ] **T22.A3 — Validación E2E sobre sectores COMPLETOS (≥2) + anti-mezcla de sectores.**
+      1. **Identificar sectores completos**: comparar los documentos ingestados por sector en BD
+         contra el nº de filas por sector en `indice_emis.csv`. Sector completo = todos sus docs
+         presentes. Helper SQL:
+         ```sql
+         SELECT metadatos->>'sector_gics' AS s, count(DISTINCT metadatos->>'titulo') AS docs
+         FROM informes_ic.embeddings_vectoriales
+         WHERE metadatos ? 'sector_gics' GROUP BY 1 ORDER BY 1;
+         ```
+         y comparar con `cut -d, -f2 indice_emis.csv | sort | uniq -c`. Por orden del CSV, los
+         primeros completos serán **3020 (Alimentos)** y **2510 (Automóviles y Componentes)**.
+      2. **Correr una empresa por sector, en ≥2 sectores DISTINTOS y completos** (p. ej. 3020 →
+         Alpina S.A.S. o Grupo Nutresa; 2510 → una empresa automotriz colombiana, p. ej. Sofasa
+         S.A. / Colmotores — confirmar antes que su GICS resuelto por `chain_02` cae en el sector
+         completo elegido; si no, elegir otra empresa/sector completo).
+      3. **Verificar por informe**:
+         - referencias 3 → **≥ 8 fuentes distintas** citadas, **0 huérfanas**, fuentes EMIS del
+           sector presentes en Referencias;
+         - **NO mezcla de sectores**: los chunks **sectoriales** citados pertenecen al `sector_gics`
+           de la empresa. Los documentos **globales** (`es_global=true`, InformeConvergenciaLocal)
+           SÍ están permitidos por diseño (ADR-012/018) → **exclúyelos** del chequeo anti-mezcla.
+           Comprobar el `sector_gics` de los `chunks_usados` citados: no debe aparecer un sector
+           específico ajeno (p. ej. el informe de Alpina no cita fuentes marcadas 2510/4010).
 
 ### Criterios de aceptación Sprint A
 
 1. El retrieval de una consulta sectorial devuelve chunks de **≥ 5 documentos distintos** cuando
    existen (medido con el harness).
-2. Referencias del informe: de 3 → **≥ 8 fuentes distintas** en la corrida de validación.
+2. Referencias del informe: de 3 → **≥ 8 fuentes distintas** en cada corrida de validación.
 3. **0 citas huérfanas** en el `.docx` de validación (o todas mapeadas a una referencia real).
-4. Sin regresión de precisión del retrieval (gold set del harness) ni de RN-001.
-5. Gate verde: ruff 0 + `pytest -m "not slow"` (≥322 fast tests).
+4. **Anti-mezcla**: en ≥2 sectores completos, los chunks sectoriales citados son del sector de la
+   empresa (globales exentos); ningún sector específico ajeno aparece citado.
+5. Sin regresión de precisión del retrieval (gold set del harness) ni de RN-001.
+6. Gate verde: ruff 0 + `pytest -m "not slow"` (≥322 fast tests).
 
 ---
 
@@ -1831,8 +1852,14 @@ OBJETIVOS SPRINT A (hoy):
   Sin degradar precisión. Tuning dentro de ADR-012/014 (no re-litigar).
 - T22.A2 (DT-052): que los chunks usados lleguen a Referencias; endurecer el prompt para citar
   (Autor, año) de las fuentes del contexto; resolver citas huérfanas. Preservar RN-001.
-- T22.A3: validación E2E TRAS la indexación — Alpina (3020) + una no-alimentaria (2030/4010).
-  Objetivo: referencias 3 → ≥8 distintas, 0 huérfanas, fuentes EMIS presentes en Referencias.
+- T22.A3: validación E2E sobre sectores COMPLETOS (≥2) + anti-mezcla. Identificar sectores
+  completos comparando docs/sector en BD vs filas/sector en indice_emis.csv (los primeros
+  completos por orden del CSV: 3020 Alimentos y 2510 Automóviles). Correr una empresa por sector
+  en ≥2 sectores distintos y completos (p. ej. 3020→Alpina; 2510→empresa automotriz colombiana,
+  confirmando que su GICS cae en el sector completo). Verificar por informe: referencias 3 → ≥8
+  distintas, 0 huérfanas, fuentes EMIS del sector presentes, y NO mezcla de sectores (los chunks
+  SECTORIALES citados son del sector de la empresa; los globales es_global=true están permitidos
+  por ADR-012/018 y se excluyen del chequeo anti-mezcla).
 
 REGLAS DURAS (CLAUDE.md TIER 1):
 - No hardcodear nombres de modelo (van en .env). No credenciales en código.
