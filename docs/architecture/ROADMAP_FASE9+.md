@@ -111,7 +111,7 @@ Leyenda de estado: ⬜ Pendiente · 🟡 En curso · ✅ Completada · ⏸️ Bl
 | 19 | Auditoría de Arquitectura, Código y Docs | ✅ | 2026-07-24 | _pendiente_ | `FASE19_HALLAZGOS.md` |
 | 20 | Gap Analysis de Calidad vs Informe Patrón (Noel) | ✅ | 2026-07-24 | `f08fc53` | `FASE20_HALLAZGOS.md` |
 | 21 | Calidad de Contenido — Sprint A + A' (ex-F19) | ✅ | 2026-07-24 | `1a96d7b`..`17a9a91` (merge `307ec4b`) | `FASE21_HALLAZGOS.md` |
-| 22 | Coherencia y Robustez del Informe (ex-F20) | ⬜ | — | — | — |
+| 22 | Evidencia, Retrieval y Coherencia (Sprint A: DT-049/052; Sprint B: coherencia) | 🟡 | — | — | — |
 | 23 | Fuentes: Corpus EMIS completo + Búsqueda paga | ⬜ | — | — | — |
 | 24 | HITL Módulo 1 — Gap Auditor (ex-F21) | ⬜ | — | — | — |
 | 25 | HITL Módulo 2 — Consistency Checker + UI (ex-F22) | ⬜ | — | — | — |
@@ -168,10 +168,10 @@ Se arrastra y actualiza entre fases. (Fuente: `ARQUITECTURA.md` §5 + hallazgos.
 | DT-046 | **Cap 4 estructura divergente**: `chain_05_ecosistema` produce Local/Global/Disruptores en vez de 4.1 Inversiones / 4.2 Integraciones verticales / 4.3 M&A / 4.4 Joint ventures / 4.5 Alianzas, con eventos (Título + capacidad estratégica adquirida + vulnerabilidad mitigada). Es la mayor divergencia de contenido. | 21 | ✅ **Cerrada F21 (T21.8, `beecd9c`)**: `chain_05` reescrita a 4.1–4.5 (movimientos corporativos), 3 eventos por subcap con los 4 campos del patrón. Doc `prompt-05` actualizado. |
 | DT-047 | **Deriva del nº de áreas en Cap 5**: la variante paralela `chain_06a` (RN-009) permite que el LLM improvise áreas (avianca 5.1–5.7 vs 4 fijas del distrito). Restringir a las 4 áreas del patrón. | 22 | ⬜ Detectado en Fase 20 (T20.2). |
 | DT-048 | **Score de calidad no automatizado**: `docs/eval/RUBRICA_CALIDAD.md` es manual. Cablear un LLM-judge (temperatura 0) que la aplique sobre el `.docx` y emita score por capítulo, para medir regresión de calidad entre fases. | 22 | ⬜ Propuesto en Fase 20 (T20.1). Severidad Baja. |
-| DT-049 | **Evidencia RAG delgada / baja diversidad de fuentes**: en el E2E de cierre F21 (Alpina 3020) el informe citó **solo 3 referencias** (2 documentos compilados + 1 web) con **18 "Dato no disponible"** y Cap 2.1 (fichas de competidor) ausente. Diagnóstico en BD: 2687 chunks totales, 3020 con 44 chunks sectoriales + 594 globales, pero los 44 provienen de **un único documento compilado** por sector → poca diversidad de fuentes citables. **Causa confirmada 2026-07-24:** el lote EMIS diverso (250 PDFs, p. ej. 3020 tiene 13 fuentes: CFA, EMIS, Euromonitor, GlobalData…) **está en disco pero NUNCA se ingestó** (DT-034); la BD solo tiene los compilados de Fase 13. La búsqueda web devolvió 122 chunks pero solo **1 se citó** (resultados poco relevantes tipo `todolicitaciones.cl`; el resto lo purga ADR-013 "solo citado"). Las secciones granulares nuevas (fichas de competidor, 2.3 tabla de mercado, Cap 4 eventos M&A/JV) exigen datos que el corpus compilado no contiene. **Acciones:** (F23) **ingestar el lote EMIS de `documentos_sectoriales/FuentesEMIS/` (ver DT-034)** — es la palanca directa; luego evaluar búsqueda paga; (F22) afinar retrieval/breadth — investigar por qué solo 1 de 122 chunks web se cita, mejorar queries web por competidor con entidades extraídas de Cap 1/2 (T22.4 enriquecimiento dirigido), y revisar si la reserva sectorial y la purga ADR-013 son demasiado agresivas cuando el corpus es concentrado. | 23 (corpus/DT-034) / 22 (retrieval) | ⬜ **Detectado en el E2E de cierre F21** (2026-07-24). Evidencia: `FASE21_HALLAZGOS.md §5`. La mitad de corpus se resuelve ingestando el lote EMIS ya disponible. |
+| DT-049 | **Evidencia RAG delgada / baja diversidad de fuentes**: en el E2E de cierre F21 (Alpina 3020) el informe citó **solo 3 referencias** (2 documentos compilados + 1 web) con **18 "Dato no disponible"** y Cap 2.1 (fichas de competidor) ausente. Diagnóstico en BD: 2687 chunks totales, 3020 con 44 chunks sectoriales + 594 globales, pero los 44 provienen de **un único documento compilado** por sector → poca diversidad de fuentes citables. **Causa confirmada 2026-07-24:** el lote EMIS diverso (250 PDFs, p. ej. 3020 tiene 13 fuentes: CFA, EMIS, Euromonitor, GlobalData…) **está en disco pero NUNCA se ingestó** (DT-034); la BD solo tiene los compilados de Fase 13. La búsqueda web devolvió 122 chunks pero solo **1 se citó** (resultados poco relevantes tipo `todolicitaciones.cl`; el resto lo purga ADR-013 "solo citado"). Las secciones granulares nuevas (fichas de competidor, 2.3 tabla de mercado, Cap 4 eventos M&A/JV) exigen datos que el corpus compilado no contiene. **Acciones:** (F23) **ingestar el lote EMIS de `documentos_sectoriales/FuentesEMIS/` (ver DT-034)** — es la palanca directa; luego evaluar búsqueda paga; (F22) afinar retrieval/breadth — investigar por qué solo 1 de 122 chunks web se cita, mejorar queries web por competidor con entidades extraídas de Cap 1/2 (T22.4 enriquecimiento dirigido), y revisar si la reserva sectorial y la purga ADR-013 son demasiado agresivas cuando el corpus es concentrado. | **22 (Sprint A, hoy)** / 23 (corpus) | 🟡 **En curso**: retrieval → F22 Sprint A (T22.A1); corpus → indexación EMIS de fondo (T23.1, lanzada). Evidencia: `FASE21_HALLAZGOS.md §5`. |
 | DT-050 | **Base de conocimiento de empresas (directorio + acumulación)**: los informes siempre buscan competidores/jugadores del mismo sector y hoy esa identificación se recomputa por web en cada corrida (y ADR-013 descarta casi todo). Propuesta: tabla `informes_ic.empresas_directorio` que (a) se **siembra** del corpus `documentos_sectoriales/FuentesEMIS/EmpresasColombia/` (~97.935 empresas colombianas de ISI Markets/WVB: nombre, sector local, actividad, ingreso, ciudad, empleados, descripción, NIT), (b) se **nutre** con las entidades identificadas en cada informe, y (c) se **cura con intervención humana** más adelante (`curado` bool; el usuario indicó "todavía no"). Inyectar jugadores locales como contexto estructurado en Cap 2/4 cierra la mitad "local" de DT-049. Retos: mapeo Sector-Local→GICS, volumen ~98k, dedup por NIT, ToS. Diseño completo en `docs/architecture/PROPUESTA_BASE_EMPRESAS.md`. | 23 (o mini-fase previa) | ⬜ **Propuesto 2026-07-24** (activos aportados por el usuario). No implementado; requiere Plan Mode. Curación humana → HITL (F24/F25). |
 | DT-051 | **Ingesta de PDF falla con bytes NUL**: al ingestar el lote EMIS del sector 3020, 10 de 13 PDFs (todos los Euromonitor "Sector Capsule") fallaron con `ValueError: A string literal cannot contain NUL (0x00) characters` — esos PDFs inyectan 0x00 en el texto extraído y PostgreSQL lo rechaza en columnas TEXT. Euromonitor aparece en muchos sectores del lote, así que bloqueaba buena parte del corpus. | — | ✅ **Cerrada F21-post (`1be4993`, merge `3256403`)**: `_sanitize_text()` en `pdf_ingestor.py` elimina NUL y controles C0 (conserva tab/LF/CR) antes de chunkar; +1 test. |
-| DT-052 | **Atribución/citación no sigue al corpus recuperado**: prueba A/B de Alpina tras enriquecer el sector 3020 (44→286 chunks / 14 docs). El **contenido mejoró mucho** (Cap 2.1 de ausente → 14 fichas de competidor en tabla; radar de placeholder → datos reales del LLM; 1→16 tablas Word), pero **la citación NO**: las 14 fuentes EMIS nuevas no aparecen en Referencias (siguen 3) ni sus nombres en el texto (Euromonitor/CFA/GlobalData = 0 menciones); 0 chunks web citados (123 descartados por ADR-013); y se detectó una **cita huérfana** `(Alpina, Carvajal Empaques, 2019)`. Riesgo **RN-001**: sin atribución no se puede verificar que las fichas nuevas estén ancladas a fuentes vs sintetizadas. Causa probable: la reserva sectorial/`rag_max_chunks_per_doc` favorece el doc compilado y `build_references_section` solo surface los chunks efectivamente en `chunks_usados`; el LLM redacta desde el contexto sin emitir citas trazables por fuente. **Acción:** en F22 (con T22.4/DT-049) — asegurar que las fuentes recuperadas y usadas se citen y aparezcan en Referencias, resolver huérfanas, y medir nº de fuentes distintas citadas. | 22 | ⬜ **Detectado en la prueba A/B post-ingesta EMIS** (2026-07-24). Evidencia: `FASE21_HALLAZGOS.md §5`. |
+| DT-052 | **Atribución/citación no sigue al corpus recuperado**: prueba A/B de Alpina tras enriquecer el sector 3020 (44→286 chunks / 14 docs). El **contenido mejoró mucho** (Cap 2.1 de ausente → 14 fichas de competidor en tabla; radar de placeholder → datos reales del LLM; 1→16 tablas Word), pero **la citación NO**: las 14 fuentes EMIS nuevas no aparecen en Referencias (siguen 3) ni sus nombres en el texto (Euromonitor/CFA/GlobalData = 0 menciones); 0 chunks web citados (123 descartados por ADR-013); y se detectó una **cita huérfana** `(Alpina, Carvajal Empaques, 2019)`. Riesgo **RN-001**: sin atribución no se puede verificar que las fichas nuevas estén ancladas a fuentes vs sintetizadas. Causa probable: la reserva sectorial/`rag_max_chunks_per_doc` favorece el doc compilado y `build_references_section` solo surface los chunks efectivamente en `chunks_usados`; el LLM redacta desde el contexto sin emitir citas trazables por fuente. **Acción:** F22 Sprint A T22.A2 — asegurar que las fuentes recuperadas y usadas se citen y aparezcan en Referencias, resolver huérfanas, y medir nº de fuentes distintas citadas. | **22 (Sprint A, hoy)** | 🟡 **En curso** en F22 Sprint A. Detectado en la prueba A/B post-ingesta EMIS (2026-07-24). Evidencia: `FASE21_HALLAZGOS.md §5.2`. |
 
 > **Nota de numeración DT-035 (Fase 19):** `FASE18_HALLAZGOS.md §9` reutilizó el ID "DT-035"
 > para "verificación E2E de Alpina" (que el §7 de esa misma fase marca ✅ 4/4). El **DT-035
@@ -1648,12 +1648,74 @@ LECTURAS OBLIGATORIAS al arrancar:
 
 ---
 
-# FASE 22 — Coherencia y Robustez del Informe (ex-F20 en v2.5)
+# FASE 22 — Evidencia, Retrieval y Coherencia (re-scoped 2026-07-24)
 
-**Prioridad:** P0 · **Estimación:** ~2–3 días · **Estado:** ⬜ Pendiente
-**Deuda:** DT-027 (radar 50%), DT-030 (checkpoint), Q1 (coherencia post-gen)
+**Prioridad:** P0 · **Estimación:** ~3–4 días (2 sprints) · **Estado:** ⬜ Pendiente
+**Deuda:** **DT-049 (breadth/diversidad de retrieval), DT-052 (citación no sigue al corpus)** —
+Sprint A prioritario; DT-027 (radar), DT-030 (checkpoint), DT-047 (áreas Cap 5), DT-048 (LLM-judge),
+Q1 (coherencia) — Sprint B.
 
-### Objetivo
+> **Re-scoping (2026-07-24):** la prueba A/B post-ingesta EMIS (`FASE21_HALLAZGOS.md §5.2`) mostró
+> que enriquecer el corpus **mejora mucho el contenido pero no la citación** (referencias planas en
+> 3, fuentes EMIS no citadas, cita huérfana). El cuello de botella ahora es **retrieval + citación**,
+> no el corpus. Por eso F22 lidera con **Sprint A — Evidencia y Retrieval** (DT-049/052), que corre
+> en **paralelo a la indexación EMIS de fondo** (código puro + harness, sin Ollama/E2E). El bloque
+> original de coherencia/robustez pasa a **Sprint B**.
+
+---
+
+## SPRINT A — Evidencia y Retrieval (prioritario, hoy; paralelo a la indexación EMIS)
+
+### Objetivo Sprint A
+
+Que el corpus enriquecido se traduzca en **fuentes diversas y trazables** en el informe. Hoy, con
+286 chunks / 14 docs en el sector 3020, el retrieval por capítulo concentra los chunks en ~2-3
+documentos (el compilado) → solo 3 referencias, y las fuentes EMIS usadas para el contenido **no se
+citan** (riesgo RN-001: no se puede verificar el anclaje). Es problema de retrieval + citación, no
+de disponibilidad.
+
+### Contexto / causa raíz (verificado en código 2026-07-24)
+
+- `PGVectorStore.search()` usa `rag_top_k` + `rag_max_chunks_per_doc=4` + reservas
+  (sector 3, global 2, empresa 2) + MMR. Con top_k≈10 y cap 4/doc, el resultado abarca ~2-3
+  documentos → poca diversidad de fuentes. Palancas: `rag_top_k`, `rag_max_chunks_per_doc`,
+  reservas, y/o garantía de "mínimo N documentos distintos" en el ensamblado del retrieval.
+- `build_references_section(todos_chunks)` (apa_formatter) es **fiel**: emite 1 ref por documento
+  presente en `chunks_usados`. Si solo hay 3 refs es porque `chunks_usados` solo tiene 3 docs.
+- `find_orphan_citations()` ya detecta huérfanas; en el A/B apareció `(Alpina, Carvajal, 2019)`.
+
+### Tareas Sprint A
+
+- [ ] **T22.A1 (DT-049) — Diversidad de retrieval.** Con el harness `scripts/eval_retrieval.py`
+      (Fase 14, T14.1), medir nº de documentos distintos por consulta ANTES y ajustar palancas
+      (`rag_max_chunks_per_doc`, `rag_top_k`, reservas) y/o añadir una garantía de "≥ N docs
+      distintos" en `PGVectorStore.search()`. Objetivo: subir la diversidad sin degradar precisión
+      (usar el gold set del harness). No re-litigar ADR-012/014; tuning dentro de sus parámetros.
+      Tests unitarios con mocks del repo.
+- [ ] **T22.A2 (DT-052) — La citación sigue al corpus + huérfanas.** Verificar que los chunks
+      efectivamente usados (`chunks_usados`) lleguen a `build_references_section` y aparezcan en
+      Referencias; endurecer el prompt para que el LLM cite (Autor, año) de las fuentes del
+      contexto; y tratar huérfanas (mapear a la referencia real o suprimir la cita). Preservar
+      RN-001 (sin inventar atribuciones). Tests de contrato (chunks → refs; huérfanas = 0).
+- [ ] **T22.A3 — Validación E2E (tras terminar la indexación EMIS).** Re-correr Alpina (3020) y
+      una empresa no alimentaria (2030 o 4010) y comparar contra `FASE21_HALLAZGOS.md §5.2`:
+      objetivo referencias 3 → **≥ 8 fuentes distintas** citadas, **0 citas huérfanas**, y las
+      fuentes EMIS (Euromonitor/CFA/EMIS/GlobalData) presentes en Referencias.
+
+### Criterios de aceptación Sprint A
+
+1. El retrieval de una consulta sectorial devuelve chunks de **≥ 5 documentos distintos** cuando
+   existen (medido con el harness).
+2. Referencias del informe: de 3 → **≥ 8 fuentes distintas** en la corrida de validación.
+3. **0 citas huérfanas** en el `.docx` de validación (o todas mapeadas a una referencia real).
+4. Sin regresión de precisión del retrieval (gold set del harness) ni de RN-001.
+5. Gate verde: ruff 0 + `pytest -m "not slow"` (≥322 fast tests).
+
+---
+
+## SPRINT B — Coherencia y Robustez (después del Sprint A)
+
+### Objetivo Sprint B
 
 Mejorar la coherencia interna del informe generado y la robustez del pipeline ante fallos tardíos.
 Las corridas de Fase 17/18 evidencian tres problemas que requieren código, no solo corpus:
@@ -1679,7 +1741,7 @@ Las corridas de Fase 17/18 evidencian tres problemas que requieren código, no s
   Un fallo de red en el Resumen Ejecutivo hoy descarta todo. Implementar snapshot a BD de
   los caps N0/N1/N2 + función de reanudación (`--resume <session_id>`).
 
-### Tareas
+### Tareas Sprint B
 
 - [ ] **T22.1 (Q1) — Contexto de caps previos para Cap 6 y N3.** Pasar resúmenes de
       Caps 2/3/4 al prompt de Cap 6 (Accionables) y al prompt del Resumen Ejecutivo. Verificar
@@ -1688,6 +1750,10 @@ Las corridas de Fase 17/18 evidencian tres problemas que requieren código, no s
       scores del radar: LLM con temperatura 0, prompt estructurado, sin texto narrativo.
       Wrapper en `generate_benchmarking.py`; fallback al placeholder garantizado. Test: 5
       corridas con el mismo texto → 5/5 JSON parseables.
+      **NOTA (2026-07-24):** con el corpus 3020 enriquecido, la corrida A/B de Alpina emitió el
+      radar con **datos reales** (6 competidores, 5 dims), no placeholder. Antes de construir la
+      cadena dedicada, **re-medir el hit-rate** (N=5) sobre corpus enriquecido: puede que el
+      problema se atenúe y DT-027 baje de prioridad o se cierre con solo el endurecimiento del prompt.
 - [ ] **T22.3 (DT-030) — Checkpoint de caps N0/N1/N2 a BD.** Persistir el texto de cada
       capítulo completado (columna JSONB en `historial_informes` o tabla `caps_cache`).
       Flag `--resume <session_id>` en `run_pilot.py` que recarga los caps cacheados y salta
@@ -1724,50 +1790,67 @@ Las corridas de Fase 17/18 evidencian tres problemas que requieren código, no s
 
 ```
 Eres Claude Code trabajando en el proyecto InformesAuto (~/Test/InformesAuto).
-Branch de trabajo: feature/fase22-coherencia (crear desde develop).
+Branch de trabajo: feature/fase22-evidencia-retrieval (crear desde develop).
 
-ESTADO DE ENTRADA (Fase 21 cerrada, 321 tests fast en verde, ruff 0):
-- F21 completa: DT-035/036 (Sprint A) + DT-043/044/045/046 (Sprint A') cerrados.
-  search_depth parametrizable; Cap 2/3 des-sesgados; 2.3 Mercado + Metodología + Aviso IA
-  ensamblados; Cap 4 reescrito a 4.1–4.5. E2E Alpina validó los criterios estructurales.
-- DT-031/032/033 cerrados. Reservas empresa/sector/global operativas.
-- DEUDA NUEVA CRÍTICA — DT-049 (evidencia RAG delgada): el E2E de cierre de F21 mostró que
-  Alpina citó solo 3 fuentes con 18 "Dato no disponible" y Cap 2.1 (competidores) ausente.
-  Diagnóstico: 44 chunks/sector pero de UN documento compilado (poca diversidad); 122 chunks
-  web ingestados, solo 1 citado. Parte retrieval/breadth → F22 (T22.4); parte corpus → F23.
-- CORPUS EMIS LISTO EN DISCO (resuelve la mitad de corpus de DT-049 / DT-034): 250 PDFs
-  diversos por sector en `documentos_sectoriales/FuentesEMIS/<Sector>/` + índice
-  `documentos_sectoriales/FuentesEMIS/indice_emis.csv`. Ingesta (~2–4 h, corrida larga
-  independiente del código, se puede lanzar YA en tmux/nohup):
-  `uv run python scripts/ingest_batch.py --dir documentos_sectoriales --csv documentos_sectoriales/FuentesEMIS/indice_emis.csv`.
-  Es la ingesta de T23.1; se recomienda lanzarla antes/durante F22 para que T22.4 (breadth)
-  se mida sobre el corpus enriquecido y no sobre los compilados de Fase 13.
-- Deuda pendiente: DT-027 (radar 50%), DT-030 (checkpoint), Q1 (coherencia).
+FASE 22 — SPRINT A: Evidencia y Retrieval (DT-049 + DT-052). Corre EN PARALELO a la
+indexación EMIS de fondo. El Sprint B (coherencia/robustez) va después.
 
-OBJETIVOS DE FASE 22:
-- T22.1 (Q1): contexto caps previos para Cap 6 y N3.
-- T22.2 (DT-027): cadena radar dedicada temperatura 0.
-- T22.3 (DT-030): checkpoint caps N0/N1/N2 + --resume.
-- T22.4 (DT-049): enriquecimiento dirigido post-N1 (entidades Cap 2/3 → búsquedas de
-  contraste) + investigar breadth de retrieval (por qué solo 1/122 chunks web se cita).
-- T22.6 (DT-047): fijar 4 áreas en Cap 5. T22.7 (DT-048): LLM-judge de la rúbrica.
-- T22.5: E2E de validación (coherencia + radar + reanudación + nº de fuentes citadas).
+PASO 0 — Lanzar la indexación EMIS de fondo (una sola vez, ANTES de empezar a codear):
+  nohup uv run python scripts/ingest_batch.py \
+    --dir documentos_sectoriales \
+    --csv documentos_sectoriales/FuentesEMIS/indice_emis.csv > /tmp/ingest_emis_full.log 2>&1 &
+  (250 docs, ~2–4 h; idempotente — el sector 3020 ya está y se salta. El fix de bytes NUL
+   DT-051 ya está mergeado, así que los Euromonitor ahora entran.)
+  IMPORTANTE: mientras la indexación corre, NO ejecutes E2E (`run_pilot.py`) ni tests `@slow`:
+  compiten por Ollama/VRAM y la BD está cambiando. El trabajo de Sprint A es código + ruff +
+  `pytest -m "not slow"` (mockeado, sin Ollama) → no hay conflicto. La validación E2E (T22.A3)
+  se hace AL TERMINAR la indexación.
+
+PASO 1 — Ramas: git checkout develop && git checkout -b feature/fase22-evidencia-retrieval
+PASO 2 — Gate de entrada: uv run ruff check src/ tests/ -q && uv run pytest -m "not slow" -q
+
+ESTADO DE ENTRADA (Fase 21 cerrada + post: merge 307ec4b; 322 tests fast, ruff 0):
+- F21 completa (6 DT de contenido). DT-051 cerrado (fix bytes NUL en ingesta de PDF).
+- PRUEBA A/B (FASE21_HALLAZGOS §5.2): tras ingestar el sector 3020 (44→286 chunks / 14 docs),
+  el contenido mejoró MUCHO (Cap 2.1 ausente → 14 fichas de competidor en tabla; radar
+  placeholder → datos reales; 1→16 tablas) PERO la citación NO: referencias siguen en 3, las
+  14 fuentes EMIS no se citan, 0 chunks web citados, 1 cita huérfana. => cuello de botella =
+  retrieval + citación, NO corpus.
+- CAUSA RAÍZ VERIFICADA EN CÓDIGO:
+  * `PGVectorStore.search()` (src/ic/infrastructure/retrieval/pgvector_store.py): rag_top_k +
+    rag_max_chunks_per_doc=4 + reservas (sector 3, global 2, empresa 2) + MMR → los chunks
+    abarcan solo ~2-3 documentos aunque existan 14.
+  * `build_references_section()` (apa_formatter) es FIEL: 1 ref por doc en chunks_usados. Solo
+    hay 3 refs porque chunks_usados solo tiene 3 docs → hay que diversificar el retrieval.
+  * `find_orphan_citations()` ya detecta huérfanas.
+
+OBJETIVOS SPRINT A (hoy):
+- T22.A1 (DT-049): diversificar el retrieval (≥5 docs distintos por consulta cuando existan).
+  Medir con el harness scripts/eval_retrieval.py (gold set) ANTES/DESPUÉS; ajustar
+  rag_max_chunks_per_doc / rag_top_k / reservas y/o garantizar "≥N docs distintos" en search().
+  Sin degradar precisión. Tuning dentro de ADR-012/014 (no re-litigar).
+- T22.A2 (DT-052): que los chunks usados lleguen a Referencias; endurecer el prompt para citar
+  (Autor, año) de las fuentes del contexto; resolver citas huérfanas. Preservar RN-001.
+- T22.A3: validación E2E TRAS la indexación — Alpina (3020) + una no-alimentaria (2030/4010).
+  Objetivo: referencias 3 → ≥8 distintas, 0 huérfanas, fuentes EMIS presentes en Referencias.
 
 REGLAS DURAS (CLAUDE.md TIER 1):
-- No hardcodear nombres de modelo (van en .env).
-- No credenciales en código.
-- domain/ no importa SQLAlchemy/httpx/Streamlit.
-- No re-litigar ADR-012, ADR-013, ADR-014, ADR-015.
+- No hardcodear nombres de modelo (van en .env). No credenciales en código.
+- domain/ no importa SQLAlchemy/httpx/Streamlit; I/O externo por wrapper en infrastructure/.
+- No re-litigar ADR-012, ADR-013, ADR-014, ADR-015. RN-001: nunca inventar atribuciones.
 
 MÉTODO: Plan Mode antes de tocar archivos. Un commit atómico por tarea.
-Gate tras cada tarea: ruff 0 + pytest -m "not slow" verde.
+Gate tras cada tarea: ruff 0 + pytest -m "not slow" verde. Al cerrar Sprint A: FASE22_HALLAZGOS.md
++ tablero/deuda/changelog; luego seguir con Sprint B (T22.1/2/3/6/7) o cerrar y abrir F22-Sprint B.
 
 LECTURAS OBLIGATORIAS al arrancar:
-- docs/architecture/ROADMAP_FASE9+.md §FASE22 (esta sección)
-- docs/decisions/FASE21_HALLAZGOS.md (estado y deuda)
-- docs/architecture/ADR-012-filtrado-sectorial.md (addendum Fase 18)
-- src/ic/domain/use_cases/generate_informe.py (pipeline)
-- src/ic/domain/use_cases/generate_benchmarking.py (_extract_radar)
+- docs/architecture/ROADMAP_FASE9+.md §FASE22 (Sprint A) + §5 deuda (DT-049/052)
+- docs/decisions/FASE21_HALLAZGOS.md §5.1 y §5.2 (prueba A/B y diagnóstico)
+- src/ic/infrastructure/retrieval/pgvector_store.py (search + reservas + MMR + max_chunks_per_doc)
+- src/ic/infrastructure/citation/apa_formatter.py (build_references_section, find_orphan_citations)
+- src/ic/domain/use_cases/generate_informe.py (todos_chunks → refs; _promote_cited_web; orphans)
+- scripts/eval_retrieval.py (harness de evaluación, Fase 14 T14.1) + docs/eval/RUBRICA_CALIDAD.md
+- src/ic/shared/config.py (rag_top_k, rag_max_chunks_per_doc, rag_*_reserve, rag_mmr_lambda)
 ```
 
 ---
@@ -1823,6 +1906,9 @@ gratuitos se quedan cortos (perfiles de competidores, noticias LatAm, datos de m
       fuentes distintas citadas antes/después (harness `scripts/eval_retrieval.py` + rúbrica F20).
       **Re-correr el E2E de Alpina** tras la ingesta y comparar contra `FASE21_HALLAZGOS.md §5`
       (objetivo: bajar los 18 "Dato no disponible" y subir de 3 a >8 fuentes citadas).
+      **Estado 2026-07-24:** el **sector 3020 ya está ingestado** (44→286 chunks / 14 docs) y sirvió
+      para la prueba A/B (§5.2). El **lote completo (250 docs)** se lanza HOY como tarea de fondo,
+      en paralelo al Sprint A de F22 (evidencia/retrieval). Idempotente: 3020 se salta.
 - [ ] **T23.2 — Matriz de proveedores de búsqueda.** Candidatos mínimos: Tavily tier pago,
       Serper.dev, Brave Search API, Exa, SerpAPI; opcional APIs de datos empresariales.
       Columnas: costo por 1k consultas, tier gratuito, cobertura noticias/LatAm/español,
@@ -2206,6 +2292,7 @@ de tamaño→DT-039; ADR-014 tabla de estado obsoleta→corrección documental).
 
 | Fecha | Versión | Cambio |
 |-------|---------|--------|
+| 2026-07-24 | 3.4 | **Post-F21: hallazgos de ingesta EMIS + re-scoping de F22.** Prueba A/B (sector 3020 ingestado, 44→286 chunks/14 docs): el contenido mejora mucho (Cap 2.1 ausente→14 fichas en tabla; radar placeholder→real; 1→16 tablas) pero la citación no (refs planas en 3, fuentes EMIS no citadas, 1 huérfana). Nuevas deudas: **DT-051** (bytes NUL en ingesta de PDF — ✅ cerrada, `_sanitize_text`, merge `3256403`), **DT-052** (citación no sigue al corpus → F22 Sprint A), **DT-050** (base de conocimiento de empresas desde EmpresasColombia ~98k → propuesta `PROPUESTA_BASE_EMPRESAS.md`, diferida). **F22 re-scoped** a "Evidencia, Retrieval y Coherencia": **Sprint A** (hoy, paralelo a la indexación EMIS de fondo) = DT-049 (diversidad de retrieval) + DT-052 (citación); **Sprint B** = coherencia/checkpoint/áreas/LLM-judge (T22.1/3/6/7); DT-027 radar a re-medir sobre corpus enriquecido. T23.1: 3020 ingestado, lote completo (250) lanzado hoy en background. |
 | 2026-07-24 | 3.3 | **Fase 21 (Calidad de Contenido — Sprint A + A') cerrada** (`1a96d7b`..`9a27820`). T21.1 (DT-035): `search_depth` parametrizable en WebConnector + CachedWebConnector, queries de competidor `advanced` (firma pública intacta). T21.2 (DT-036): constraint sectorial en casos locales `chain_04` + query web dedicada en `generate_tendencias`. T21.5 (DT-043): `chain_03`/`chain_04` **des-sesgados** por `{sector_gics}` (fuera FoodTech/agroindustrial). T21.7 (DT-045): secciones formales **Metodología** + **Aviso de uso de IA** en `assembler`. T21.8 (DT-046): **Cap 4 reescrito** a 4.1–4.5 (movimientos corporativos, 3 eventos/subcap). T21.6 (DT-044): **Cap 2.3 Mercado** — `chain_03b_mercado` + `CapMercado` + `GenerateMercado` + cableado N1 (max_workers=4) + interleave 2.2↔2.4. T21.3: runbook `BUSQUEDA_FUENTES.md` reconciliado con scripts reales. Las 6 DT de contenido (035/036/043/044/045/046) **cerradas**. `docs/prompts/` = 9/9 chains. **321 fast tests** (+16), ruff 0. **E2E Alpina** validó los 5 criterios estructurales (2.3 Mercado+tabla, Metodología, Aviso IA, Cap 4 en 4.1–4.5, Cap 3 sin KPO/turismo). **Hallazgo nuevo DT-049**: evidencia RAG delgada (Alpina citó 3 refs, 18 "Dato no disponible", 1/122 chunks web citados) por baja diversidad de fuentes en el corpus compilado → retrieval/breadth a F22 (T22.4), corpus diverso + búsqueda paga a F23. `FASE21_HALLAZGOS.md`. |
 | 2026-07-24 | 3.2 | **Fase 20 (Gap Analysis vs patrón Noel) cerrada.** T20.1: rúbrica versionada `docs/eval/RUBRICA_CALIDAD.md` v1.0 (5 dimensiones E/P/V/F/T × 0–3 por capítulo, manual + LLM-judge). T20.2: matriz de brechas de 3 informes — hallazgo raíz: **variabilidad brutal por sector** (Alpina food ≈11–13/cap dentro del corpus; Avianca/Bancolombia fuera del corpus ≈5–7/cap y **0 tablas**). T20.3: auditoría de fidelidad — `docs/prompts/` completado a **8/8 chains + README** (mapa de los 17 source_prompts); `prompt-05-convergencia`→`prompt-06`. Divergencias: `chain_05` reescribió Cap 4 (🔴), sesgo "FoodTech/agroindustrial" hardcodeado (🔴), 2.3 Mercado nunca implementado (🔴). T20.4: **Metodología + Aviso de uso de IA ausentes** del ensamblado. Bug numeración 5.x confirmado **pre-fix** (DT-032 cerrado). Nuevas DT-043..048. F21 ampliada a Sprint A' de contenido (T21.5–T21.8: des-sesgo, 2.3 Mercado, Metodología/Aviso IA, rediseño Cap 4); F22 +T22.6/T22.7 (áreas Cap 5, LLM-judge); F26 +T26.6 (fichas-tabla, headings, estilo). Sin cambios en `src/`; gate verde (305 fast, ruff 0). `FASE20_HALLAZGOS.md`. |
 | 2026-07-24 | 3.1 | **Fase 19 (Auditoría) cerrada.** T19.1: 3 archivos > 300 L confirmados + `_run_n3`=157 L; cobertura `domain/` (gate rápido) = **69%** (< 80%; pytest-cov añadido como dev-dep). T19.3: 15 ADR + 13 RN auditados con evidencia `archivo:línea` — divergencias ADR-004 (LCEL en domain), ADR-009 (regresión tamaño), ADR-014 (tabla obsoleta), RN-013 (`search_depth` no implementado). T19.4: **DT-018 cerrado** (`check-ruff.sh` cableado en `settings.json`); DT-027 retarget→F22; colisión DT-035 documentada. Nuevas DT-037..042 (particiones + pricing/hook + cobertura + LCEL). Re-priorización: F22 absorbe DT-027/037/039/040/041/042; F26 absorbe DT-038. Sin cambios en código de aplicación; gate verde (305 fast, ruff 0). `FASE19_HALLAZGOS.md`. |

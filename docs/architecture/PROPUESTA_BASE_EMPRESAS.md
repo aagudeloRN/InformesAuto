@@ -124,3 +124,16 @@ idempotente al estilo `ensure_*_columns()`.
 Aprobar en Plan Mode el alcance mínimo: (a) tabla + migración, (b) script de semilla con mapeo
 GICS por NIT/CIIU, (c) gancho de lectura en Cap 2/4 (contexto estructurado), dejando la escritura
 automática y la curación para iteraciones siguientes.
+
+## 7. Criterio del usuario (2026-07-24) — a incorporar en el diseño
+
+- **La tabla debe crecer, mejorarse y validarse de forma incremental**, no ser un volcado estático
+  del Excel. Se nutre y corrige con las búsquedas que el sistema haga en cada informe.
+- **No todas las ~98k empresas merecen citarse como competencia relevante** para la empresa
+  analizada: hace falta un criterio de **relevancia/selección** (por sector, tamaño, cercanía
+  geográfica, coincidencia de actividad) antes de inyectarlas como competidores. El Excel es
+  materia prima, no verdad de competencia.
+- **Valor a largo plazo:** este tipo de tabla es un activo para **proyectos futuros** más allá del
+  informe actual. Se trabajará **a profundidad más adelante** (no en la fase de hoy).
+- Implicación de diseño: separar "directorio bruto" (semilla, todas las empresas) de "candidatos
+  de competencia" (subconjunto relevante por informe, con score de relevancia y curación humana).
