@@ -52,8 +52,16 @@ def _to_retrieved(chunks) -> list[RetrievedChunk]:
     """Adapta ChunkResult (infra) a RetrievedChunk (domain puro)."""
     out: list[RetrievedChunk] = []
     for c in chunks:
-        sector = (c.metadatos or {}).get("sector_gics")
-        out.append(RetrievedChunk(sector_gics=sector, score=round(float(c.score), 4)))
+        meta = c.metadatos or {}
+        sector = meta.get("sector_gics")
+        sectores = tuple(meta.get("sectores") or ())  # DT-053: array multi-sector
+        out.append(
+            RetrievedChunk(
+                sector_gics=sector,
+                score=round(float(c.score), 4),
+                sectores=sectores,
+            )
+        )
     return out
 
 
