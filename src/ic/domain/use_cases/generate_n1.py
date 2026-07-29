@@ -17,6 +17,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     """Ejecuta Caps 2/3/4 en paralelo + párrafos introductivos N1."""
     from ic.data.database import SessionLocal
     from ic.data.repositories.embedding_repo import EmbeddingRepository
+    from ic.domain.chains.chain_02b_entidades import build_chain_entidades
     from ic.domain.chains.chain_03_benchmarking import build_chain_03
     from ic.domain.chains.chain_03b_mercado import build_chain_03b
     from ic.domain.chains.chain_04_tendencias import build_chain_04
@@ -50,8 +51,11 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             return fn(store, cached_web, cached_oal)
 
     def _fn_cap2(store, web, _oal):
+        # T22.4 (DT-054): cadena de identificación de entidades para búsqueda dirigida por
+        # competidor (enriquece las fichas de 2.1 más allá de las queries a nivel sector).
         return GenerateBenchmarking(
-            chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=web
+            chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=web,
+            entidades_chain=build_chain_entidades(ctx.api_llm or ctx.llm),
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,

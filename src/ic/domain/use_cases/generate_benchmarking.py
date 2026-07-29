@@ -7,6 +7,7 @@ import re
 from langchain_core.runnables import Runnable
 
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
+from ic.domain.chains.chain_02b_entidades import parse_entidades
 from ic.domain.chains.chain_03_benchmarking import format_chunks_as_context
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
@@ -95,10 +96,39 @@ class GenerateBenchmarking:
         chain: Runnable,
         store: PGVectorStore,
         web_connector: WebConnector,
+        entidades_chain: Runnable | None = None,
     ) -> None:
         self._chain = chain
         self._store = store
         self._web_connector = web_connector
+        # T22.4 (DT-054): cadena de identificación de entidades competidoras. Si es None se
+        # conserva el comportamiento previo (sin búsqueda dirigida por entidad).
+        self._entidades_chain = entidades_chain
+
+    def _identificar_entidades(self, chunks, sector_gics: str) -> list[str]:
+        """Extrae entidades competidoras ancladas a la evidencia inicial (T22.4, RN-001)."""
+        raw = self._entidades_chain.invoke({
+            "sector_gics": sector_gics,
+            "retrieval_competidores": format_chunks_as_context(chunks),
+        })
+        entidades = parse_entidades(raw)
+        logger.info("entidades competidoras identificadas: %d %s", len(entidades), entidades)
+        return entidades
+
+    def _buscar_por_entidad(self, entidades: list[str], sector_gics: str) -> None:
+        """Búsqueda web dirigida por entidad para poblar las fichas de la sección 2.1 (T22.4)."""
+        for entidad in entidades:
+            query = (
+                f"{entidad} {sector_gics} perfil empresa portafolio productos "
+                "cuota de mercado Colombia"
+            )
+            results = self._web_connector.search(query, search_depth="advanced")
+            if results:
+                self._store.ingest(
+                    texts=[r.content for r in results],
+                    fuente_tipo="web",
+                    urls=[r.url for r in results],
+                )
 
     def execute(
         self,
@@ -125,10 +155,24 @@ class GenerateBenchmarking:
                     urls=[r.url for r in web_results],
                 )
 
+        retrieval_query = f"{sector_gics} competitors benchmarking {nombre_empresa}"
         chunks = self._store.search(
-            f"{sector_gics} competitors benchmarking {nombre_empresa}",
-            sector_gics=sector_gics_code, empresa_id=empresa_id,
+            retrieval_query, sector_gics=sector_gics_code, empresa_id=empresa_id,
         )
+
+        # T22.4 (DT-054): identificar entidades competidoras y lanzar búsquedas dirigidas por
+        # entidad (no solo por sector) para enriquecer las fichas de la sección 2.1. Solo si hay
+        # cadena de entidades y evidencia inicial suficiente para anclar nombres (RN-001).
+        if self._entidades_chain is not None and check_retrieval_sufficient(
+            chunks, min_chunks=_MIN_CHUNKS
+        ):
+            entidades = self._identificar_entidades(chunks, sector_gics)
+            if entidades:
+                self._buscar_por_entidad(entidades, sector_gics)
+                # Re-recuperar con el índice enriquecido (web por-entidad + EMIS individuales).
+                chunks = self._store.search(
+                    retrieval_query, sector_gics=sector_gics_code, empresa_id=empresa_id,
+                )
 
         if not check_retrieval_sufficient(chunks, min_chunks=_MIN_CHUNKS):
             return CapBenchmarking(
