@@ -88,22 +88,34 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,
         )
 
+    # T22.3 (DT-030): --resume salta los caps ya persistidos; solo se computan los faltantes.
+    from ic.domain.use_cases import checkpoint_hooks
+
+    _fns = {"cap2": _fn_cap2, "mercado": _fn_mercado, "cap3": _fn_cap3, "cap4": _fn_cap4}
+    _restored = {name: checkpoint_hooks.restore(ctx, name) for name in _fns}
+    _results: dict = {}
     with ThreadPoolExecutor(max_workers=4) as pool:
-        f2 = pool.submit(_store, _fn_cap2)
-        f_mkt = pool.submit(_store, _fn_mercado)
-        f3 = pool.submit(_store, _fn_cap3)
-        f4 = pool.submit(_store, _fn_cap4)
-    ctx.cap, ctx.cap_mercado = f2.result(), f_mkt.result()
-    ctx.cap_tend, ctx.cap_eco = f3.result(), f4.result()
+        _futures = {
+            name: pool.submit(_store, fn)
+            for name, fn in _fns.items()
+            if _restored[name] is None
+        }
+    for name in _fns:
+        _results[name] = (
+            _restored[name] if _restored[name] is not None else _futures[name].result()
+        )
+    ctx.cap, ctx.cap_mercado = _results["cap2"], _results["mercado"]
+    ctx.cap_tend, ctx.cap_eco = _results["cap3"], _results["cap4"]
 
     ctx.step_fn(4, "Párrafos introductorios N1")
     if ctx.intro_chain is not None:
-        for cap_obj, titulo in [
-            (ctx.cap, "Análisis Competitivo"),
-            (ctx.cap_tend, "Análisis Sectorial Tendencial"),
-            (ctx.cap_eco, "Ecosistema Empresarial"),
+        # El intro se aplica solo a caps recién computados; los restaurados ya lo incluyen.
+        for cap_obj, titulo, name in [
+            (ctx.cap, "Análisis Competitivo", "cap2"),
+            (ctx.cap_tend, "Análisis Sectorial Tendencial", "cap3"),
+            (ctx.cap_eco, "Ecosistema Empresarial", "cap4"),
         ]:
-            if cap_obj is not None and cap_obj.retrieval_suficiente:
+            if _restored[name] is None and cap_obj is not None and cap_obj.retrieval_suficiente:
                 intro = ctx.intro_chain.invoke({
                     "titulo": titulo, "empresa": ctx.params.empresa,
                     "resumen_cap": cap_obj.texto[:500],
@@ -111,3 +123,11 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 # DT-055: intro saneado puede quedar vacío → no anteponer líneas en blanco
                 if intro:
                     cap_obj.texto = intro + "\n\n" + cap_obj.texto
+
+    # Persistir los caps recién computados (con intro aplicado) para poder reanudar.
+    for name, obj in [
+        ("cap2", ctx.cap), ("mercado", ctx.cap_mercado),
+        ("cap3", ctx.cap_tend), ("cap4", ctx.cap_eco),
+    ]:
+        if _restored[name] is None:
+            checkpoint_hooks.save(ctx, name, obj)

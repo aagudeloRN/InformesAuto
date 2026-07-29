@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ic.domain.use_cases import checkpoint_hooks
+
 logger = logging.getLogger(__name__)
 
 StepCallback = Callable[[int, int, str], None]
@@ -25,6 +27,7 @@ class InformeParams:
     empresa: str
     ciiu: str | None = None
     output_path: str | None = None
+    resume: bool = False  # T22.3 (DT-030): reanuda desde el último capítulo persistido
 
 
 @dataclass
@@ -72,6 +75,9 @@ class _PipelineContext:
     cache_web_counter: Any = None
     cache_oal_counter: Any = None
     empresa_id: Any = None  # UUID resuelto en N0; se pasa a todos los use cases (T18.3)
+    # T22.3 (DT-030): checkpoint --resume
+    run_key: str = ""
+    checkpoint: dict = field(default_factory=dict)  # {cap_nombre: payload} ya persistido
 
 
 class GenerateInforme:
@@ -97,6 +103,7 @@ class GenerateInforme:
                 on_step(n, self.TOTAL_PASOS, label)
 
         ctx = self._setup_infra(params, _step, time.time())
+        checkpoint_hooks.load(ctx)
         self._sweep_stale_web(ctx)
         self._run_n0(ctx)
         self._run_n1(ctx)
@@ -107,6 +114,7 @@ class GenerateInforme:
         self, params: InformeParams, step_fn: Any, total_start: float
     ) -> _PipelineContext:
         from ic.domain.chains.chain_intro import build_chain_intro
+        from ic.domain.checkpoint_serde import make_run_key
         from ic.infrastructure.llm.gateway import (
             CostTracker,
             build_llm,
@@ -141,6 +149,7 @@ class GenerateInforme:
             output_path=output_path,
             cache_web_counter=CacheCounter(),
             cache_oal_counter=CacheCounter(),
+            run_key=make_run_key(params.empresa, params.ciiu),
         )
 
     def _sweep_stale_web(self, ctx: _PipelineContext) -> None:
@@ -186,26 +195,33 @@ class GenerateInforme:
         from ic.infrastructure.sources.cached_connector import CachedWebConnector
 
         ctx.step_fn(1, "Cap 1 — Descripción de la empresa")
-        # T16.0-B: CachedWebConnector para Cap 1 (sesión breve, single-threaded)
-        with SessionLocal() as db_n0:
-            cached_web_n0 = CachedWebConnector(
-                ctx.web, db_n0, ctx.settings, counter=ctx.cache_web_counter
-            )
-            uc_desc = GenerateEmpresaDescription(
-                chain=build_chain_01(ctx.cap1_llms), web_connector=cached_web_n0
-            )
-            ctx.empresa = uc_desc.execute(ctx.params.empresa)
-        if ctx.params.ciiu:
-            ctx.empresa = ctx.empresa.__class__(
-                nombre_empresa=ctx.empresa.nombre_empresa,
-                actividad_ciiu=ctx.params.ciiu,
-                texto=ctx.empresa.texto,
-            )
+        # T22.3: reanudar desde checkpoint evita recomputar Cap 1 (búsquedas web + LLM).
+        ctx.empresa = checkpoint_hooks.restore(ctx, "empresa")
+        if ctx.empresa is None:
+            # T16.0-B: CachedWebConnector para Cap 1 (sesión breve, single-threaded)
+            with SessionLocal() as db_n0:
+                cached_web_n0 = CachedWebConnector(
+                    ctx.web, db_n0, ctx.settings, counter=ctx.cache_web_counter
+                )
+                uc_desc = GenerateEmpresaDescription(
+                    chain=build_chain_01(ctx.cap1_llms), web_connector=cached_web_n0
+                )
+                ctx.empresa = uc_desc.execute(ctx.params.empresa)
+            if ctx.params.ciiu:
+                ctx.empresa = ctx.empresa.__class__(
+                    nombre_empresa=ctx.empresa.nombre_empresa,
+                    actividad_ciiu=ctx.params.ciiu,
+                    texto=ctx.empresa.texto,
+                )
+            checkpoint_hooks.save(ctx, "empresa", ctx.empresa)
         ctx.step_fn(2, "GICS — Clasificación de sector")
-        ctx.gics = ClassifyGICS(chain=build_chain_02(ctx.api_llm or ctx.llm)).execute(
-            nombre_empresa=ctx.params.empresa, descripcion_empresa=ctx.empresa.texto,
-            ciiu=ctx.params.ciiu,
-        )
+        ctx.gics = checkpoint_hooks.restore(ctx, "gics")
+        if ctx.gics is None:
+            ctx.gics = ClassifyGICS(chain=build_chain_02(ctx.api_llm or ctx.llm)).execute(
+                nombre_empresa=ctx.params.empresa, descripcion_empresa=ctx.empresa.texto,
+                ciiu=ctx.params.ciiu,
+            )
+            checkpoint_hooks.save(ctx, "gics", ctx.gics)
         # Resolver empresa_id al inicio del pipeline para pasarlo a todos los use cases (T18.3).
         # Esto permite que el retrieval priorice docs asociados a esta empresa.
         try:
@@ -240,6 +256,13 @@ class GenerateInforme:
 
         e, g = ctx.params.empresa, ctx.gics.grupo_gics
         g_code = extract_gics_code(g)
+        # T22.3 (DT-030): --resume salta Cap 5/6 ya persistidos. Cap 6 es barrera de
+        # sincronización (consume Cap 5); si Cap 5 se restaura y Cap 6 no, se recomputa
+        # Cap 6 sobre el Cap 5 restaurado — el DAG se respeta.
+        ctx.cap_conv = checkpoint_hooks.restore(ctx, "cap5")
+        ctx.cap_acc = checkpoint_hooks.restore(ctx, "cap6")
+        conv_restaurado = ctx.cap_conv is not None
+        acc_restaurado = ctx.cap_acc is not None
         with SessionLocal() as db_n2:
             store_n2 = PGVectorStore(ctx.embedder, EmbeddingRepository(db_n2), ctx.settings)
             store_n2.session_id = ctx.session_id
@@ -248,7 +271,7 @@ class GenerateInforme:
             )
 
             ctx.step_fn(6, "Cap 5 — Convergencia Empresarial")
-            if ctx.api_llm_synth is not None:
+            if not conv_restaurado and ctx.api_llm_synth is not None:
                 ctx.cap_conv = GenerateConvergencia(
                     chain=build_chain_06_synth(ctx.api_llm_synth),
                     chain_eje=build_chain_06a(ctx.api_llm) if ctx.api_llm else None,
@@ -259,7 +282,7 @@ class GenerateInforme:
                 )
 
             ctx.step_fn(7, "Cap 6 — Accionables Estratégicos")
-            if ctx.api_llm is not None:
+            if not acc_restaurado and ctx.api_llm is not None:
                 # Coherencia (T22.1, Q1): pasar un resumen de los hallazgos de los caps ya
                 # generados (2/3/4/5) para que los accionables los referencien explícitamente,
                 # no solo el retrieval. Todos están disponibles en este punto del DAG.
@@ -284,11 +307,12 @@ class GenerateInforme:
 
         ctx.step_fn(8, "Párrafos introductorios N2")
         if ctx.intro_chain is not None:
-            for cap_obj, titulo in [
-                (ctx.cap_conv, "Convergencia Empresarial"),
-                (ctx.cap_acc, "Accionables Estratégicos"),
+            # El intro se aplica solo a caps recién computados; los restaurados ya lo incluyen.
+            for cap_obj, titulo, restaurado in [
+                (ctx.cap_conv, "Convergencia Empresarial", conv_restaurado),
+                (ctx.cap_acc, "Accionables Estratégicos", acc_restaurado),
             ]:
-                if cap_obj is not None and cap_obj.retrieval_suficiente:
+                if not restaurado and cap_obj is not None and cap_obj.retrieval_suficiente:
                     intro = ctx.intro_chain.invoke({
                         "titulo": titulo, "empresa": ctx.params.empresa,
                         "resumen_cap": cap_obj.texto[:500],
@@ -296,6 +320,12 @@ class GenerateInforme:
                     # DT-055: intro saneado puede quedar vacío → no anteponer líneas en blanco
                     if intro:
                         cap_obj.texto = intro + "\n\n" + cap_obj.texto
+
+        # Persistir los caps recién computados (con intro) para poder reanudar (T22.3).
+        if not conv_restaurado:
+            checkpoint_hooks.save(ctx, "cap5", ctx.cap_conv)
+        if not acc_restaurado:
+            checkpoint_hooks.save(ctx, "cap6", ctx.cap_acc)
 
     def _run_n3(self, ctx: _PipelineContext) -> InformeResult:
         from ic.data.database import SessionLocal, engine
@@ -479,6 +509,9 @@ class GenerateInforme:
             wc.hits, wc.misses, wc.hits * _AVG_WEB_MS,
         )
         logger.info("Cache openalex: %d HITs / %d MISSes", oc.hits, oc.misses)
+
+        # T22.3 (DT-030): corrida completa → el checkpoint ya no hace falta.
+        checkpoint_hooks.clear(ctx)
 
         return InformeResult(
             ruta_docx=ctx.output_path, n_referencias=len(refs),

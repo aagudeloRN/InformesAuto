@@ -85,6 +85,11 @@ def main() -> None:
         default=None,
         help='Ruta de salida del .docx (default: ./output/<empresa>.docx)',
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Reanuda una corrida interrumpida desde el último capítulo persistido (T22.3)",
+    )
     args = parser.parse_args()
 
     from ic.shared.config import get_settings
@@ -116,7 +121,9 @@ def main() -> None:
     _banner(f"Generando informe: {args.empresa}")
 
     uc = GenerateInforme(settings)
-    params = InformeParams(empresa=args.empresa, ciiu=args.ciiu, output_path=output_path)
+    params = InformeParams(
+        empresa=args.empresa, ciiu=args.ciiu, output_path=output_path, resume=args.resume
+    )
 
     global _step_times, _step_start, _last_step_label
     _step_times = {}
