@@ -427,3 +427,81 @@ Redactar AVANCES/RETOS/RECOMENDACIONES (con números) en FASE22_HALLAZGOS.md y e
 Sprint B, y dejar el prompt de arranque de la siguiente ventana (DT-057 reingesta / DT-056 KB
 o el merge), con la misma estructura.
 ```
+
+---
+
+# 15. Cierre Bloque B2 (2026-07-29) — competidores + Cap 4 adaptativo
+
+Rama `feature/fase22-sprintB` (continúa B1, sin mergear). Gate final: **ruff 0, 390 fast tests**
+(372 base B1 + 3 reserva EMIS + 10 entidades + 5 netos Cap 4), 2 skipped, 14 deselected.
+
+## 15.1 AVANCES (3 commits atómicos, gate verde tras cada uno)
+
+- `24aef9f` **T1a (DT-054)** — La reserva sectorial estricta incluye EMIS individuales.
+  `embedding_repo.search_similar` (rama `sector_estricto`) filtraba a
+  `tipo_fuente='informe_compilado'`, excluyendo de la reserva garantizada a los EMIS
+  individuales (`tipo_fuente` NULL pero con `sector_gics` seteado). Ahora filtra solo por
+  `sector_gics`: compilado y EMIS individuales compiten por score dentro de la reserva; la
+  web/académicas (`sector_gics` NULL) siguen fuera → **anti-mezcla ADR-012 preservada**.
+  Diagnóstico confirmado en BD: sector 2510 tiene **970** chunks EMIS individuales (46 compilado);
+  3020 tiene **242** (44 compilado) — todos `tipo_fuente` NULL, antes inelegibles para la reserva.
+  +3 tests fast (captura del SQL construido, Session falsa).
+- `a6381a4` **T1b (T22.4, DT-054)** — Identificación de entidades + búsqueda dirigida.
+  Nueva `chain_02b_entidades`: dado el retrieval sectorial inicial, el LLM extrae los nombres de
+  empresas competidoras **presentes en la evidencia** (RN-001: `parse_entidades` es puro —
+  fences, dedup case-insensitive, cap 8, no fabrica). `GenerateBenchmarking` gana
+  `entidades_chain` opcional: identifica → **una búsqueda web dirigida por entidad**
+  (perfil/portafolio/cuota) → re-recupera con el índice enriquecido (web por-entidad + EMIS
+  individuales vía T1a). `entidades_chain=None` conserva el comportamiento B1. Cableado en
+  `generate_n1._fn_cap2`. +10 tests fast.
+- `9e74d1c` **T2 (DT-058)** — Cap 4 Ecosistema adaptativo. Las 5 subsecciones 4.1–4.5 pasan a
+  datos (`SUBSECCIONES`) + placeholder `{secciones_solicitadas}`. `generate_ecosistema` gatea
+  cada subsección por su **propio** retrieval (`check_retrieval_sufficient`): solo se solicitan
+  las que superan el umbral; las sin evidencia se **omiten** (sin filler "Dato no disponible").
+  Si ninguna supera el umbral → párrafo de ausencia (ADR-002), el capítulo **no se elimina**.
+  `chunks_usados` = unión dedup de subsecciones activas. +8 tests fast (gating) +
+  `test_fase21_content` actualizado al diseño adaptativo.
+
+### Medición reproducible (criterio d) — `scripts/measure_competitor_evidence.py`
+Harness enfocado (patrón `measure_radar_hitrate`): corre solo el camino del Cap 2 N veces,
+2 sectores (3020/2510), y mide `n_fichas` (tablas `| Campo | Valor |` en 2.1),
+`n_competidores_radar`, `n_refs_emis_individual` (chunks_usados de EMIS individual) y
+`n_docs_distintos`. Modo `--before` (sin `entidades_chain`) vs por defecto (con), snapshots en
+`docs/decisions/fase22_competitor_evidence_{antes,despues}.json`.
+<!-- NUMEROS_MEDICION -->
+
+## 15.2 RETOS / lecciones
+
+- **Gating por conteo, no por relevancia (DT-058).** `check_retrieval_sufficient` es conteo puro
+  (`len ≥ min`). Las reservas sectorial/global de `store.search` rellenan conteo aunque la query
+  de subsección sea poco específica, así que el gate discrimina menos de lo ideal en producción
+  (mock lo aísla bien). Es el mecanismo acordado y un neto positivo vs forzar 5 con filler; el
+  gating fino por score/relevancia queda como futuro (liga con DT-049/DT-059).
+- **T1a beneficia a `--before` y `--after`.** La reserva ampliada (T1a) ya está activa en ambos
+  modos del harness; el `--before` aísla solo el aporte de T22.4 (entidades). El efecto propio de
+  T1a sobre los EMIS individuales se sustenta con el SQL + test + el conteo de corpus (970/242).
+- **Chesterton's Fence en `test_fase21_content`.** El test verificaba las cabeceras 4.1–4.5
+  hardcodeadas en `USER_PROMPT_05`; con el rediseño se actualizó a comprobar la estructura vía
+  `build_secciones_solicitadas(SUBSECCIONES)` (no se borró la intención, se re-apuntó).
+
+## 15.3 RECOMENDACIONES / siguiente ventana
+
+- **DT-057 (reingesta enriquecida)** es el siguiente paso natural: etiquetar `tipo_fuente` en la
+  ingesta EMIS y metadata por chunk consolidan T1a (hoy los EMIS individuales entran por
+  `sector_gics`, pero un `tipo_fuente` explícito habilita boost/telemetría). Ver
+  [[project_kb_entidades_plan]].
+- **Merge B1+B2 → develop**: decidir con el usuario. La rama `feature/fase22-sprintB` acumula
+  6 commits (3 B1 + 3 B2) + docs, gate verde.
+- **DT-054 estado**: núcleo cerrado (reserva + T22.4). Reingesta con `tipo_fuente` → DT-057.
+
+### Prompt de arranque siguiente ventana (DT-057 reingesta / merge)
+```
+Eres Claude Code, ingeniero de InformesAuto. Sprint B (B1+B2) está CERRADO en la rama
+feature/fase22-sprintB con gate verde (ruff 0, 390 fast tests). B2 entregó: reserva sectorial
+que incluye EMIS individuales (DT-054/T1a), identificación de entidades + búsqueda dirigida
+(T22.4/T1b), y Cap 4 adaptativo con gating por-subsección (DT-058). Hoy: (1) mergear B1+B2 a
+develop si el usuario lo aprueba; (2) arrancar DT-057 (reingesta enriquecida Tanda 1: tipo_fuente
+a EMIS individuales, metadata por chunk, idempotencia por hash, NER→entidad_menciones). Lee
+memory project_kb_entidades_plan (secuencia), FASE22_HALLAZGOS §15, PROPUESTA_KNOWLEDGE_BASE.md.
+Restricciones CLAUDE.md TIER 1. Plan Mode para lo no trivial. Gate por commit.
+```
