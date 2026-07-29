@@ -1,6 +1,11 @@
-"""Coherencia — T22.1 (build_caps_summary) y T22.6 (enforce_cap5_areas)."""
+"""Coherencia — T22.1 (build_caps_summary), T22.6 (enforce_cap5_areas) y
+T22.A3 (sector_histogram, anti-mezcla)."""
 
-from ic.domain.coherence import build_caps_summary, enforce_cap5_areas
+from ic.domain.coherence import (
+    build_caps_summary,
+    enforce_cap5_areas,
+    sector_histogram,
+)
 
 
 def test_une_y_etiqueta_capitulos():
@@ -82,3 +87,35 @@ def test_devuelve_labels_eliminados():
     texto = _CAP5 + "## 5.7 Área Estratégica: Extra\nContenido.\n"
     _saneado, eliminados = enforce_cap5_areas(texto)
     assert any("5.7" in e for e in eliminados)
+
+
+# --- T22.A3: sector_histogram (anti-mezcla) ---
+
+
+def test_histograma_clasifica_on_sector_exento_ajeno():
+    metas = [
+        {"sector_gics": "3020", "titulo": "EMIS Lácteos"},          # on-sector primario
+        {"sector_gics": "2510", "sectores": ["3020"], "titulo": "Multi"},  # on-sector por array
+        {"sector_gics": None, "es_global": "true", "titulo": "Global"},    # exento global
+        {"sector_gics": None, "titulo": "Web"},                     # exento web (sin sector)
+        {"sector_gics": "2510", "titulo": "Autos EMIS"},            # ajeno
+    ]
+    h = sector_histogram(metas, "3020")
+    assert h.on_sector == 2
+    assert h.exento == 2
+    assert h.ajeno == 1
+    assert h.ajenos == [("Autos EMIS", "2510")]
+
+
+def test_histograma_es_global_bool_y_metadatos_none():
+    metas = [
+        {"sector_gics": None, "es_global": True, "titulo": "Global bool"},  # exento
+        None,                                                               # exento (sin meta)
+    ]
+    h = sector_histogram(metas, "3020")
+    assert (h.on_sector, h.exento, h.ajeno) == (0, 2, 0)
+
+
+def test_histograma_sin_ajenos_no_lista():
+    h = sector_histogram([{"sector_gics": "3020"}], "3020")
+    assert h.ajeno == 0 and h.ajenos == []

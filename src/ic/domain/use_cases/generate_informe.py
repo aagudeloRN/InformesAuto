@@ -341,6 +341,21 @@ class GenerateInforme:
                 todos_chunks += cap_obj.chunks_usados
         refs = build_references_section(todos_chunks)
 
+        # Anti-mezcla (T22.A3, TIER 4 trazabilidad): histograma de sectores de los chunks
+        # CITADOS. Los globales/web quedan exentos por diseño (ADR-012/018); un chunk de un
+        # sector específico ajeno al de la empresa sería contaminación real. Solo mide (RN-001).
+        from ic.domain.coherence import sector_histogram
+        from ic.shared.constants.gics_groups import extract_gics_code
+
+        sector_code = extract_gics_code(ctx.gics.grupo_gics)
+        hist = sector_histogram([c.metadatos for c in todos_chunks], sector_code)
+        logger.info(
+            "Anti-mezcla chunks citados [sector=%s]: on_sector=%d exento=%d ajeno=%d",
+            sector_code, hist.on_sector, hist.exento, hist.ajeno,
+        )
+        if hist.ajenos:
+            logger.warning("Anti-mezcla: chunks de sector AJENO citados: %s", hist.ajenos)
+
         # Persistencia web "solo lo citado" (T14.5, DT-020): de los chunks web de esta sesión,
         # se promueven los efectivamente usados y se borra el resto de la búsqueda.
         self._promote_cited_web(ctx, todos_chunks)

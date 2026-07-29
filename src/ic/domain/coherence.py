@@ -9,9 +9,66 @@ lugar de derivarse solo del retrieval.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 
 # Encabezado de área del Cap 5 en formato canónico markdown: "## 5.1 Área Estratégica: ..."
 _CAP5_AREA_RE = re.compile(r"^##\s*5\.(\d+)\b.*$", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class SectorHistogram:
+    """Histograma anti-mezcla de los chunks citados (Fase 22, T22.A3, TIER 4 trazabilidad).
+
+    Clasifica cada chunk citado respecto al sector de la empresa del informe:
+    - ``on_sector``: el chunk pertenece al sector esperado (primario o array multi-sector).
+    - ``exento``: fuente sin sector propio (web/académica) o documento global cross-sector
+      (``es_global=true``) — exenta por diseño (ADR-012/018).
+    - ``ajeno``: chunk de un sector específico DISTINTO al esperado → contaminación real.
+
+    ``ajenos`` lista los (titulo, sector_gics) de los chunks ajenos para el log de auditoría.
+    """
+
+    on_sector: int = 0
+    exento: int = 0
+    ajeno: int = 0
+    ajenos: list[tuple[str, str]] = field(default_factory=list)
+
+
+def _es_global(meta: dict) -> bool:
+    """`es_global` viene de jsonb: puede ser bool True o la cadena 'true'."""
+    val = meta.get("es_global")
+    return val is True or str(val).lower() == "true"
+
+
+def sector_histogram(
+    metadatos: list[dict | None], sector_empresa: str
+) -> SectorHistogram:
+    """Clasifica los metadatos de los chunks citados por su relación con el sector esperado.
+
+    Helper puro (Dependency Agnosticism): opera sobre los ``metadatos`` ya en memoria de los
+    chunks citados, sin I/O. Criterio DT-053 (multi-sector): un chunk es *on-sector* si el
+    sector de la empresa coincide con su ``sector_gics`` primario O está en su array
+    ``sectores``; es *exento* si es global (``es_global``) o no trae sector propio
+    (``sector_gics`` None y ``sectores`` vacío); *ajeno* en otro caso.
+
+    RN-001: solo mide y reporta; nunca reatribuye ni inventa la fuente de un chunk.
+    """
+    on_sector = exento = ajeno = 0
+    ajenos: list[tuple[str, str]] = []
+    for meta in metadatos:
+        meta = meta or {}
+        sector_gics = meta.get("sector_gics")
+        sectores = meta.get("sectores") or []
+        if sector_empresa == sector_gics or sector_empresa in sectores:
+            on_sector += 1
+        elif _es_global(meta) or (sector_gics is None and not sectores):
+            exento += 1
+        else:
+            ajeno += 1
+            ajenos.append((meta.get("titulo") or "(sin título)", str(sector_gics)))
+    return SectorHistogram(
+        on_sector=on_sector, exento=exento, ajeno=ajeno, ajenos=ajenos
+    )
 
 
 def build_caps_summary(
