@@ -42,6 +42,41 @@ _FORMATO_EVENTO = (
     "resto, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n\n"
 )
 
+# Subsecciones del Cap 4 como datos (DT-058): (id, título, encabezado descriptivo, consulta RAG).
+# El capítulo es adaptativo: cada subsección se gatea por su propio retrieval en
+# generate_ecosistema y solo se emiten las que tienen evidencia suficiente (ADR-002).
+SUBSECCIONES: list[tuple[str, str, str, str]] = [
+    ("4.1", "Inversiones",
+     "Inversiones relevantes en empresas, startups o capacidad productiva del sector.",
+     "inversiones capital riesgo capacidad productiva startups"),
+    ("4.2", "Integraciones Verticales",
+     "Movimientos de integración hacia proveedores o canales de distribución.",
+     "integración vertical proveedores canales distribución"),
+    ("4.3", "Fusiones y Adquisiciones (M&A)",
+     "Operaciones de fusión o adquisición entre actores del sector.",
+     "fusiones adquisiciones M&A compra de empresas"),
+    ("4.4", "Joint Ventures",
+     "Empresas conjuntas y sociedades de riesgo compartido entre actores del sector.",
+     "joint venture sociedad conjunta riesgo compartido alianza"),
+    ("4.5", "Alianzas de Compra y Abastecimiento",
+     "Acuerdos de compra, abastecimiento o colaboración comercial entre actores del sector.",
+     "alianzas compra abastecimiento colaboración comercial"),
+]
+
+
+def build_secciones_solicitadas(activas: list[tuple[str, str, str, str]]) -> str:
+    """Ensambla los bloques de instrucción SOLO de las subsecciones activas (DT-058).
+
+    Las subsecciones sin evidencia suficiente se omiten por completo (no se pide al modelo que
+    rellene con "Dato no disponible"), preservando la numeración original de las presentes.
+    """
+    bloques = [
+        f"## {sid}. {titulo}\n\n{descripcion}\n" + _FORMATO_EVENTO
+        for sid, titulo, descripcion, _query in activas
+    ]
+    return "".join(bloques).rstrip()
+
+
 USER_PROMPT_05 = (
     "Genera el \"Capítulo 4. Panorama del Ecosistema\" para el informe de inteligencia "
     "competitiva de la empresa descrita a continuación.\n\n"
@@ -58,22 +93,8 @@ USER_PROMPT_05 = (
     "cadena de valor del sector: inversiones, integraciones verticales, fusiones y adquisiciones, "
     "joint ventures y alianzas de abastecimiento. Comprender estos movimientos permite anticipar "
     "cambios en la estructura competitiva y detectar oportunidades de posicionamiento.\"\n\n"
-    "Desarrolla exactamente las siguientes secciones en este orden:\n\n"
-    "## 4.1. Inversiones\n\n"
-    "Inversiones relevantes en empresas, startups o capacidad productiva del sector.\n"
-    + _FORMATO_EVENTO
-    + "## 4.2. Integraciones Verticales\n\n"
-    "Movimientos de integración hacia proveedores o canales de distribución.\n"
-    + _FORMATO_EVENTO
-    + "## 4.3. Fusiones y Adquisiciones (M&A)\n\n"
-    "Operaciones de fusión o adquisición entre actores del sector.\n"
-    + _FORMATO_EVENTO
-    + "## 4.4. Joint Ventures\n\n"
-    "Empresas conjuntas y sociedades de riesgo compartido entre actores del sector.\n"
-    + _FORMATO_EVENTO
-    + "## 4.5. Alianzas de Compra y Abastecimiento\n\n"
-    "Acuerdos de compra, abastecimiento o colaboración comercial entre actores del sector.\n"
-    + _FORMATO_EVENTO.rstrip()
+    "Desarrolla EXACTAMENTE las siguientes secciones en este orden (no agregues otras):\n\n"
+    "{secciones_solicitadas}"
 )
 
 

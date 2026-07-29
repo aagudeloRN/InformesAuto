@@ -161,11 +161,13 @@ class EmbeddingRepository:
             # Solo chunks con es_global=true (reserva global cross-sector, Fase 18 DT-031)
             conditions.append("e.metadatos->>'es_global' = 'true'")
         elif sector_gics is not None and sector_estricto:
-            # Solo el corpus sectorial compilado del GICS pedido (evidencia sectorial garantizada)
-            conditions.append(
-                "(e.metadatos->>'sector_gics' = :sector "
-                "AND e.metadatos->>'tipo_fuente' = 'informe_compilado')"
-            )
+            # Todo el corpus sectorial del GICS pedido (evidencia sectorial garantizada).
+            # DT-054: antes se restringía a tipo_fuente='informe_compilado', lo que excluía de la
+            # reserva a los EMIS individuales (tipo_fuente NULL pero con sector_gics seteado). Al
+            # filtrar solo por sector_gics, el compilado y los EMIS individuales compiten por score
+            # dentro de la reserva; la web/académicas (sector_gics NULL) siguen fuera → la garantía
+            # sectorial anti-mezcla de ADR-012 se preserva.
+            conditions.append("e.metadatos->>'sector_gics' = :sector")
             params["sector"] = sector_gics
         elif sector_gics is not None:
             # Incluye el sector pedido + docs multi-sector + fuentes sin sector (web/académicas)

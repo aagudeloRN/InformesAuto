@@ -2,6 +2,8 @@ from langchain_core.runnables import Runnable
 
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
 from ic.domain.chains.chain_05_ecosistema import (
+    SUBSECCIONES,
+    build_secciones_solicitadas,
     format_academic_sources,
     format_chunks_as_context,
 )
@@ -49,12 +51,27 @@ class GenerateEcosistema:
                     urls=[r.url for r in results],
                 )
 
-        chunks = self._store.search(
-            f"{sector_query} ecosistema proveedores clientes alianzas",
-            sector_gics=sector_gics_code, empresa_id=empresa_id,
-        )
+        # DT-058: capítulo adaptativo. Cada subsección 4.x se gatea por su propio retrieval; solo
+        # se solicitan al modelo las que superan el umbral (ADR-002). Si ninguna lo supera, el
+        # capítulo se OMITE con párrafo de ausencia (no se borra del informe).
+        activas: list[tuple[str, str, str, str]] = []
+        chunks_usados: list = []
+        vistos: set = set()
+        for subsec in SUBSECCIONES:
+            _sid, _titulo, _desc, query = subsec
+            sub_chunks = self._store.search(
+                f"{sector_query} {query}", sector_gics=sector_gics_code, empresa_id=empresa_id,
+            )
+            if not check_retrieval_sufficient(sub_chunks, min_chunks=_MIN_CHUNKS):
+                continue
+            activas.append(subsec)
+            for ch in sub_chunks:
+                clave = ch.chunk_id or ch.chunk_texto
+                if clave not in vistos:
+                    vistos.add(clave)
+                    chunks_usados.append(ch)
 
-        if not check_retrieval_sufficient(chunks, min_chunks=_MIN_CHUNKS):
+        if not activas:
             return CapEcosistema(
                 texto=build_absent_paragraph("Cap 4 — Ecosistema Empresarial"),
                 n_chunks_usados=0,
@@ -62,7 +79,7 @@ class GenerateEcosistema:
                 chunks_usados=[],
             )
 
-        context = format_chunks_as_context(chunks)
+        context = format_chunks_as_context(chunks_usados)
         web_context = format_academic_sources(all_web_results)
 
         texto = self._chain.invoke({
@@ -70,6 +87,7 @@ class GenerateEcosistema:
             "sector_gics": sector_gics,
             "retrieval_sector": context,
             "fuentes_web": web_context,
+            "secciones_solicitadas": build_secciones_solicitadas(activas),
         })
 
         if has_cjk_characters(texto):
@@ -78,14 +96,14 @@ class GenerateEcosistema:
                     "Cap 4 — Ecosistema Empresarial",
                     "El modelo generó texto en un idioma incorrecto (no español)",
                 ),
-                n_chunks_usados=len(chunks),
+                n_chunks_usados=len(chunks_usados),
                 retrieval_suficiente=False,
-                chunks_usados=chunks,
+                chunks_usados=chunks_usados,
             )
 
         return CapEcosistema(
             texto=texto,
-            n_chunks_usados=len(chunks),
+            n_chunks_usados=len(chunks_usados),
             retrieval_suficiente=True,
-            chunks_usados=chunks,
+            chunks_usados=chunks_usados,
         )
