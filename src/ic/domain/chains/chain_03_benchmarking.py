@@ -89,7 +89,7 @@ USER_PROMPT_03 = (
     "- ¿Qué oportunidades no están cubriendo los líderes globales?\n"
     "- ¿Qué estrategias están usando las startups para ganar cuota de mercado?\n\n"
     "## RADAR DE POSICIONAMIENTO (emitir AL FINAL, después de todo el texto anterior)\n\n"
-    "Basándote en el análisis de la sección 2.1, emite EXACTAMENTE el siguiente bloque JSON "
+    "Basándote en el análisis de la sección 2.1, emite EXACTAMENTE un bloque JSON válido "
     "(reemplaza los nombres y valores con los competidores reales analizados; scores de 1 a 5):\n\n"
     "```radar_json\n"
     '{{\n'
@@ -101,8 +101,14 @@ USER_PROMPT_03 = (
     '  }}\n'
     '}}\n'
     "```\n\n"
-    "Incluye de 4 a 8 competidores clave de la sección 2.1. "
-    "No emitas ningún texto después del bloque ```radar_json```."
+    "REGLAS DEL BLOQUE RADAR (obligatorias, el bloque se procesa por máquina):\n"
+    "- Incluye de 4 a 8 competidores clave de la sección 2.1.\n"
+    "- Conserva EXACTAMENTE las 5 claves de 'dimensions' mostradas; cada competidor debe tener "
+    "una lista de EXACTAMENTE 5 números entre 1 y 5.\n"
+    "- Usa comillas dobles en todas las claves y nombres. Sin comas colgantes. Sin comentarios. "
+    "Sin texto ni explicación dentro del bloque.\n"
+    "- Abre el bloque con ```radar_json y ciérralo con ```. "
+    "No emitas ningún texto, nota ni razonamiento después del cierre del bloque."
 )
 
 

@@ -66,3 +66,36 @@ def test_extract_radar_missing_competidores_key():
     _, data = _extract_radar(texto)
     assert data is not None
     assert "competidores" not in data
+
+
+# ── T22.2 (DT-027): robustez del extractor para subir el hit-rate ──────────────
+
+
+def test_extract_radar_json_label_fence():
+    """El modelo etiqueta el fence como ```json en vez de ```radar_json → igual se extrae."""
+    texto = "Análisis.\n\n```json\n" + json.dumps(_VALID_JSON, ensure_ascii=False) + "\n```"
+    limpio, data = _extract_radar(texto)
+    assert data is not None
+    assert "Nestlé" in data["competidores"]
+    assert "```" not in limpio
+
+
+def test_extract_radar_trailing_comma():
+    """Coma colgante antes de } (error frecuente del LLM local) → se tolera y parsea."""
+    texto = (
+        'Texto.\n\n```radar_json\n{"dimensions": ["A"], '
+        '"competidores": {"X": [1, 2, 3, 4, 5],}}\n```'
+    )
+    _, data = _extract_radar(texto)
+    assert data is not None
+    assert data["competidores"]["X"] == [1, 2, 3, 4, 5]
+
+
+def test_extract_radar_bare_no_fence():
+    """Objeto del radar sin fences reconocibles → escaneo balanceado lo delimita."""
+    obj = json.dumps(_VALID_JSON, ensure_ascii=False)
+    texto = f"Prosa del capítulo.\n\n{obj}\ntexto final"
+    limpio, data = _extract_radar(texto)
+    assert data is not None
+    assert "Unilever" in data["competidores"]
+    assert "Prosa del capítulo." in limpio

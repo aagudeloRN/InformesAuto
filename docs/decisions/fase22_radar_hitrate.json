@@ -1,0 +1,48 @@
+{
+  "tarea": "T22.2 (DT-027) hit-rate del radar tras endurecer prompt+extractor",
+  "n": 5,
+  "hits": 4,
+  "hit_rate": 0.8,
+  "corridas": [
+    {
+      "empresa": "Alpina S.A.S.",
+      "gics": "3020",
+      "radar_presente": true,
+      "n_competidores": 7,
+      "retrieval_suficiente": true,
+      "segundos": 186.0
+    },
+    {
+      "empresa": "Sofasa S.A.",
+      "gics": "2510",
+      "radar_presente": true,
+      "n_competidores": 4,
+      "retrieval_suficiente": true,
+      "segundos": 237.3
+    },
+    {
+      "empresa": "Alpina S.A.S.",
+      "gics": "3020",
+      "radar_presente": true,
+      "n_competidores": 6,
+      "retrieval_suficiente": true,
+      "segundos": 204.2
+    },
+    {
+      "empresa": "Sofasa S.A.",
+      "gics": "2510",
+      "radar_presente": false,
+      "n_competidores": 0,
+      "retrieval_suficiente": true,
+      "segundos": 132.0
+    },
+    {
+      "empresa": "Alpina S.A.S.",
+      "gics": "3020",
+      "radar_presente": true,
+      "n_competidores": 4,
+      "retrieval_suficiente": true,
+      "segundos": 288.3
+    }
+  ]
+}
