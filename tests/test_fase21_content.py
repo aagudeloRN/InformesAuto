@@ -217,8 +217,18 @@ def test_assembler_incluye_metodologia_y_aviso_ia():
 
 
 def test_chain_05_estructura_movimientos_4_1_a_4_5():
-    from ic.domain.chains.chain_05_ecosistema import SYSTEM_PROMPT_05, USER_PROMPT_05
+    from ic.domain.chains.chain_05_ecosistema import (
+        SUBSECCIONES,
+        SYSTEM_PROMPT_05,
+        USER_PROMPT_05,
+        build_secciones_solicitadas,
+    )
 
+    # DT-058: las subsecciones 4.1–4.5 ahora son datos (SUBSECCIONES) que se ensamblan de forma
+    # adaptativa vía el placeholder {secciones_solicitadas}. Con todas activas, la estructura
+    # completa se conserva.
+    assert "{secciones_solicitadas}" in USER_PROMPT_05
+    todas = build_secciones_solicitadas(SUBSECCIONES)
     for subcap in [
         "## 4.1. Inversiones",
         "## 4.2. Integraciones Verticales",
@@ -226,10 +236,10 @@ def test_chain_05_estructura_movimientos_4_1_a_4_5():
         "## 4.4. Joint Ventures",
         "## 4.5. Alianzas de Compra",
     ]:
-        assert subcap in USER_PROMPT_05
+        assert subcap in todas
     # Campos por evento (patrón Noel).
-    assert "Capacidad estratégica adquirida" in USER_PROMPT_05
-    assert "Vulnerabilidad mitigada" in USER_PROMPT_05
+    assert "Capacidad estratégica adquirida" in todas
+    assert "Vulnerabilidad mitigada" in todas
     assert "{sector_gics}" in SYSTEM_PROMPT_05
     # Ya no mapea actores estáticos (estructura vieja).
     assert "Actores Disruptores" not in USER_PROMPT_05
