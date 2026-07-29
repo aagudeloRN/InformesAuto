@@ -1,8 +1,8 @@
 # FASE 22 — Hallazgos: Evidencia y Retrieval (Sprint A)
 
-> Estado: **Sprint A — código cerrado y commiteado (A1/A2); validación E2E (A3) pendiente**
-> de que termine la indexación EMIS de fondo. Este documento se completa con los números del
-> harness y del E2E cuando A3 se ejecute (≥2 sectores completos: ya disponibles 3020 y 2510).
+> Estado: **Sprint A — CERRADO y validado (A1/A2/A3).** Harness A/B + E2E en 2 sectores
+> completos (3020 Alpina, 2510 Sofasa) ejecutados 2026-07-29 sobre el corpus EMIS indexado
+> (§5/§6). Los 6 criterios de aceptación quedan demostrados; deuda nueva DT-054/055 (§9) → F23/B.
 
 ## 1. Objetivo
 
@@ -66,40 +66,92 @@ consecuencia directa de la diversidad de retrieval (A1). A2 cubre las huérfanas
 - **DT-052** (citación no sigue al corpus): código Sprint A commiteado (A2). Validación de
   "≥8 referencias, 0 huérfanas, fuentes EMIS presentes" en E2E → §5 (pendiente).
 
-## 5. Validación (PENDIENTE — tras indexación EMIS)
+## 5. Validación — T22.A3 (ejecutada 2026-07-29, corpus EMIS indexado)
 
 ### 5.1 Harness de retrieval (antes/después) — `scripts/eval_retrieval.py`
 
-<!-- Correr con la BD estable (indexación terminada):
-     uv run python scripts/eval_retrieval.py --mode filtered
-     uv run python scripts/eval_retrieval.py --mode filtered --mmr-lambda 1.0   # contraste A/B
-     Medir: nº de documentos distintos por consulta, precision, contamination, hit-rate.
-     Criterio: ≥5 docs distintos cuando existen; sin regresión de precisión vs baseline F14. -->
-_Pendiente._
+Gold set de 25 consultas (una por sector GICS). Snapshots en `docs/decisions/`:
+`fase22_baseline.json` (MMR λ=0.7, el config vigente), `fase22_nomm.json` (contraste λ=1.0),
+comparados contra `fase14_baseline.json`.
 
-### 5.2 E2E sobre sectores completos (≥2) + anti-mezcla — T22.A3
+| métrica                | F14 baseline | **F22 (MMR 0.7)** | F22 (sin MMR, λ=1.0) |
+|------------------------|:-----------:|:-----------------:|:--------------------:|
+| context precision      | 1.0000      | **1.0000**        | 1.0000               |
+| cross-sector contam.   | 0.0000      | **0.0000**        | 0.0000               |
+| hit-rate sectorial     | 1.0000      | **1.0000**        | 1.0000               |
+| chunks correctos (avg) | 3.2000      | **3.7600**        | 4.0400               |
+| score medio sectorial  | 0.7636      | **0.7604**        | 0.7602               |
 
-Sectores completos confirmados en BD (2026-07-27): **3020 Alimentos (14 docs)**,
-**2510 Automóviles (12 docs)**, 2010 Bienes de capital (11). Procedimiento:
+- **Sin regresión** (criterio 5): precisión 1.0 y contaminación 0.0 se mantienen tras reactivar
+  MMR y bajar el cap por doc; `avg_correct` sube de 3.2 → **3.76** sobre el corpus enriquecido.
+- MMR (λ=0.7) rinde ligeramente menos `avg_correct` que sin MMR (3.76 vs 4.04) porque **cambia
+  relevancia por diversidad** — su beneficio real (más documentos distintos citados) se mide en
+  el E2E (§5.2), no en el conteo de gold por sector. El harness no mide diversidad de documentos.
 
-```bash
-# 3020 (dentro del corpus food):
-uv run python scripts/run_pilot.py --empresa "Alpina S.A.S."
-# 2510 (automotriz colombiana; confirmar que chain_02 resuelve su GICS a 2510):
-uv run python scripts/run_pilot.py --empresa "<empresa automotriz colombiana>"
-```
+### 5.2 E2E sobre 2 sectores completos + anti-mezcla — T22.A3
 
-Criterios de aceptación por informe:
-- Referencias 3 → **≥8 fuentes distintas**; **0 huérfanas**; fuentes EMIS del sector presentes.
-- **Anti-mezcla**: los chunks *sectoriales* citados pertenecen al `sector_gics` de la empresa
-  (los globales `es_global=true` están exentos por ADR-012/018); ningún sector específico ajeno
-  aparece citado.
+Dos corridas `run_pilot.py` con Ollama libre (una a la vez, VRAM WSL 8GB):
+**Alpina S.A.S. → GICS 3020** y **Sofasa S.A. → GICS 2510** (chain_02 resolvió 2510 en runtime;
+la SQL de retrieval usó `sector='2510'`). Métricas de `historial_informes.metricas_fiabilidad`
++ log anti-mezcla + inspección `python-docx`:
 
-_Pendiente de ejecutar (esperando fin de la indexación EMIS, por decisión del usuario)._
+| criterio                       | Alpina (3020)        | Sofasa (2510)             |
+|--------------------------------|----------------------|---------------------------|
+| n_fuentes_total (antes 3)      | **8** ✅             | **14** ✅                 |
+| n_citas_huerfanas              | **0** ✅             | **0** ✅                  |
+| n_huerfanas_suprimidas         | 0                    | 0                         |
+| caps OK                        | 7/7                  | 7/7                       |
+| Cap 5 áreas (T22.6)            | **4** (5.1–5.4) ✅   | **4** (5.1–5.4) ✅        |
+| Cap 6 cruza caps previos (T22.1)| **sí** (Cap 2/3/4/5)| **sí** (Tendencias/Converg.)|
+| anti-mezcla `on/exento/ajeno`  | 1/7/0 (nivel doc)    | **17/33/0** (log, chunks) |
+| EMIS del sector en Referencias | Informe sectorial 3020| Informe sectorial 2510 + "Automotor" |
 
-## 6. Métricas de cierre
+- **Anti-mezcla (criterio 4): `ajeno=0` en ambos** — ningún chunk de un sector específico ajeno
+  se citó; los globales (`es_global=true`) y la web quedan exentos por ADR-012/018. El histograma
+  se emite por log en cada corrida (`generate_informe`, paso 10) vía `coherence.sector_histogram`.
+- **T22.1**: Cap 6 de Alpina referencia hallazgos concretos ("el crecimiento del 27 % en volumen
+  del segmento de café listo para beber" [Cap 3], "Nestlé y Danone… bebidas fortificadas" [Cap 2],
+  "integración de sensores IoT" [Cap 5]); el de Sofasa referencia "El capítulo de Tendencias…",
+  "El capítulo de Convergencia Territorial…".
 
-_Pendiente (se completa al cerrar Sprint A tras A3)._
+## 6. Métricas de cierre (antes → después)
+
+| indicador                         | antes (F21 A/B) | después (F22 A3)        |
+|-----------------------------------|:---------------:|:-----------------------:|
+| Referencias por informe           | 3               | **8 (Alpina) / 14 (Sofasa)** |
+| chunks correctos (harness, avg)   | 3.2             | **3.76**                |
+| citas huérfanas en `.docx`        | 1 (Alpina A/B)  | **0 / 0**               |
+| anti-mezcla `ajeno` (sectorial)   | (no medido)     | **0 / 0**               |
+| precisión / contaminación harness | 1.0 / 0.0       | **1.0 / 0.0** (sin regresión) |
+
+**Los 6 criterios de aceptación del Sprint A quedan demostrados** con evidencia reproducible
+(snapshots + 2 `.docx` en `output/fase22_alpina.docx` y `output/fase22_sofasa.docx`).
+
+## 9. Hallazgos y deuda nueva (no bloquean el cierre de Sprint A)
+
+- **DT-054 — EMIS individuales sub-citados.** El sector 3020 tiene 14 docs (13 EMIS individuales
+  + 1 compilado) y 2510 análogo, pero las Referencias siguen dominadas por web + el compilado.
+  Causa: (a) la **reserva sectorial estricta** filtra a `tipo_fuente='informe_compilado'`
+  (`embedding_repo.search_similar`), así que los EMIS individuales (con `tipo_fuente` NULL) **nunca
+  entran a la reserva garantizada**; (b) en el pool general compiten por score con la web y suelen
+  perder. La diversidad en *conteo* subió (3→8/14) pero la *mezcla de fuentes* es web-pesada.
+  Acción → **F23**: ampliar la reserva sectorial más allá del compilado (o dar boost de score a
+  EMIS) y/o etiquetar `tipo_fuente` en la ingesta EMIS. La capacidad multi-sector (DT-053) sigue
+  dormida (columna `sectores_adicionales` vacía).
+- **DT-055 — Fuga de andamiaje del prompt en el intro del Cap 6 (Sofasa).** El párrafo
+  introductorio de Accionables filtró meta-texto del modelo ("We need to produce a paragraph
+  intro…", "Answer", "(In)"). El *cuerpo* de accionables quedó limpio y sí cruza capítulos (T22.1).
+  Aislado a la cadena de párrafos intro N2; no ocurrió en Alpina. Acción → **Sprint B** (endurecer/
+  sanear la salida del intro; posible `strip` de reasoning). No afecta anti-mezcla/refs/huérfanas.
+
+## 10. Docs fallidos de la ingesta EMIS (A3-d, no bloqueante)
+
+Los 5 errores de la ingesta (Deloitte Retail, CBRE Real Estate ×2, FDA Novel Drug, EY LatAm)
+están **fuera** de 3020/2510/2010 → no afectan la validación. El log de ingesta
+(`/tmp/ingest_emis_full.log`) ya no existe, por lo que el traceback exacto no se recuperó; los
+PDF existen en disco (`documentos_sectoriales/FuentesEMIS/`) y no impiden nuevas ingestas.
+**Decisión:** deuda de curación → **F23** (re-ingesta puntual con diagnóstico del PDF), no se
+re-ingiere ahora por no aportar a los sectores validados.
 
 ## 7. Sprint B adelantado (código, mientras indexa el corpus EMIS)
 
