@@ -468,7 +468,32 @@ Harness enfocado (patrón `measure_radar_hitrate`): corre solo el camino del Cap
 `n_competidores_radar`, `n_refs_emis_individual` (chunks_usados de EMIS individual) y
 `n_docs_distintos`. Modo `--before` (sin `entidades_chain`) vs por defecto (con), snapshots en
 `docs/decisions/fase22_competitor_evidence_{antes,despues}.json`.
-<!-- NUMEROS_MEDICION -->
+
+**Resultados (2026-07-29, N=2, corpus EMIS indexado, generación vía OpenRouter):**
+
+| métrica (promedio) | ANTES (solo sector) | DESPUÉS (T22.4 entidades) |
+|--------------------|:-------------------:|:-------------------------:|
+| n_fichas (2.1)     | 7.0                 | **14.0**                  |
+| n_competidores_radar | 0.0               | **4.0**                   |
+| n_refs_emis_individual | 1.0             | 1.0                       |
+| n_docs_distintos   | 5.0                 | 5.0                       |
+
+Detalle por caso (el promedio esconde el mayor efecto):
+
+| caso | fichas antes→después | radar antes→después | emis_indiv |
+|------|:--------------------:|:-------------------:|:----------:|
+| **Alpina** (3020) | **0 → 14** | **0 → 4** | 0 |
+| **Sofasa** (2510) | 14 → 14    | **0 → 4** | 2 |
+
+- **T22.4 rescata el Cap 2.1 cuando el corpus sectorial es delgado.** Alpina (3020, 242 chunks
+  EMIS indiv.) pasó de fichas=0/radar=0 (sección vacía) a **14 fichas + 4 competidores** gracias a
+  la identificación de entidades + búsqueda dirigida. Sofasa (2510, corpus más denso) ya tenía
+  fichas; ganó el **radar (0→4)**. El radar sube en ambos porque la sección 2.1 llega poblada.
+- **EMIS individuales presentes (T1a) donde el corpus es denso.** Sofasa cita **2** refs EMIS
+  individuales/corrida (antes de T1a eran estructuralmente 0 en la reserva); Alpina 0 (corpus más
+  chico + la reserva se llena con el compilado, que tiene `tipo_fuente=informe_compilado`). Subir
+  el mix de forma consistente → **DT-057** (etiquetar `tipo_fuente` explícito + boost de score).
+- `n_docs_distintos=5` en todas las corridas = el piso `rag_min_distinct_docs=5` (DT-049) opera.
 
 ## 15.2 RETOS / lecciones
 

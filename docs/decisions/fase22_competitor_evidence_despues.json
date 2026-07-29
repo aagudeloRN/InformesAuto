@@ -1,0 +1,36 @@
+{
+  "tarea": "DT-054 + T22.4 — evidencia de competidores del Cap 2",
+  "modo": "despues",
+  "con_entidades_chain": true,
+  "n": 2,
+  "promedios": {
+    "n_fichas": 14.0,
+    "n_competidores_radar": 4.0,
+    "n_refs_emis_individual": 1.0,
+    "n_docs_distintos": 5.0
+  },
+  "corridas": [
+    {
+      "empresa": "Alpina S.A.S.",
+      "gics": "3020",
+      "segundos": 337.7,
+      "n_fichas": 14,
+      "n_competidores_radar": 4,
+      "n_refs_emis_individual": 0,
+      "n_docs_distintos": 5,
+      "n_chunks_usados": 10,
+      "retrieval_suficiente": true
+    },
+    {
+      "empresa": "Sofasa S.A.",
+      "gics": "2510",
+      "segundos": 188.0,
+      "n_fichas": 14,
+      "n_competidores_radar": 4,
+      "n_refs_emis_individual": 2,
+      "n_docs_distintos": 5,
+      "n_chunks_usados": 10,
+      "retrieval_suficiente": true
+    }
+  ]
+}
