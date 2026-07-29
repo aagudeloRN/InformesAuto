@@ -18,8 +18,8 @@ from ic.domain.eval.retrieval_metrics import (
 _GOLD = Path(__file__).parent / "fixtures" / "gold_set.json"
 
 
-def _c(sector, score=0.7):
-    return RetrievedChunk(sector_gics=sector, score=score)
+def _c(sector, sectores=(), score=0.7):
+    return RetrievedChunk(sector_gics=sector, sectores=tuple(sectores), score=score)
 
 
 # --- context_precision ---
@@ -71,16 +71,49 @@ def test_n_correct_chunks():
 
 
 def test_mean_sector_score():
-    r = [_c("2530", 0.8), _c("2530", 0.6), _c("4010", 0.9)]
+    r = [_c("2530", score=0.8), _c("2530", score=0.6), _c("4010", score=0.9)]
     assert mean_sector_score(r, "2530") == 0.7
-    assert mean_sector_score([_c("4010", 0.9)], "2530") == 0.0
+    assert mean_sector_score([_c("4010", score=0.9)], "2530") == 0.0
+
+
+# --- multi-sector (DT-053): on-sector por el array `sectores`, no solo el primario ---
+
+
+def test_precision_multisector_por_array():
+    # primario 4010, pero el doc también sirve a 2530 → on-sector para 2530
+    r = [_c("4010", sectores=("4010", "2530")), _c("2530")]
+    assert context_precision(r, "2530") == 1.0
+
+
+def test_contaminacion_multisector_no_contamina():
+    # el chunk 4010/[4010,2530] NO es contaminación para 2530 porque 2530 ∈ sectores
+    r = [_c("4010", sectores=("4010", "2530")), _c(None)]
+    assert cross_sector_contamination(r, "2530") == 0.0
+
+
+def test_hit_multisector_por_array():
+    # primario ajeno, pero el array cubre el esperado → hit
+    assert sectoral_hit([_c("4010", sectores=("4010", "2530"))], "2530") == 1.0
+
+
+def test_n_correct_y_score_multisector():
+    r = [_c("4010", sectores=("2530",), score=0.6), _c("2530", score=0.8)]
+    assert n_correct_chunks(r, "2530") == 2
+    assert mean_sector_score(r, "2530") == 0.7
+
+
+def test_chunk_sin_primario_pero_con_array_cuenta_como_con_sector():
+    # sector_gics None pero sectores no vacío → tiene info sectorial y es on-sector
+    r = [_c(None, sectores=("2530",))]
+    assert context_precision(r, "2530") == 1.0  # 1/1 con-sector correcto
+    assert cross_sector_contamination(r, "4010") == 1.0  # con-sector ajeno → contamina
 
 
 # --- evaluate_query + aggregate (determinismo) ---
 
 
 def test_evaluate_query_deterministico():
-    r = [_c("2530", 0.8), _c("4010", 0.7), _c(None, 0.9)]
+    r = [_c("2530", score=0.8), _c("4010", score=0.7), _c(None, score=0.9)]
     m1 = evaluate_query("q", "2530", r)
     m2 = evaluate_query("q", "2530", r)
     assert m1 == m2

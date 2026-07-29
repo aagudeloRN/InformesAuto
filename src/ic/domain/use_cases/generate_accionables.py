@@ -25,6 +25,7 @@ class GenerateAccionables:
         sector_gics: str,
         sector_gics_code: str | None = None,
         empresa_id=None,
+        hallazgos_caps_previos: str = "",
     ) -> CapAccionables:
         query = (
             f"{sector_gics} {nombre_empresa} "
@@ -46,6 +47,8 @@ class GenerateAccionables:
             "descripcion_empresa": descripcion_empresa,
             "sector_gics": sector_gics,
             "retrieval_cruzado": context,
+            "hallazgos_caps_previos": hallazgos_caps_previos
+            or "No se proporcionaron resúmenes de capítulos previos.",
         })
 
         if has_cjk_characters(texto):

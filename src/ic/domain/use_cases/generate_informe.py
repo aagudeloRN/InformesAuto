@@ -260,11 +260,26 @@ class GenerateInforme:
 
             ctx.step_fn(7, "Cap 6 — Accionables Estratégicos")
             if ctx.api_llm is not None:
+                # Coherencia (T22.1, Q1): pasar un resumen de los hallazgos de los caps ya
+                # generados (2/3/4/5) para que los accionables los referencien explícitamente,
+                # no solo el retrieval. Todos están disponibles en este punto del DAG.
+                from ic.domain.coherence import build_caps_summary
+                hallazgos = build_caps_summary([
+                    (etiqueta, obj.texto)
+                    for etiqueta, obj in [
+                        ("Cap 2 — Benchmarking", ctx.cap),
+                        ("Cap 3 — Tendencias", ctx.cap_tend),
+                        ("Cap 4 — Ecosistema", ctx.cap_eco),
+                        ("Cap 5 — Convergencia", ctx.cap_conv),
+                    ]
+                    if obj is not None and obj.retrieval_suficiente
+                ])
                 ctx.cap_acc = GenerateAccionables(
                     chain=build_chain_07(ctx.api_llm), store=store_n2,
                 ).execute(
                     nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
                     sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+                    hallazgos_caps_previos=hallazgos,
                 )
 
         ctx.step_fn(8, "Párrafos introductorios N2")
@@ -291,6 +306,7 @@ class GenerateInforme:
         from ic.infrastructure.citation.apa_formatter import (
             build_references_section,
             find_orphan_citations,
+            strip_orphan_citations,
         )
         from ic.shared.types import InformePiloto
 
@@ -301,6 +317,7 @@ class GenerateInforme:
                 "Cap 2: Benchmarking": ctx.cap.texto,
             }
             for key, obj in [
+                ("Cap 2.3: Mercado", ctx.cap_mercado),
                 ("Cap 3: Tendencias", ctx.cap_tend),
                 ("Cap 4: Ecosistema", ctx.cap_eco),
                 ("Cap 5: Convergencia", ctx.cap_conv),
@@ -324,21 +341,48 @@ class GenerateInforme:
                 todos_chunks += cap_obj.chunks_usados
         refs = build_references_section(todos_chunks)
 
+        # Anti-mezcla (T22.A3, TIER 4 trazabilidad): histograma de sectores de los chunks
+        # CITADOS. Los globales/web quedan exentos por diseño (ADR-012/018); un chunk de un
+        # sector específico ajeno al de la empresa sería contaminación real. Solo mide (RN-001).
+        from ic.domain.coherence import sector_histogram
+        from ic.shared.constants.gics_groups import extract_gics_code
+
+        sector_code = extract_gics_code(ctx.gics.grupo_gics)
+        hist = sector_histogram([c.metadatos for c in todos_chunks], sector_code)
+        logger.info(
+            "Anti-mezcla chunks citados [sector=%s]: on_sector=%d exento=%d ajeno=%d",
+            sector_code, hist.on_sector, hist.exento, hist.ajeno,
+        )
+        if hist.ajenos:
+            logger.warning("Anti-mezcla: chunks de sector AJENO citados: %s", hist.ajenos)
+
         # Persistencia web "solo lo citado" (T14.5, DT-020): de los chunks web de esta sesión,
         # se promueven los efectivamente usados y se borra el resto de la búsqueda.
         self._promote_cited_web(ctx, todos_chunks)
 
+        # Saneamiento de citas huérfanas (T22.A2, DT-052): las citas (Autor, año) del texto sin
+        # referencia que las respalde se SUPRIMEN, no se inventa una fuente (RN-001). Se aplica a
+        # cada capítulo antes del ensamblado y de la detección residual.
+        caps_con_texto = [
+            ctx.cap, ctx.cap_mercado, ctx.cap_tend, ctx.cap_eco,
+            ctx.cap_conv, ctx.cap_acc, ctx.resumen,
+        ]
+        n_huerfanas_suprimidas = 0
+        for cap_obj in caps_con_texto:
+            if cap_obj is not None and getattr(cap_obj, "texto", None):
+                cap_obj.texto, n_sup = strip_orphan_citations(cap_obj.texto, refs)
+                n_huerfanas_suprimidas += n_sup
+        if n_huerfanas_suprimidas:
+            logger.info(
+                "Citas huérfanas suprimidas (sin referencia): %d", n_huerfanas_suprimidas
+            )
+
         texto_completo = " ".join(
-            c.texto
-            for c in [
-                ctx.cap, ctx.cap_mercado, ctx.cap_tend, ctx.cap_eco,
-                ctx.cap_conv, ctx.cap_acc, ctx.resumen,
-            ]
-            if c is not None
+            c.texto for c in caps_con_texto if c is not None
         )
         orphans = find_orphan_citations(texto_completo, refs)
         if orphans:
-            logger.warning("Citas huérfanas detectadas (sin referencia): %s", orphans)
+            logger.warning("Citas huérfanas residuales tras saneamiento: %s", orphans)
 
         caps_fiabilidad = [
             ("Cap 1 — Descripción", True),
@@ -359,6 +403,7 @@ class GenerateInforme:
             "caps_ausencia": [n for n, ok in caps_fiabilidad if not ok],
             "n_fuentes_total": len(refs),
             "n_citas_huerfanas": len(orphans),
+            "n_huerfanas_suprimidas": n_huerfanas_suprimidas,
             "tiempo_ollama_total_s": round(ctx.tracker.total_ollama_time_s(), 2),
         }
 

@@ -135,16 +135,49 @@ def format_chunks_with_meta(chunks: list[ChunkResult]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
+# Patrón de cita inline (Autor, año): grupo 1 = autor(es), grupo 2 = año o "s.f.".
+_CITA_RE = re.compile(r"\(([^()]+),\s*(\d{4}|s\.f\.)\)")
+
+
+def _cita_matches_ref(autor_cita: str, autores_refs: set[str]) -> bool:
+    """True si el autor de la cita mapea a alguna referencia (coincidencia por subcadena)."""
+    autor_cita = autor_cita.strip().lower()
+    return any(autor_cita in a or a in autor_cita for a in autores_refs)
+
+
 def find_orphan_citations(texto: str, refs: list[Referencia]) -> list[str]:
     """Devuelve citas (Autor, año) del texto que no coinciden con ninguna referencia."""
-    pattern = re.compile(r"\(([^()]+),\s*(\d{4}|s\.f\.)\)")
     autores_refs = {r.autor.lower() for r in refs}
-    orphans: list[str] = []
-    for m in pattern.finditer(texto):
-        autor_cita = m.group(1).strip().lower()
-        if not any(autor_cita in a or a in autor_cita for a in autores_refs):
-            orphans.append(m.group(0))
+    orphans = [
+        m.group(0)
+        for m in _CITA_RE.finditer(texto)
+        if not _cita_matches_ref(m.group(1), autores_refs)
+    ]
     return list(dict.fromkeys(orphans))
+
+
+def strip_orphan_citations(texto: str, refs: list[Referencia]) -> tuple[str, int]:
+    """Suprime del texto las citas (Autor, año) sin referencia que las respalde (DT-052).
+
+    Quitar una atribución no sustentada es correcto por RN-001 (nunca inventar atribuciones):
+    ante una cita huérfana, se elimina la cita, no se fabrica una fuente. Devuelve el texto
+    saneado y cuántas citas se suprimieron. Limpia el espacio sobrante que deja la cita.
+    """
+    autores_refs = {r.autor.lower() for r in refs}
+    n = 0
+
+    def _sub(m: re.Match) -> str:
+        nonlocal n
+        if _cita_matches_ref(m.group(1), autores_refs):
+            return m.group(0)
+        n += 1
+        return ""
+
+    saneado = _CITA_RE.sub(_sub, texto)
+    # Colapsa el doble espacio o el " ." que pueda quedar tras borrar la cita.
+    saneado = re.sub(r" +([.,;:])", r"\1", saneado)
+    saneado = re.sub(r"[ \t]{2,}", " ", saneado)
+    return saneado, n
 
 
 def build_references_section(chunks: list[ChunkResult]) -> list[Referencia]:

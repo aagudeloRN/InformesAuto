@@ -76,14 +76,22 @@ def build_chain_06(llm: object) -> Runnable:
 
 _SYNTH_SYSTEM = (
     "Eres un consultor senior en estrategia empresarial. Integra los análisis de convergencia "
-    "recibidos en un capítulo cohesivo. Mantén todas las secciones numeradas, elimina repeticiones "
-    "y asegura transiciones fluidas. Conserva títulos en negrilla y tono ejecutivo. "
-    "IDIOMA OBLIGATORIO: español latino neutro."
+    "recibidos en un capítulo cohesivo. Conserva títulos en negrilla y tono ejecutivo. "
+    "IDIOMA OBLIGATORIO: español latino neutro.\n\n"
+    "ESTRUCTURA OBLIGATORIA: el capítulo tiene EXACTAMENTE 4 áreas estratégicas, ni una más:\n"
+    "- ## 5.1 Área Estratégica: Sostenibilidad Ambiental\n"
+    "- ## 5.2 Área Estratégica: Transformación Digital y Gobierno Inteligente\n"
+    "- ## 5.3 Área Estratégica: Desarrollo Social-Humano\n"
+    "- ## 5.4 Área Estratégica: Desarrollo Económico\n"
+    "Está PROHIBIDO agregar, renumerar, dividir o inventar subsecciones más allá de 5.4 "
+    "(nada de 5.5, 5.6, etc.). Integra todo el contenido recibido dentro de estas 4 áreas, "
+    "elimina repeticiones y asegura transiciones fluidas."
 )
 
 _SYNTH_USER = (
     "Integra los siguientes análisis en el Capítulo 5. Convergencia Empresarial en las Áreas "
-    "Estratégicas del Distrito.\n\n"
+    "Estratégicas del Distrito, respetando EXACTAMENTE las 4 áreas (5.1 a 5.4) y sin crear "
+    "subsecciones adicionales.\n\n"
     "Inicia con: \"La convergencia empresarial analiza cómo las estrategias de la empresa se "
     "alinean con las prioridades del territorio y las tendencias del sector, identificando puntos "  # noqa: E501
     "de intersección que generan ventajas competitivas sostenibles y contribuyen al desarrollo "

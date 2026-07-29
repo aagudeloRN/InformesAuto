@@ -6,6 +6,7 @@ from ic.infrastructure.citation.apa_formatter import (
     find_orphan_citations,
     format_chunks_with_meta,
     format_reference,
+    strip_orphan_citations,
 )
 from ic.shared.types import ChunkResult, Referencia
 
@@ -241,6 +242,79 @@ class TestFindOrphanCitations:
         refs = [self._ref("Fortune Business Insights", "2026")]
         texto = "Según (Fortune Business Insights, 2026) crece."
         assert find_orphan_citations(texto, refs) == []
+
+
+# ── T22.A2 (DT-052): strip_orphan_citations ───────────────────────────────
+
+
+class TestStripOrphanCitations:
+    def _ref(self, autor: str, año: str = "2024") -> Referencia:
+        return Referencia(
+            clave=f"{autor}{año}", autor=autor, año=año, titulo="Título",
+            fuente="Fuente", url=None, apa_string=f"{autor}. ({año}).",
+        )
+
+    def test_suprime_huerfana_y_conserva_valida(self):
+        refs = [self._ref("Euromonitor", "2024")]
+        texto = "El líder (Euromonitor, 2024) domina; una huérfana (Carvajal, 2019) aquí."
+        saneado, n = strip_orphan_citations(texto, refs)
+        assert n == 1
+        assert "(Euromonitor, 2024)" in saneado
+        assert "Carvajal" not in saneado
+        # Tras suprimir, no quedan huérfanas.
+        assert find_orphan_citations(saneado, refs) == []
+
+    def test_cita_multientidad_malformada_se_suprime(self):
+        # La huérfana real del A/B: (Alpina, Carvajal Empaques, 2019).
+        refs = [self._ref("Euromonitor", "2024")]
+        texto = "Dato de mercado (Alpina, Carvajal Empaques, 2019) sin respaldo."
+        saneado, n = strip_orphan_citations(texto, refs)
+        assert n == 1
+        assert "Carvajal Empaques" not in saneado
+
+    def test_sin_huerfanas_no_cambia_conteo(self):
+        refs = [self._ref("García, J.", "2024")]
+        texto = "Según (García, J., 2024) el sector crece."
+        saneado, n = strip_orphan_citations(texto, refs)
+        assert n == 0
+        assert saneado == texto
+
+    def test_no_deja_espacio_sobrante(self):
+        refs = [self._ref("Euromonitor", "2024")]
+        texto = "El mercado creció (Fantasma, 2020) según fuentes."
+        saneado, _ = strip_orphan_citations(texto, refs)
+        assert "  " not in saneado
+        assert " ." not in saneado
+
+
+# ── T22.A2 (DT-052): contrato chunks_usados → Referencias ──────────────────
+
+
+class TestChunksToRefsContract:
+    def _pdf_chunk(self, url: str, titulo: str, autor: str) -> ChunkResult:
+        return ChunkResult(
+            chunk_texto=f"Contenido de {titulo}.", fuente_tipo="pdf", fuente_url=url,
+            score=0.8, metadatos={"titulo": titulo, "autor": autor, "año": "2024"},
+        )
+
+    def test_n_docs_distintos_producen_n_referencias(self):
+        # 5 documentos EMIS distintos (por URL) → 5 referencias, sin colapsar.
+        chunks = [
+            self._pdf_chunk(f"/emis/doc_{i}.pdf", f"Informe {i}", f"Publisher {i}")
+            for i in range(5)
+        ]
+        # Añadir chunks repetidos del mismo doc no debe inflar las referencias.
+        chunks.append(self._pdf_chunk("/emis/doc_0.pdf", "Informe 0", "Publisher 0"))
+        refs = build_references_section(chunks)
+        assert len(refs) == 5
+
+    def test_texto_saneado_sin_huerfanas_contra_refs_reales(self):
+        chunks = [self._pdf_chunk("/emis/a.pdf", "Capsule", "Euromonitor")]
+        refs = build_references_section(chunks)
+        texto = "Cita válida (Euromonitor, 2024) y una inventada (Inexistente, 2010)."
+        saneado, n = strip_orphan_citations(texto, refs)
+        assert n == 1
+        assert find_orphan_citations(saneado, refs) == []
 
 
 # ── T10.2: format_chunks_with_meta ────────────────────────────────────────

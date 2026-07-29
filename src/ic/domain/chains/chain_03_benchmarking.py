@@ -16,6 +16,9 @@ SYSTEM_PROMPT_03 = (
     "- Sustenta cada afirmación con datos concretos o porcentajes de las fuentes proporcionadas.\n"
     "- Cita cada párrafo con la fuente en formato: (Autor, año). "
     "Ejemplo: (Fortune Business Insights, 2026). "
+    "Usa UNA SOLA fuente por cita: nunca combines varias entidades en un mismo paréntesis "
+    "(mal: (Alpina, Carvajal, 2019); bien: (Euromonitor, 2024)). Si varios datos vienen de "
+    "fuentes distintas, cita cada uno por separado con su propio (Autor, año). "
     "NUNCA cites un nombre de archivo (.pdf, .docx); usa SIEMPRE el autor o institución.\n"
     "- Si un dato no está disponible en las fuentes, escribe: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
     "- No inventar información bajo ninguna circunstancia.\n"

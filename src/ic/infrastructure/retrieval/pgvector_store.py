@@ -7,6 +7,11 @@ from ic.infrastructure.retrieval.embedder import Embedder
 from ic.shared.config import Settings
 from ic.shared.types import ChunkResult
 
+# Fase 22 (DT-049): factor de ampliación del pool base para poder rellenar la garantía de
+# diversidad. Se piden más candidatos de los que caben en top_k; el excedente (ya filtrado por
+# umbral y diversificado por MMR) sirve para sustituir chunks de documentos sobre-representados.
+_DIVERSITY_POOL_MULT = 3
+
 
 class PGVectorStore:
     def __init__(self, embedder: Embedder, repo: EmbeddingRepository, settings: Settings) -> None:
@@ -20,6 +25,9 @@ class PGVectorStore:
         self._global_reserve = getattr(settings, "rag_global_reserve", 2)
         self._empresa_reserve = getattr(settings, "rag_empresa_reserve", 2)
         self._mmr_lambda = getattr(settings, "rag_mmr_lambda", 0.7)
+        # Piso de diversidad de documentos (Fase 22, DT-049): mínimo de docs distintos que
+        # search() intenta devolver cuando el corpus los tiene.
+        self._min_distinct_docs = getattr(settings, "rag_min_distinct_docs", 5)
         # Sesión de la corrida (T14.5): marca los chunks web para promover solo lo citado.
         self.session_id: str | None = None
 
@@ -84,13 +92,18 @@ class PGVectorStore:
         t = threshold if threshold is not None else self._threshold
 
         query_vec = self._embedder.embed(query)
-        rows = self._repo.search_similar(
-            query_vec, k, t, empresa_id,
+        # Pool ampliado (Fase 22, DT-049): se piden más candidatos que top_k para poder rellenar
+        # la garantía de diversidad. El slice [:k] preserva el comportamiento previo como base;
+        # el resto del pool alimenta la sustitución por documentos no representados.
+        pool_k = max(k, k * _DIVERSITY_POOL_MULT) if self._min_distinct_docs > 0 else k
+        pool = self._repo.search_similar(
+            query_vec, pool_k, t, empresa_id,
             sector_gics=sector_gics,
             solo_activos=solo_activos,
             max_chunks_per_doc=self._max_chunks_per_doc,
             mmr_lambda=self._mmr_lambda,
         )
+        rows = pool[:k]
 
         # Prioridad final: empresa > sector > global > resto por score.
         # Cada capa se recupera en búsqueda estricta y se antepone a las capas de menor
@@ -139,6 +152,12 @@ class PGVectorStore:
         rows = _prepend(capa_sectorial, rows, k)
         rows = _prepend(capa_empresa, rows, k)
 
+        # Garantía de diversidad (Fase 22, DT-049): si el resultado concentra pocos documentos,
+        # sustituye chunks de docs sobre-representados por chunks de docs no representados del
+        # pool ampliado. Preserva reservas (prepend al frente; la sustitución mira desde el final)
+        # y no introduce chunks bajo umbral (el pool ya está filtrado).
+        rows = self._enforce_doc_diversity(rows, pool, k, self._min_distinct_docs)
+
         return [
             ChunkResult(
                 chunk_texto=obj.chunk_texto,
@@ -150,3 +169,73 @@ class PGVectorStore:
             )
             for obj, score in rows
         ]
+
+    @staticmethod
+    def _doc_key(obj) -> object:
+        """Clave de documento para contar diversidad y deduplicar Referencias.
+
+        Alineada con `build_references_section`: un PDF se identifica por su `documento_id`;
+        una fuente web (sin documento) por su `fuente_url`. Como último recurso, el id del chunk
+        (garantiza que cada chunk sin doc ni url cuente como fuente distinta).
+        """
+        return getattr(obj, "documento_id", None) or getattr(obj, "fuente_url", None) or obj.id
+
+    def _enforce_doc_diversity(
+        self, rows: list[tuple], pool: list[tuple], k: int, min_docs: int
+    ) -> list[tuple]:
+        """Garantiza ≥`min_docs` documentos distintos en `rows` cuando `pool` los tiene.
+
+        Sustituye los chunks de documentos sobre-representados (empezando por el final, para
+        proteger las reservas antepuestas) por chunks de documentos aún no representados tomados
+        del pool ampliado. Si queda hueco bajo `k` sin docs sobre-representados que sacrificar,
+        los añade. Nunca baja de `len(rows)` chunks ni excede `k`; no introduce candidatos bajo
+        umbral porque el pool ya viene filtrado por `search_similar`.
+        """
+        if min_docs <= 0 or not rows:
+            return rows
+
+        current_keys = {self._doc_key(o) for o, _ in rows}
+        if len(current_keys) >= min_docs:
+            return rows
+
+        ids_in_rows = {o.id for o, _ in rows}
+        missing = [
+            (o, s) for o, s in pool
+            if o.id not in ids_in_rows and self._doc_key(o) not in current_keys
+        ]
+        if not missing:
+            return rows
+
+        counts: dict = {}
+        for o, _ in rows:
+            key = self._doc_key(o)
+            counts[key] = counts.get(key, 0) + 1
+
+        result = list(rows)
+        seen_keys = set(current_keys)
+        for cand_obj, cand_score in missing:
+            if len(seen_keys) >= min_docs:
+                break
+            cand_key = self._doc_key(cand_obj)
+            if cand_key in seen_keys:  # otro chunk del mismo doc ya entró en esta pasada
+                continue
+            # Buscar desde el final un chunk de un documento con >1 representante para sustituir.
+            swap_idx = None
+            for i in range(len(result) - 1, -1, -1):
+                if counts[self._doc_key(result[i][0])] > 1:
+                    swap_idx = i
+                    break
+            if swap_idx is None:
+                # Sin doc sobre-representado que sacrificar: añadir si aún cabe bajo k.
+                if len(result) < k:
+                    result.append((cand_obj, cand_score))
+                    counts[cand_key] = counts.get(cand_key, 0) + 1
+                    seen_keys.add(cand_key)
+                    continue
+                break
+            removed_key = self._doc_key(result[swap_idx][0])
+            result[swap_idx] = (cand_obj, cand_score)
+            counts[removed_key] -= 1
+            counts[cand_key] = counts.get(cand_key, 0) + 1
+            seen_keys.add(cand_key)
+        return result

@@ -42,8 +42,10 @@ class Settings(BaseSettings):
     rag_similarity_threshold: float = 0.7
     rag_top_k: int = 10
     # Cap por documento: evita que un informe sectorial grande monopolice el contexto
-    # (diversidad de fuentes — hallazgo RepositorioRN MMR, ADR-012)
-    rag_max_chunks_per_doc: int = 4
+    # (diversidad de fuentes — hallazgo RepositorioRN MMR, ADR-012).
+    # Fase 22 (DT-049): bajado 4→2 con el corpus EMIS multi-documento por sector, para que
+    # los slots de contexto cubran más documentos distintos → más fuentes citables.
+    rag_max_chunks_per_doc: int = 2
     # Cupos reservados para chunks del corpus sectorial estricto (mismo GICS) cuando hay
     # match de sector: garantiza que la evidencia sectorial aflore pese al backlog web (ADR-012)
     rag_sector_reserve: int = 3
@@ -51,11 +53,17 @@ class Settings(BaseSettings):
     # construcción; su vocabulario a veces embebe por debajo del umbral general (ADR-012)
     rag_sector_reserve_threshold: float = 0.5
     # MMR (Fase 14, T14.2): reranking por diversidad de documento. λ=1.0 lo desactiva (no-op);
-    # λ<1.0 → penaliza chunks del mismo documento. DESACTIVADO por defecto (λ=1.0): la
-    # evaluación T14.1 mostró que degrada el retrieval en este corpus, donde la evidencia
-    # sectorial está concentrada en un único documento por sector (ver FASE14_HALLAZGOS.md).
-    # Se conserva parametrizable para corpus futuros con sectores multi-documento.
-    rag_mmr_lambda: float = 1.0
+    # λ<1.0 → penaliza chunks del mismo documento. Fase 14 lo desactivó (λ=1.0) porque el
+    # corpus era mono-documento por sector (la evidencia estaba concentrada en un único doc;
+    # penalizar diversidad degradaba el retrieval — FASE14_HALLAZGOS.md). Fase 22 (DT-049) lo
+    # REACTIVA (λ=0.7) al llegar el corpus EMIS multi-documento por sector: esa condición ya
+    # no aplica y la diversidad de documento vuelve a ser deseable (no re-litiga ADR-014; es su
+    # palanca documentada). Validable A/B con `scripts/eval_retrieval.py --mmr-lambda`.
+    rag_mmr_lambda: float = 0.7
+    # Piso de diversidad (Fase 22, DT-049): mínimo de documentos DISTINTOS que search() intenta
+    # devolver cuando el corpus los tiene. Garantía determinista sobre MMR + cap por doc, para
+    # que las Referencias del informe reflejen la amplitud real del corpus (≥8 fuentes citables).
+    rag_min_distinct_docs: int = 5
     # Cupos reservados para chunks globales cross-sector (Fase 18, DT-031): documentos con
     # es_global=true participan en todos los sectores con cupo propio, antepuestos tras los
     # sectoriales. Mismo umbral relajado que rag_sector_reserve_threshold (ADR-012 addendum).
