@@ -108,4 +108,6 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                     "titulo": titulo, "empresa": ctx.params.empresa,
                     "resumen_cap": cap_obj.texto[:500],
                 })
-                cap_obj.texto = intro + "\n\n" + cap_obj.texto
+                # DT-055: intro saneado puede quedar vacío → no anteponer líneas en blanco
+                if intro:
+                    cap_obj.texto = intro + "\n\n" + cap_obj.texto
