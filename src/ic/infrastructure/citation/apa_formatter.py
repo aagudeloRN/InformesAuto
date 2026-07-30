@@ -2,6 +2,7 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
+from ic.shared.constants import TipoFuente
 from ic.shared.types import ChunkResult, Referencia
 
 
@@ -89,7 +90,7 @@ def _apa_report(meta: CitationMetadata) -> str:
     # Informes compilados de Ruta N: se aclara que agregan múltiples fuentes (ADR-012)
     etiqueta = (
         " [Informe compilado de múltiples fuentes]"
-        if meta.tipo_fuente == "informe_compilado"
+        if meta.tipo_fuente == TipoFuente.INFORME_COMPILADO.value
         else " [Informe]"
     )
     return f"{nombre}. ({meta.año}). {titulo_md}{etiqueta}.{fuente_part}{url_part}"

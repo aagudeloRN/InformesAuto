@@ -22,7 +22,7 @@ from ic.data.repositories.embedding_repo import EmbeddingRepository
 from ic.infrastructure.retrieval import chunker as chunker_mod
 from ic.infrastructure.retrieval.embedder import Embedder
 from ic.shared.config import Settings
-from ic.shared.constants import EstadoIngesta, TipoDocumento
+from ic.shared.constants import EstadoIngesta, TipoDocumento, TipoFuente
 
 logger = logging.getLogger(__name__)
 
@@ -132,9 +132,13 @@ class PdfIngestor:
         if sectores_adicionales:
             todos = ([sector_efectivo] if sector_efectivo else []) + sectores_adicionales
             metadatos_base["sectores"] = todos
-        # Los informes sectoriales de Ruta N son compilaciones de múltiples fuentes (ADR-012)
+        # Procedencia (tipo_fuente): habilita reserva/boost y telemetría de mix (DT-054/057).
+        # Los informes sectoriales de Ruta N son compilaciones de múltiples fuentes (ADR-012);
+        # los EMIS individuales entran etiquetados desde su ingesta (antes quedaban NULL).
         if tipo == TipoDocumento.PDF_SECTORIAL or es_global:
-            metadatos_base["tipo_fuente"] = "informe_compilado"
+            metadatos_base["tipo_fuente"] = TipoFuente.INFORME_COMPILADO.value
+        elif tipo == TipoDocumento.INFORME_EMIS:
+            metadatos_base["tipo_fuente"] = TipoFuente.INFORME_EMIS.value
 
         # Crear el DocumentoLocal PRIMERO para estampar documento_id en cada chunk
         # (habilita filtrado por ciclo de vida activo/inactivo vía JOIN).
