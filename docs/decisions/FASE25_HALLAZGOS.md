@@ -110,35 +110,142 @@ comportan bien; no requieren recalibración por ahora.
 - Migración `ensure_revisiones_tables` idempotente (fake engine, doble llamada, IF NOT EXISTS). Sin
   tocar vectores, sin `down -v`.
 
+### Revisión del usuario (2026-07-30) — falencias observadas en el informe → trabajo de mañana
+
+El usuario revisó `alpina_sa_informe.docx`: **mejoró mucho** vs. corridas previas, pero persisten
+falencias serias en el **descubrimiento de competidores** y varios capítulos aún salen **sin
+información**. Evidencia extraída del log y del `.docx`:
+
+- **Competidores irrelevantes / de industria ajena (raíz identificada).** La lista anclada del KB para
+  Alpina (empresa de **lácteos**) fue:
+  `['Food and Beverage Industry News', 'Postobón SA', 'Beverage Industry News', 'Fomento Económico
+  Mexicano', 'Coca-Cola Co', 'Profit perEmployee', 'ProfitMargin', 'Fedepalma']` (KB=8, LLM=3).
+  Problemas: (a) **ruido NER** — medios ("… Industry News") y fragmentos de métrica OCR-pegados
+  ("Profit perEmployee", "ProfitMargin"); (b) **industria equivocada** — Postobón/Coca-Cola/FEMSA
+  (bebidas azucaradas), Fedepalma (palma); (c) **cero pares lácteos reales** (Colanta, Alquería,
+  Nestlé, Danone, Parmalat ausentes). También se coló "Bavaria (Cervecería)" como actor en Cap 4.2.
+- **Causa raíz: granularidad del sector.** El anclaje usa `sector_gics=3020`, que en GICS es el
+  **industry group "Food, Beverage & Tobacco"** — agrupa alimentos + bebidas + tabaco. Anclar a ese
+  nivel trae bebidas/tabaco/palma como "competidores directos" de una láctea. El criterio de
+  **actividad/producto** del KB (DT-056 §1.4: sector, tamaño, geografía, **actividad**) **no se está
+  aplicando**; y el ranking por señal (`n_menciones`) premia publishers/industrias adyacentes sobre
+  los pares reales.
+- **Capítulos/subsecciones sin información.** En el `.docx`: fichas 2.1.2 (Regionales) y 2.1.3
+  (Startups) con "todos los campos: Dato no disponible", 2.5 Brechas vacío, 3.3 Casos Locales vacío,
+  y Cap 4 (4.1–4.5) casi todo "Dato no disponible" para Monto/Año de eventos. El principio de datos
+  ausentes (ADR-002) funciona, pero **dispara demasiado** por evidencia delgada (DT-049) y por falta
+  de fuentes estructuradas de eventos/perfiles (DT-054/DT-060).
+- **El loop de auto-revisión ayudó pero no puede fabricar evidencia.** Cap 2 subió +4 (6→10) re-
+  buscando, pero **topó bajo el gate** porque ni el corpus ni la web dirigida devolvieron pares
+  lácteos. El fix es **aguas arriba** (relevancia del KB + granularidad de sector + corpus/extracción),
+  no en el loop.
+
+**Trabajo de mañana (nueva DT-061 — relevancia y granularidad de competidores):** ver §2 (prompt de
+arranque). Palancas: (1) anclar por **sub-industria/producto** (lácteos) y no por industry group 3020;
+(2) aplicar el criterio de **actividad** en `list_competidores_by_sector` (DT-056 §1.4); (3) **purgar/
+curar** el ruido del KB (medios, fragmentos de métrica) y **sembrar pares reales** (DT-050); (4) subir
+el techo de evidencia (DT-049/DT-060) para que las fichas y Cap 4 dejen de salir vacías.
+
 ---
 
-## §2 — Prompt de arranque de la siguiente ventana
+## §2 — Prompt de arranque de la siguiente ventana (DT-061)
 
-El usuario decide entre **DT-060 (reingesta RAG gated por A/B)** y **HITL F24/F25** (Gap Auditor +
-Consistency Checker, que ya pueden apoyarse en el panel de `revisiones_capitulo`).
+Tras revisar el informe de Alpina, el usuario decidió que **mañana se trabaja el componente de
+descubrimiento de competidores** (falencias: competidores irrelevantes/de industria ajena +
+capítulos sin información). Prompt completo abajo (misma estructura que el prompt DT-059).
 
 ```
 ## ROL
-Eres Claude Code, ingeniero de InformesAuto (~/Test/InformesAuto): inteligencia competitiva (RAG
-local pgvector + Ollama, LangChain, capas). DT-059 (loop de auto-revisión) está CERRADO y mergeado
-(rama feature/fase25-dt059): juez con rúbrica v1.0 (rubric_score + chain_judge), loop puro
-guardar-el-mejor (self_review), dos sabores (web re-busca reusando KB DT-056; integración solo
-re-sintetiza), trazabilidad en revisiones_capitulo. Flag selfreview_enabled default-OFF
-(invariante). Gate base: ruff 0, 464 fast tests.
+Eres Claude Code, ingeniero del proyecto InformesAuto (~/Test/InformesAuto): informes de
+inteligencia competitiva (RAG local pgvector + Ollama, LangChain, arquitectura por capas). DT-059
+(loop de auto-revisión por-nodo) está CERRADO y MERGEADO a develop (merge 442dd90 + 172f0a0/a369662,
+rama feature/fase25-dt059): juez con rúbrica v1.0 (domain/eval/rubric_score.py + domain/chains/
+chain_judge.py), loop puro guardar-el-mejor (domain/eval/self_review.py), dos sabores (web re-busca
+reusando KB DT-056; integración re-sintetiza — domain/use_cases/self_review_hooks.py), trazabilidad
+en informes_ic.revisiones_capitulo. Flag selfreview_enabled default-OFF (invariante). Gate base:
+ruff 0 (src/ tests/), 464 fast tests, 2 skipped.
 
-Hoy ejecutas <DT-060 reingesta A/B | HITL F24/F25>. Rama nueva desde develop.
+Hoy ejecutas DT-061 — RELEVANCIA Y GRANULARIDAD DE COMPETIDORES (fix del descubrimiento de Cap 2 +
+capítulos vacíos). Rama nueva feature/fase26-dt061 desde develop.
 
-## RESTRICCIONES (CLAUDE.md TIER 1)
-- Sin nombres de modelo en código (config/.env/routing, ADR-002). domain/ no importa
-  SQLAlchemy/httpx/Streamlit; librería externa por wrapper en infrastructure/. Sin credenciales.
+## PROBLEMA (evidencia real, E2E Alpina 2026-07-30 — ver FASE25_HALLAZGOS.md §1 "Revisión del usuario")
+Alpina es LÁCTEOS. El KB ancló como competidores:
+['Food and Beverage Industry News','Postobón SA','Beverage Industry News','Fomento Económico
+Mexicano','Coca-Cola Co','Profit perEmployee','ProfitMargin','Fedepalma'] (KB=8, LLM=3).
+- (a) RUIDO NER: medios ("… Industry News"), fragmentos de métrica OCR-pegados ("Profit perEmployee",
+  "ProfitMargin"). (b) INDUSTRIA AJENA: Postobón/Coca-Cola/FEMSA (bebidas azucaradas), Fedepalma
+  (palma), y "Bavaria (Cervecería)" en Cap 4.2. (c) CERO pares lácteos reales (Colanta, Alquería,
+  Nestlé, Danone, Parmalat).
+- RAÍZ: el anclaje usa sector_gics=3020, que en GICS es el INDUSTRY GROUP "Food, Beverage & Tobacco"
+  → demasiado grueso; agrupa alimentos+bebidas+tabaco. El criterio de ACTIVIDAD/PRODUCTO del KB
+  (DT-056 §1.4: sector, tamaño, geografía, ACTIVIDAD) NO se aplica; el ranking por señal (n_menciones)
+  premia publishers/industrias adyacentes sobre los pares reales.
+- ADEMÁS capítulos/subsecciones salen sin información (fichas 2.1.2/2.1.3, 2.5 Brechas, 3.3 Casos
+  Locales, Cap 4 4.1–4.5) → evidencia delgada (DT-049) + faltan fuentes estructuradas (DT-054/060).
+- El loop DT-059 ayudó (Cap 2 +4) pero NO fabrica evidencia: si el corpus/web no traen pares lácteos,
+  topa bajo el gate. El fix es AGUAS ARRIBA (relevancia KB + granularidad de sector + corpus).
+
+## RESTRICCIONES (CLAUDE.md TIER 1 — verificar antes de cada acción)
+- Sin nombres de modelo en código (config/.env/routing, ADR-002). domain/ no importa SQLAlchemy/httpx/
+  Streamlit; toda librería externa por wrapper en infrastructure/. Sin credenciales en código ni git.
+- BD compartida: esquema propio SIEMPRE; NUNCA down -v; migraciones idempotentes ensure_*; datos en
+  bind mount. Ollama en host (127.0.0.1:11434). No reingesta/re-embeber salvo que se decida (eso es
+  DT-060, gated por A/B).
+- RN-001 (no envenenar): el KB acumula con provenance + estado candidato/verificado; corregir sin
+  fabricar. Curación honesta (marcar descartado), no invención.
 - Cambios atómicos: 1 commit por tarea, gate verde tras cada uno (ruff 0 + pytest -m "not slow").
-  Plan Mode. BD: esquema propio, migraciones idempotentes ensure_*, NUNCA down -v.
+  PLAN MODE obligatorio (toca KB + granularidad GICS + anclaje del retrieval → decisiones de diseño).
 
-## LECTURAS OBLIGATORIAS
-- docs/decisions/FASE25_HALLAZGOS.md (este cierre). docs/architecture/PROPUESTA_KNOWLEDGE_BASE.md.
-- memory: project_fase25_dt059_estado, roadmap.
+## TAREAS (afinar en Plan Mode con el usuario)
+T1 — Granularidad de sector para el anclaje: hoy se ancla por industry group (3020). Evaluar bajar a
+  sub-industria/producto (p.ej. "lácteos"/GICS 302020 Food Products o un tag de actividad) para que
+  los pares sean de la MISMA actividad, no del industry group. Revisar shared/constants/gics_groups
+  (extract_gics_code — ojo feedback: devuelve nombre sin código, mantener fallback) y chain_02_gics.
+T2 — Filtro de relevancia por actividad en EntidadRepository.list_competidores_by_sector (DT-056
+  §1.4): que el KB devuelva pares por actividad/producto de la empresa analizada, excluyendo ruido
+  (medios, fragmentos de métrica) y ordenando por relevancia, no solo por n_menciones.
+T3 — Curación/purga del KB + siembra de pares reales: marcar descartado el ruido residual (medios,
+  "ProfitMargin", genéricos) por sector; sembrar pares lácteos reales desde la base de empresas
+  (DT-050 / documentos_sectoriales) con estado verificado. Idempotente, provenance.
+T4 (stretch / puede ir a DT-060) — Subir el techo de evidencia para fichas 2.1.2/2.1.3 y Cap 4:
+  medir cuánto de "Dato no disponible" es evidencia delgada (DT-049) vs. gating (DT-058) y proponer.
+
+## PRUEBAS POR TAREA (gate = ruff 0 + pytest -m "not slow")
+- Anclaje: dado un KB sembrado, list_competidores_by_sector(actividad='lácteos') devuelve pares
+  lácteos y EXCLUYE bebidas/tabaco/medios/métricas (fixtures deterministas, sin BD real).
+- Curación: marcar descartado es idempotente y no degrada verificado (RN-001).
+- Invariante: sin sub-sector/actividad → comportamiento actual (no romper otros sectores).
+- E2E slow (marcado): re-correr Alpina y verificar que la lista anclada mejora (pares lácteos > ruido).
 
 ## DONE
-1. <objetivo de la ventana>. 2. Gate verde. 3. 1 commit atómico por tarea. 4. Docs/memoria
-   actualizados. 5. Decidir siguiente ventana.
+1. Competidores de Cap 2 relevantes al sector real (menos industria ajena/ruido, más pares reales).
+2. Gate verde (≥464 + nuevos). 3. 1 commit atómico por tarea. 4. Roadmap/PROPUESTA/memoria
+   actualizados (DT-061). 5. E2E de verificación (Alpina) con números antes/después. 6. Decidir
+   siguiente ventana (DT-060 reingesta A/B para el techo de evidencia, o HITL F24/F25 curación).
+
+## REGLAS DURAS (checklist)
+- [ ] ¿Anclaje por actividad/sub-sector real, no por industry group grueso?
+- [ ] ¿Filtro de relevancia excluye medios/métricas/industria ajena? ¿Ordena por relevancia?
+- [ ] ¿Curación con provenance + estado (RN-001, no degrada verificado)? ¿Sin fabricar?
+- [ ] ¿Invariante: sectores sin actividad definida = comportamiento actual?
+- [ ] ¿Migración idempotente en esquema propio? ¿Sin down -v? ¿Sin reingesta (eso es DT-060)?
+- [ ] ¿Gate verde (ruff 0 + pytest -m "not slow") tras cada commit?
+
+## LECTURAS OBLIGATORIAS
+- docs/decisions/FASE25_HALLAZGOS.md §1 (Revisión del usuario) + §2 (este prompt).
+- docs/architecture/PROPUESTA_KNOWLEDGE_BASE.md §1 (KB entidades) + §1.4 (anclaje/relevancia) +
+  PROPUESTA_BASE_EMPRESAS.md (DT-050, base de empresas para sembrar pares reales).
+- docs/decisions/FASE24_HALLAZGOS.md (cierre DT-056: stoplist, señal competidor/publisher/ruido).
+- Código: domain/use_cases/generate_benchmarking.py (_identificar_entidades, kb_competidores) +
+  generate_n1.py _fn_cap2; data/repositories/entidad_repo.py (list_competidores_by_sector);
+  domain/kb/aggregate.py (señal/stoplist); shared/constants/gics_groups.py (extract_gics_code);
+  domain/chains/chain_02_gics.py + chain_02b_entidades.py.
+- memory: project_fase25_dt059_estado, project_fase24_dt056_estado, project_kb_entidades_plan,
+  feedback_extract_gics_code, roadmap.
+
+## CIERRE DOCUMENTADO
+FASE26_HALLAZGOS.md con AVANCES/RETOS/RECOMENDACIONES + números (lista anclada antes/después por
+sector, % ruido/industria ajena eliminado, pares reales añadidos). Sincronizar ROADMAP (DT-061 →
+estado) y PROPUESTA §1.4. Mergear a develop --no-ff tras aprobación. Dejar el prompt de la
+siguiente ventana con esta MISMA estructura.
 ```
