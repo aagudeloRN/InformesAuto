@@ -104,6 +104,13 @@ class Settings(BaseSettings):
     # Ingesta PDF (RN-010)
     pdf_batch_size_pages: int = 20
 
+    # NER de entidades (DT-057/T3) — motor y modelos por config, nunca hardcodeados en app-code.
+    # Motor pluggable: "spacy" (librería, CPU, sin VRAM) hoy; otros motores se añaden en el wrapper.
+    # Corpus EMIS bilingüe (~79% inglés / ~24% español): se elige el modelo por idioma del chunk.
+    ner_engine: str = "spacy"
+    ner_spacy_model_en: str = "en_core_web_md"
+    ner_spacy_model_es: str = "es_core_news_md"
+
     # Aplicación
     app_env: str = "development"
     log_level: str = "INFO"
