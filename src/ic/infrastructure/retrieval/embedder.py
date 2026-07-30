@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import time
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 
@@ -17,6 +18,7 @@ class Embedder:
         self._model = settings.llm_local_embed_model
         self._keep_alive = settings.embedder_keep_alive
         self._batch_keep_alive = settings.embedder_batch_keep_alive
+        self._max_workers = max(1, getattr(settings, "embedder_max_workers", 1))
         # Efectivo durante batch_mode(); None = usar _keep_alive (default seguro ADR-006)
         self._active_keep_alive: str | None = None
 
@@ -68,4 +70,16 @@ class Embedder:
         raise last_exc  # type: ignore[misc]
 
     def embed_many(self, texts: list[str]) -> list[list[float]]:
-        return [self.embed(t) for t in texts]
+        """Embebe una lista de textos, preservando el orden.
+
+        Con ``embedder_max_workers > 1`` lanza las peticiones en paralelo (ThreadPoolExecutor):
+        cada ``embed`` es una llamada HTTP bloqueante que libera el GIL, así que la concurrencia
+        solapa las peticiones a Ollama (~5x medido). El paralelismo solo es seguro con el modelo
+        cargado (dentro de ``batch_mode()``); con keep_alive:0 por-petición causaría thrash de
+        carga/descarga, por eso fuera de batch_mode conviene ``embedder_max_workers=1``.
+        """
+        if self._max_workers <= 1 or len(texts) <= 1:
+            return [self.embed(t) for t in texts]
+        workers = min(self._max_workers, len(texts))
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            return list(executor.map(self.embed, texts))

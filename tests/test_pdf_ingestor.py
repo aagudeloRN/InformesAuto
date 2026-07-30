@@ -80,50 +80,16 @@ def test_ingest_batched_skips_duplicate_chunks(fake_settings):
     assert n == 0  # todos los chunks ya existían
 
 
-def test_ingest_batched_calls_keep_alive_after_each_batch(fake_settings):
-    """Se llama a _release_vram (keep_alive:0) después de cada lote procesado."""
+def test_ingest_batched_desaloja_generativo_una_vez_y_usa_batch_mode(fake_settings):
+    """Fase 23: el generativo se desaloja UNA vez (pre-embed); nomic queda cargado vía batch_mode.
+
+    Antes se descargaba nomic con _release_vram tras cada lote (recarga por lote). Ahora la ingesta
+    corre dentro de embedder.batch_mode() → el modelo se mantiene cargado y se descarga al salir del
+    contexto, no por lote. _release_vram solo se usa para desalojar el LLM generativo (qwen3:8b).
+    """
     from ic.infrastructure.sources.pdf_ingestor import PdfIngestor
 
-    pages = ["Página A con texto suficiente para chunking", "Página B con más contenido"]
-    fake_embedding = [0.1] * 768
-
-    with (
-        patch("ic.infrastructure.sources.pdf_ingestor._ensure_metadatos_column"),
-        patch("ic.infrastructure.sources.pdf_ingestor.PdfReader") as mock_reader_cls,
-        patch("ic.infrastructure.sources.pdf_ingestor.SessionLocal") as mock_session_cls,
-        patch(
-            "ic.infrastructure.sources.pdf_ingestor._document_already_ingested",
-            return_value=False,
-        ),
-        patch("ic.infrastructure.sources.pdf_ingestor.Embedder") as mock_embedder_cls,
-        patch("ic.infrastructure.sources.pdf_ingestor._chunk_exists", return_value=False),
-        patch("ic.infrastructure.sources.pdf_ingestor._release_vram") as mock_release,
-        patch("ic.infrastructure.sources.pdf_ingestor.EmbeddingRepository"),
-        patch("ic.infrastructure.sources.pdf_ingestor.EmbeddingVectorial"),
-    ):
-        mock_reader_cls.return_value = _make_fake_reader(pages)
-        mock_embedder = MagicMock()
-        mock_embedder.embed_many.return_value = [fake_embedding]
-        mock_embedder_cls.return_value = mock_embedder
-
-        db_mock = MagicMock()
-        mock_session_cls.return_value.__enter__ = MagicMock(return_value=db_mock)
-        mock_session_cls.return_value.__exit__ = MagicMock(return_value=False)
-
-        ingestor = PdfIngestor(fake_settings)
-        # batch_size=2, 2 páginas → 1 lote
-        ingestor.ingest_batched(pdf_path="/fake/test.pdf")
-
-    # 1 pre-call (desaloja qwen3:8b) + 1 post-batch (nomic-embed-text) = 2
-    assert mock_release.call_count == 2
-    mock_release.assert_called_with("http://127.0.0.1:11434", "nomic-embed-text")
-
-
-def test_ingest_batched_two_batches_calls_release_twice(fake_settings):
-    """Con 4 páginas y batch_size=2, se llama release_vram 2 veces."""
-    from ic.infrastructure.sources.pdf_ingestor import PdfIngestor
-
-    pages = ["Pág 1", "Pág 2", "Pág 3", "Pág 4"]
+    pages = ["Pág 1", "Pág 2", "Pág 3", "Pág 4"]  # batch_size=2 → 2 lotes
     fake_embedding = [0.1] * 768
 
     with (
@@ -152,8 +118,10 @@ def test_ingest_batched_two_batches_calls_release_twice(fake_settings):
         ingestor = PdfIngestor(fake_settings)
         ingestor.ingest_batched(pdf_path="/fake/test.pdf")
 
-    # 1 pre-call (desaloja qwen3:8b) + 2 post-batch (nomic-embed-text) = 3
-    assert mock_release.call_count == 3
+    # _release_vram se llama UNA sola vez (desalojo del generativo), no por lote.
+    mock_release.assert_called_once_with("http://127.0.0.1:11434", "qwen3:8b")
+    # La ingesta corre dentro de batch_mode() (nomic cargado durante todo el PDF).
+    mock_embedder.batch_mode.assert_called_once()
 
 
 def test_release_vram_handles_connection_error():

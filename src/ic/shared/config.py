@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # batch_mode() descarga el modelo al cerrar → el lote es explícito y acotado, no el default.
     embedder_keep_alive: str = "0"
     embedder_batch_keep_alive: str = "5m"
+    # Paralelismo de embeddings (Fase 23): nomic-embed-text ocupa poca VRAM y Ollama atiende
+    # peticiones concurrentes → embed_many las lanza en paralelo (medido ~5x vs serial con 4).
+    # Solo tiene efecto seguro dentro de batch_mode() (modelo cargado; sin thrash de keep_alive:0).
+    embedder_max_workers: int = 4
 
     # Caché de retrieval (Fase 15, T15.2)
     retrieval_cache_ttl_hours: int = 168  # 7 días por defecto

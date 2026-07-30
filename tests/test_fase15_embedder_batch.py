@@ -13,6 +13,7 @@ def _make_settings(keep_alive="0", batch_keep_alive="5m"):
     s.llm_local_embed_model = "nomic-embed-text"
     s.embedder_keep_alive = keep_alive
     s.embedder_batch_keep_alive = batch_keep_alive
+    s.embedder_max_workers = 1  # serial en estos tests (aíslan el comportamiento de keep_alive)
     return s
 
 
