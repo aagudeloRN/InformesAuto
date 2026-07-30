@@ -70,9 +70,11 @@ el DAG existente (N1 web → N2/N3 integración), tras un flag **default-OFF** (
 
 ### E2E de calibración (Alpina S.A., `selfreview_enabled=True`, 2026-07-30)
 
-Corrida real (Ollama + OpenRouter free + Tavily). Llegó por N1 completo y N2 hasta Cap 5; **murió en
-Cap 6 por agotamiento del tier free de OpenRouter** (`ResourceExhausted 502`), NO por el loop. Datos
-de `revisiones_capitulo` (4 caps evaluados, ambos sabores):
+Corrida real **completa** (Ollama + OpenRouter free + Tavily): informe entero generado en **1120 s
+(~18.7 min)**, `output/alpina_sa_informe.docx`+`.pdf`, 11 referencias, anti-mezcla `ajeno=0`. Hubo un
+`ResourceExhausted 502` transitorio del tier free en N2, resuelto por el **fallback de tiers**
+(`ResilientChatModel`) sin abortar. Datos de `revisiones_capitulo` (5 caps review-elegibles, ambos
+sabores):
 
 | Capítulo | Sabor | Score | Iter | Parada | Resultado |
 |----------|-------|-------|------|--------|-----------|
@@ -80,10 +82,12 @@ de `revisiones_capitulo` (4 caps evaluados, ambos sabores):
 | Cap 4 Ecosistema | web | 12→12 | 0 | umbral | pasa a la 1ª → no se revisa |
 | Cap 2 Competitivo | web | **6→10** | 2 | sin_mejora | falla el gate; re-busca 2× → **+4**; conserva el mejor (10), no el último |
 | Cap 5 Convergencia | integración | **6→14** | 1 | umbral | falla el gate; re-sintetiza 1× → **+8**, alcanza el gate |
+| Cap 6 Accionables | integración | 10→10 | 1 | sin_mejora | falla el gate; 1 revisión NO mejora → **conserva el original** (iter_ganadora=0), no la revisión |
 
-**Lo que valida:** (1) selectivo (2/4 caps que pasan no se re-generan); (2) guardar-el-mejor + las dos
-paradas (`umbral`, `sin_mejora`); (3) **ambos sabores mejoran cuando entran** (Cap 2 web +4, Cap 5
-integración +8); (4) ambos sabores ejercidos en una corrida real.
+**Lo que valida:** (1) selectivo (2/5 caps que pasan no se re-generan); (2) guardar-el-mejor + las dos
+paradas (`umbral` ×3, `sin_mejora` ×2) — Cap 6 demuestra que una revisión que **no** mejora se
+descarta (se conserva el original); (3) de los 3 caps revisados, **2 mejoran** (Cap 2 web +4, Cap 5
+integración +8); (4) ambos sabores ejercidos en una corrida real que produce el informe entero.
 **Señal recurrente:** la dimensión **V (Evidencia/Citación)** puntúa bajo en los caps web (corrobora
 DT-049: evidencia RAG delgada) → el sabor web ayuda (Cap 2 +4) pero **topa en 10** cuando el corpus
 no da más (liga con DT-060: mejor extracción = más techo). Umbral `min_total=11` y `max_iter=3` se
@@ -91,8 +95,8 @@ comportan bien; no requieren recalibración por ahora.
 
 ### RECOMENDACIONES
 
-1. **Completar un E2E full con tier no-agotado** (o reintento con `--resume`): el free de OpenRouter
-   se agotó en Cap 6. La calibración del loop ya quedó hecha (arriba); falta solo el informe entero.
+1. **Subir el techo del sabor web (DT-060):** Cap 2 mejoró +4 pero topó en 10 (<11) por evidencia
+   delgada; mejor extracción (tablas/estructura EMIS) le daría margen para alcanzar el gate.
 2. **Panel HITL** (F24/F25): exponer `revisiones_capitulo` en el historial (score inicial→final,
    motivo, faltantes) para que el analista audite dónde el loop mejoró.
 3. **DT-060 (reingesta A/B)**: mejor extracción (tablas/estructura) reduce el ruido del NER → menos
