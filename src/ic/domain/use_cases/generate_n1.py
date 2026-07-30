@@ -6,17 +6,22 @@ El orquestador (GenerateInforme._run_n1) delega aquí sin cambiar la interfaz p�
 
 from __future__ import annotations
 
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ic.domain.use_cases.generate_informe import _PipelineContext
 
+logger = logging.getLogger(__name__)
+
 
 def run_n1_parallel(ctx: _PipelineContext) -> None:
     """Ejecuta Caps 2/3/4 en paralelo + párrafos introductivos N1."""
     from ic.data.database import SessionLocal
+    from ic.data.models.entidad import ensure_entidades_tables
     from ic.data.repositories.embedding_repo import EmbeddingRepository
+    from ic.data.repositories.entidad_repo import EntidadRepository
     from ic.domain.chains.chain_02b_entidades import build_chain_entidades
     from ic.domain.chains.chain_03_benchmarking import build_chain_03
     from ic.domain.chains.chain_03b_mercado import build_chain_03b
@@ -53,9 +58,19 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     def _fn_cap2(store, web, _oal):
         # T22.4 (DT-054): cadena de identificación de entidades para búsqueda dirigida por
         # competidor (enriquece las fichas de 2.1 más allá de las queries a nivel sector).
+        # DT-056/T3: anclar con la lista canónica del KB por sector (cierra causas A/E). Sesión
+        # propia por thread; [] → comportamiento B1 (SQLAlchemy Session no es thread-safe).
+        kb_competidores: list[str] = []
+        try:
+            with SessionLocal() as db_kb:
+                ensure_entidades_tables(db_kb.get_bind())
+                kb_competidores = EntidadRepository(db_kb).list_competidores_by_sector(g_code or "")
+        except Exception:  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
+            logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)
         return GenerateBenchmarking(
             chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=web,
             entidades_chain=build_chain_entidades(ctx.api_llm or ctx.llm),
+            kb_competidores=kb_competidores,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,

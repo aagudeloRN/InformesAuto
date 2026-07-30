@@ -237,6 +237,23 @@ class GenerateInforme:
                 "No se pudo resolver empresa_id temprano — retrieval sin filtro empresa",
                 exc_info=True,
             )
+        # DT-056/T4 (base viva): nutrir el KB con la empresa principal (identidad verificada,
+        # descripción como candidato). Falla suave: es enriquecimiento, no debe romper la corrida.
+        try:
+            from ic.data.database import SessionLocal, engine
+            from ic.data.models.entidad import ensure_entidades_tables
+            from ic.data.repositories.entidad_repo import EntidadRepository
+            from ic.domain.use_cases.nurture_kb import NurtureKB
+            from ic.shared.constants.gics_groups import extract_gics_code
+            ensure_entidades_tables(engine)
+            with SessionLocal() as db_kb:
+                NurtureKB(EntidadRepository(db_kb)).execute(
+                    nombre=ctx.params.empresa,
+                    sector_gics=extract_gics_code(ctx.gics.grupo_gics),
+                    descripcion=ctx.empresa.texto,
+                )
+        except Exception:
+            logger.warning("No se pudo nutrir el KB con la empresa principal", exc_info=True)
 
     def _run_n1(self, ctx: _PipelineContext) -> None:
         from ic.domain.use_cases.generate_n1 import run_n1_parallel

@@ -134,3 +134,49 @@ class TestBusquedaDirigida:
         )
 
         assert store.search.call_count == 1  # sin entidades → sin re-retrieval
+
+
+class TestAnclajeKB:
+    """DT-056/T3 — la lista canónica del KB ancla la búsqueda dirigida (cierra causas A/E)."""
+
+    def _run(self, kb_competidores, llm_json='["Colanta"]'):
+        store = _store_con_chunks(6)
+        web = MagicMock()
+        web.search.return_value = [_web()]
+        entidades_chain = MagicMock()
+        entidades_chain.invoke.return_value = llm_json
+        chain = MagicMock()
+        chain.invoke.return_value = "texto"
+        GenerateBenchmarking(
+            chain=chain, store=store, web_connector=web, entidades_chain=entidades_chain,
+            kb_competidores=kb_competidores,
+        ).execute(
+            nombre_empresa="Alpina", descripcion_empresa="láctea",
+            sector_gics="Alimentos", sector_gics_code="3020",
+        )
+        return [
+            c.args[0] for c in web.search.call_args_list
+            if "perfil empresa portafolio" in c.args[0]
+        ]
+
+    def test_kb_competidores_lideran_la_busqueda_dirigida(self):
+        dirigidas = self._run(["Nestlé", "Danone"])
+        # KB primero, luego lo que el LLM ancló en evidencia (sin duplicar).
+        assert any("Nestlé" in q for q in dirigidas)
+        assert any("Danone" in q for q in dirigidas)
+        assert any("Colanta" in q for q in dirigidas)
+        assert len(dirigidas) == 3
+
+    def test_kb_none_es_comportamiento_b1_identico(self):
+        # None → solo lo que el LLM ancla; ninguna entidad del KB filtrada.
+        dirigidas = self._run(None)
+        assert len(dirigidas) == 1
+        assert any("Colanta" in q for q in dirigidas)
+
+    def test_kb_dedup_casefold_y_cap(self):
+        # KB con duplicado del LLM (case-insensitive) + cota MAX_ENTIDADES.
+        kb = [f"E{i}" for i in range(10)]  # excede la cota
+        dirigidas = self._run(kb, llm_json='["e0", "Colanta"]')  # "e0" duplica "E0" del KB
+        assert len(dirigidas) == MAX_ENTIDADES  # cota respetada
+        # No aparece "Colanta" porque el KB ya llenó la cota (lidera); sin duplicar "e0"/"E0".
+        assert sum("E0 " in q or q.startswith("E0 ") for q in dirigidas) == 1

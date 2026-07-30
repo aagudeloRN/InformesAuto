@@ -1,9 +1,15 @@
 # Propuesta — Knowledge Base de entidades, ingesta enriquecida y auto-revisión
 
-> **Estado:** PROPUESTA (no implementada, no es ADR). Consolida las decisiones discutidas y
-> acordadas con el usuario el **2026-07-29**, tras el cierre del Sprint A de Fase 22. Se
-> implementará en **chats limpios por bloque** (evitar context rot); los prompts de arranque
+> **Estado:** PROPUESTA (parcialmente implementada, no es ADR). Consolida las decisiones discutidas
+> y acordadas con el usuario el **2026-07-29**, tras el cierre del Sprint A de Fase 22. Se
+> implementa en **chats limpios por bloque** (evitar context rot); los prompts de arranque
 > están al final. Amplía y no reemplaza `PROPUESTA_BASE_EMPRESAS.md` (DT-050).
+>
+> **Avance:** §2 (ingesta enriquecida sin reingesta) → DT-057 ✅ (F23). §1 (KB de entidades) +
+> §1.4 (anclaje de competidores) + §1.2 (base viva) → **DT-056 ✅ (F24, 2026-07-30**, rama
+> `feature/fase24-dt056`; ver `docs/decisions/FASE24_HALLAZGOS.md`). §3 (Cap 4 adaptativo) →
+> DT-058 ✅ (F22 B2). Pendientes: §4 (auto-revisión) → DT-059; §2 Tanda 2 (reingesta A/B) → DT-060;
+> §5 (UI captura manual) → HITL F24/F25.
 >
 > Regla de oro transversal (acordada): **procedencia (provenance) + estado candidato/verificado**
 > en todo dato acumulado, para que un error extraído una vez NO se reuse como "hecho" en informes

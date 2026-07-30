@@ -7,7 +7,7 @@ import re
 from langchain_core.runnables import Runnable
 
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
-from ic.domain.chains.chain_02b_entidades import parse_entidades
+from ic.domain.chains.chain_02b_entidades import MAX_ENTIDADES, parse_entidades
 from ic.domain.chains.chain_03_benchmarking import format_chunks_as_context
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
@@ -97,6 +97,7 @@ class GenerateBenchmarking:
         store: PGVectorStore,
         web_connector: WebConnector,
         entidades_chain: Runnable | None = None,
+        kb_competidores: list[str] | None = None,
     ) -> None:
         self._chain = chain
         self._store = store
@@ -104,16 +105,38 @@ class GenerateBenchmarking:
         # T22.4 (DT-054): cadena de identificación de entidades competidoras. Si es None se
         # conserva el comportamiento previo (sin búsqueda dirigida por entidad).
         self._entidades_chain = entidades_chain
+        # DT-056/T3: lista canónica de competidores del KB por sector (cierra causas A/E). None o
+        # [] = comportamiento B1 (solo lo que el LLM ancle en la evidencia). Los nombres del KB
+        # provienen de evidencia (candidatos NER consolidados), no se fabrican (RN-001).
+        self._kb_competidores = kb_competidores or []
 
     def _identificar_entidades(self, chunks, sector_gics: str) -> list[str]:
-        """Extrae entidades competidoras ancladas a la evidencia inicial (T22.4, RN-001)."""
+        """Entidades competidoras a explotar: KB (canónico) + las ancladas en la evidencia.
+
+        La lista del KB lidera (menos alucinación, fichas pre-pobladas); se completa con las que
+        el LLM extrae de la evidencia. Dedup casefold, cota MAX_ENTIDADES (T22.4/DT-056, RN-001).
+        """
         raw = self._entidades_chain.invoke({
             "sector_gics": sector_gics,
             "retrieval_competidores": format_chunks_as_context(chunks),
         })
-        entidades = parse_entidades(raw)
-        logger.info("entidades competidoras identificadas: %d %s", len(entidades), entidades)
-        return entidades
+        del_llm = parse_entidades(raw)
+        # Fusión priorizando el KB, sin duplicar (casefold), respetando la cota.
+        fusionadas: list[str] = []
+        vistos: set[str] = set()
+        for nombre in [*self._kb_competidores, *del_llm]:
+            clave = nombre.casefold()
+            if clave in vistos:
+                continue
+            vistos.add(clave)
+            fusionadas.append(nombre)
+            if len(fusionadas) >= MAX_ENTIDADES:
+                break
+        logger.info(
+            "entidades competidoras: %d (KB=%d, LLM=%d) %s",
+            len(fusionadas), len(self._kb_competidores), len(del_llm), fusionadas,
+        )
+        return fusionadas
 
     def _buscar_por_entidad(self, entidades: list[str], sector_gics: str) -> None:
         """Búsqueda web dirigida por entidad para poblar las fichas de la sección 2.1 (T22.4)."""
