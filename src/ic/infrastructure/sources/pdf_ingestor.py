@@ -1,7 +1,11 @@
-"""Ingesta modular de PDFs: procesamiento por lotes con liberación de VRAM entre lotes.
+"""Ingesta modular de PDFs: procesamiento por lotes con gestión explícita de VRAM.
 
-Implementa RN-010: lotes de PDF_BATCH_SIZE_PAGES páginas, anti-duplicados por SHA-256
-del chunk, keep_alive:0 tras cada lote.
+Implementa RN-010: lotes de PDF_BATCH_SIZE_PAGES páginas, anti-duplicados por SHA-256 del chunk.
+Antes se descargaba nomic-embed-text con keep_alive:0 tras CADA lote; desde Fase 23 la ingesta
+usa ``Embedder.batch_mode()`` (Fase 15) → el modelo queda cargado durante todo el PDF y se
+descarga al terminar (misma política ADR-006 de no dejar VRAM ocupada, pero sin recargar por
+lote). Dentro del bloque, ``embed_many`` paraleliza las peticiones (``embedder_max_workers``).
+El LLM generativo se desaloja una vez antes de empezar (evita OOM al coexistir con el embedder).
 """
 
 import hashlib
@@ -167,54 +171,58 @@ class PdfIngestor:
         total_inserted = 0
         n_batches = (total_pages + batch_size - 1) // batch_size
 
-        for batch_idx in range(n_batches):
-            start_page = batch_idx * batch_size
-            end_page = min(start_page + batch_size, total_pages)
-            batch_text = _sanitize_text("\n".join(
-                page.extract_text() or "" for page in reader.pages[start_page:end_page]
-            )).strip()
+        # batch_mode mantiene nomic-embed-text cargado durante toda la ingesta del PDF (Fase 15):
+        # antes se descargaba tras cada lote (RN-010 original) → recarga por lote, costoso y serial.
+        # Reconcilia con ADR-006: el lote es explícito y acotado, y al salir se descarga el modelo.
+        # Dentro de este bloque embed_many paraleliza (embedder_max_workers) con el modelo cargado.
+        with embedder.batch_mode():
+            for batch_idx in range(n_batches):
+                start_page = batch_idx * batch_size
+                end_page = min(start_page + batch_size, total_pages)
+                batch_text = _sanitize_text("\n".join(
+                    page.extract_text() or "" for page in reader.pages[start_page:end_page]
+                )).strip()
 
-            if not batch_text:
-                logger.info("Lote %d/%d: sin texto — saltando", batch_idx + 1, n_batches)
-                continue
+                if not batch_text:
+                    logger.info("Lote %d/%d: sin texto — saltando", batch_idx + 1, n_batches)
+                    continue
 
-            chunks = chunker_mod.chunk_text(batch_text)
-            new_chunks: list[str] = []
+                chunks = chunker_mod.chunk_text(batch_text)
+                new_chunks: list[str] = []
 
-            with SessionLocal() as db:
-                for chunk in chunks:
-                    sha = _sha256_text(chunk)
-                    if not _chunk_exists(db, sha, schema):
-                        new_chunks.append(chunk)
+                with SessionLocal() as db:
+                    for chunk in chunks:
+                        sha = _sha256_text(chunk)
+                        if not _chunk_exists(db, sha, schema):
+                            new_chunks.append(chunk)
 
-                if new_chunks:
-                    embeddings = embedder.embed_many(new_chunks)
-                    chunk_metas = [
-                        {**metadatos_base, "chunk_sha256": _sha256_text(c)} for c in new_chunks
-                    ]
-                    repo = EmbeddingRepository(db)
-                    orm_objects = [
-                        EmbeddingVectorial(
-                            fuente_tipo="pdf",
-                            fuente_url=os.path.abspath(pdf_path),
-                            documento_id=doc_id,
-                            empresa_id=empresa_id,
-                            chunk_texto=new_chunks[j],
-                            chunk_index=total_inserted + j,
-                            embedding=embeddings[j],
-                            metadatos=chunk_metas[j],
-                        )
-                        for j in range(len(new_chunks))
-                    ]
-                    repo.insert_many(orm_objects)
-                    total_inserted += len(new_chunks)
+                    if new_chunks:
+                        embeddings = embedder.embed_many(new_chunks)
+                        chunk_metas = [
+                            {**metadatos_base, "chunk_sha256": _sha256_text(c)} for c in new_chunks
+                        ]
+                        repo = EmbeddingRepository(db)
+                        orm_objects = [
+                            EmbeddingVectorial(
+                                fuente_tipo="pdf",
+                                fuente_url=os.path.abspath(pdf_path),
+                                documento_id=doc_id,
+                                empresa_id=empresa_id,
+                                chunk_texto=new_chunks[j],
+                                chunk_index=total_inserted + j,
+                                embedding=embeddings[j],
+                                metadatos=chunk_metas[j],
+                            )
+                            for j in range(len(new_chunks))
+                        ]
+                        repo.insert_many(orm_objects)
+                        total_inserted += len(new_chunks)
 
-            _release_vram(self._settings.ollama_base_url, self._settings.llm_local_embed_model)
-            logger.info(
-                "Lote %d/%d (págs %d–%d): %d chunks nuevos, %d omitidos",
-                batch_idx + 1, n_batches, start_page + 1, end_page,
-                len(new_chunks), len(chunks) - len(new_chunks),
-            )
+                logger.info(
+                    "Lote %d/%d (págs %d–%d): %d chunks nuevos, %d omitidos",
+                    batch_idx + 1, n_batches, start_page + 1, end_page,
+                    len(new_chunks), len(chunks) - len(new_chunks),
+                )
 
         if doc_id is not None:
             try:

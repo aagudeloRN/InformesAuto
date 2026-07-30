@@ -31,11 +31,15 @@ def test_detect_language():
 
 
 def test_parse_mentions_solo_org_y_deduplica():
+    # Solo ORG entra al sustrato. Nota (DT-056): un nombre marca-persona como "Juan Valdez"
+    # (Café Juan Valdez, marca de la Fed. de Cafeteros) spaCy suele etiquetarlo PER → aquí se
+    # descarta. La desambiguación marca/empresa/persona es tarea del KB (DT-056) con provenance,
+    # no del filtro NER crudo; incluir PER inundaría el sustrato de ejecutivos/analistas.
     spans = [
         ("Alpina S.A.S.", "ORG"),
         ("ALPINA sas", "ORG"),      # mismo normalizado → dedup
         ("Bogotá", "LOC"),           # descartado (lugar)
-        ("Juan Valdez", "PER"),      # descartado (persona)
+        ("María Restrepo", "PER"),   # descartado (persona: analista/ejecutivo, no empresa)
         ("Colanta", "MISC"),         # MISC descartado (ruido en este corpus)
     ]
     ms = parse_mentions(spans)
