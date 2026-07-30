@@ -119,7 +119,10 @@ T1 — Entidad canónica + atributos con provenance: tablas `entidades` (+ `enti
 T2 — Agregación/merge desde `entidad_menciones` → entidades candidatas: dedup por
   entidad_normalizada, descartar publishers omnipresentes (heurística de señal: aparece en muchos
   sectores = ruido; concentrada en 1 sector = competidor probable), ranking por frecuencia/chunks.
-  Parser/agregador puro testeable. NO fabricar: solo consolidar lo presente.
+  Parser/agregador puro testeable. NO fabricar: solo consolidar lo presente. **Resolver la
+  ambigüedad marca/empresa/persona** (p. ej. "Juan Valdez" = Café Juan Valdez): el sustrato hoy
+  solo tiene ORG; la reconciliación con nombres marca-persona y variantes es tarea de este merge,
+  usando provenance + (si aplica) NIT/ciudad, nunca inventando.
 T3 — Anclaje de competidores (cierra causas A/E del diagnóstico): el pipeline identificar→enriquecer
   (T22.4, chain_02b) consulta el KB por sector_gics para la lista canónica ANTES de buscar. Cablear
   en generate_benchmarking / generate_n1 sin romper el path B1 (None = comportamiento actual).
@@ -161,3 +164,42 @@ Ver la fila DT-060 del roadmap: metadata posicional, chunking estructural, tabla
 doc-summary vector, (tras benchmark) embedder. Regla dura: cambiar pipeline → reingerir **1 sector**
 → A/B con `eval_retrieval.py` → escalar solo si sube precisión + mix. Requiere el update-path de
 DT-053. Más caro; solo si el A/B lo justifica.
+
+---
+
+## §3 — Refinamientos post-cierre (2026-07-30, rama `feature/ingesta-paralela`)
+
+Tras el cierre, el usuario planteó dos temas; ambos atendidos en commits aparte (`5a25872`,
+`26743c6`).
+
+### 3.1 NER: filtro ORG-only y ambigüedad marca/empresa/persona
+El sustrato solo guarda entidades etiquetadas **ORG** (PER/LOC/MISC se descartan por ruido). El
+usuario notó el caso "Juan Valdez": es persona **y** empresa/marca (Café Juan Valdez, marca de la
+Federación de Cafeteros). spaCy suele etiquetar esos nombres como PER → el filtro los pierde.
+**Decisión:** no se relaja el filtro (incluir PER inundaría el sustrato de ejecutivos/analistas);
+la **desambiguación marca/empresa/persona es responsabilidad de DT-056** (merge del KB con
+provenance + NIT/ciudad). Se corrigió el ejemplo del test para no afirmar que "Juan Valdez" es solo
+persona y se documentó el matiz. Sin cambio de comportamiento.
+
+### 3.2 Ingesta de PDFs: paralelización + modelo cargado (~5x)
+El usuario observó que la ingesta parecía serial. Confirmado en código: (1) `embed_many` embebía
+chunk por chunk (una petición HTTP bloqueante cada uno); (2) `pdf_ingestor` descargaba
+nomic-embed-text (`keep_alive:0`) **tras cada lote de páginas** → recarga del modelo por lote.
+
+**Optimización (aprovechando que nomic ocupa poca VRAM):**
+- `Embedder.embed_many` paraleliza con `ThreadPoolExecutor` (`embedder_max_workers`, default 4),
+  preservando orden. **Microbenchmark (60 chunks, Ollama local): serial 4.85s → 4 workers 0.88s
+  (~5.5x);** 2 workers 1.03s, 8 workers 1.00s (saturado). Fallback serial con 1 worker / 1 texto.
+- `pdf_ingestor` envuelve el bucle en `Embedder.batch_mode()` (mecanismo de Fase 15): nomic queda
+  cargado durante todo el PDF y se descarga al salir del contexto. **Reconcilia RN-010/ADR-006:**
+  antes keep_alive:0 por lote; ahora keep_alive positivo acotado al PDF + descarga al final (misma
+  política de no dejar VRAM ocupada, sin recargar por lote). El paralelismo solo actúa con el
+  modelo cargado → sin thrash de carga/descarga.
+- Nombres de modelo siguen en config/.env (ADR-002). Gate: ruff 0, **412 fast tests**.
+- **No se ejecutó una reingesta**: el corpus ya está indexado y la anti-dup por SHA la saltaría; la
+  ganancia aplica a PDFs nuevos y a una eventual reingesta de DT-060. Validado por microbenchmark
+  contra Ollama real + unit tests (batch_mode invocado, generativo desalojado 1 vez, orden/solape).
+- **Futuro (no hecho, bajo riesgo/valor incierto):** paralelizar también **entre PDFs** en
+  `ingest_batch.py` (hoy serial); requiere sesiones DB por hilo y varios embedders concurrentes.
+  Con el embed intra-PDF ya paralelo, el retorno marginal es menor; evaluarlo si DT-060 reingesta
+  los 25 sectores.
