@@ -90,9 +90,29 @@ def _run_review(
 
 
 def _persist_trace(run_key: str, capitulo: str, sabor: str, trace: RevisionTrace) -> None:
-    """Persiste la traza de revisión (trazabilidad TIER 4). Best-effort — se completa en T4."""
-    # T4 (DT-059): engancha RevisionRepository aquí. En T3 solo se registra en log.
-    return None
+    """Persiste la traza de revisión (trazabilidad TIER 4). Best-effort: nunca aborta la corrida."""
+    from ic.data.database import SessionLocal, engine
+    from ic.data.models.revision_capitulo import ensure_revisiones_tables
+    from ic.data.repositories.revision_repo import RevisionRepository
+
+    try:
+        ensure_revisiones_tables(engine)
+        with SessionLocal() as db:
+            RevisionRepository(db).save_revision(
+                run_key=run_key,
+                capitulo=capitulo,
+                sabor=sabor,
+                n_iteraciones=trace.n_iteraciones,
+                iter_ganadora=trace.iter_ganadora,
+                score_inicial=trace.score_inicial,
+                score_final=trace.score_final,
+                motivo_parada=trace.motivo_parada,
+                dimensiones=dict(trace.mejor.dimensiones),
+                faltantes=list(trace.mejor.faltantes),
+            )
+    except Exception:  # noqa: BLE001 — la trazabilidad es best-effort (patrón checkpoint).
+        logger.warning("No se pudo persistir la traza de auto-revisión de '%s'",
+                       capitulo, exc_info=True)
 
 
 def review_web_cap(
