@@ -265,8 +265,10 @@ class GenerateInforme:
         from ic.domain.chains.chain_06_convergencia import build_chain_06_synth
         from ic.domain.chains.chain_06a_convergencia_eje import build_chain_06a
         from ic.domain.chains.chain_07_accionables import build_chain_07
+        from ic.domain.chains.chain_judge import CRITERIOS_CAPITULO
         from ic.domain.use_cases.generate_accionables import GenerateAccionables
         from ic.domain.use_cases.generate_convergencia import GenerateConvergencia
+        from ic.domain.use_cases.self_review_hooks import review_integration_cap
         from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
         from ic.infrastructure.sources.cached_connector import CachedWebConnector
         from ic.shared.constants.gics_groups import extract_gics_code
@@ -297,6 +299,13 @@ class GenerateInforme:
                     nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
                     sector_gics_code=g_code, empresa_id=ctx.empresa_id,
                 )
+                # DT-059/T3: auto-revisión sabor integración (solo re-sintetiza). Flag OFF = no-op.
+                ctx.cap_conv = review_integration_cap(
+                    settings=ctx.settings, llm=ctx.api_llm_synth,
+                    capitulo_nombre="Cap 5 — Convergencia Empresarial",
+                    criterios=CRITERIOS_CAPITULO["Cap 5 — Convergencia Empresarial"],
+                    cap_obj=ctx.cap_conv, run_key=ctx.run_key,
+                )
 
             ctx.step_fn(7, "Cap 6 — Accionables Estratégicos")
             if not acc_restaurado and ctx.api_llm is not None:
@@ -320,6 +329,12 @@ class GenerateInforme:
                     nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
                     sector_gics_code=g_code, empresa_id=ctx.empresa_id,
                     hallazgos_caps_previos=hallazgos,
+                )
+                ctx.cap_acc = review_integration_cap(
+                    settings=ctx.settings, llm=ctx.api_llm,
+                    capitulo_nombre="Cap 6 — Accionables Estratégicos",
+                    criterios=CRITERIOS_CAPITULO["Cap 6 — Accionables Estratégicos"],
+                    cap_obj=ctx.cap_acc, run_key=ctx.run_key,
                 )
 
         ctx.step_fn(8, "Párrafos introductorios N2")
