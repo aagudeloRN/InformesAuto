@@ -47,6 +47,9 @@ def _patch_judge(monkeypatch, salidas: list[str]) -> dict:
     monkeypatch.setattr(hooks, "build_chain_judge", lambda _llm: _JudgeChain())
     monkeypatch.setattr(hooks, "build_chain_revise", lambda _llm: _ReviseChain())
     monkeypatch.setattr(hooks, "format_chunks_as_context", lambda chunks: "EVIDENCIA")
+    # Los tests fast NO deben tocar la BD compartida: la persistencia de trazabilidad
+    # (probada aparte en test_fase25_trazabilidad con engine/sesión falsos) se anula aquí.
+    monkeypatch.setattr(hooks, "_persist_trace", lambda *a, **k: None)
     return state
 
 
