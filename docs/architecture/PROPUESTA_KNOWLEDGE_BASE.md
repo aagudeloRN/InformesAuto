@@ -8,8 +8,9 @@
 > **Avance:** §2 (ingesta enriquecida sin reingesta) → DT-057 ✅ (F23). §1 (KB de entidades) +
 > §1.4 (anclaje de competidores) + §1.2 (base viva) → **DT-056 ✅ (F24, 2026-07-30**, rama
 > `feature/fase24-dt056`; ver `docs/decisions/FASE24_HALLAZGOS.md`). §3 (Cap 4 adaptativo) →
-> DT-058 ✅ (F22 B2). Pendientes: §4 (auto-revisión) → DT-059; §2 Tanda 2 (reingesta A/B) → DT-060;
-> §5 (UI captura manual) → HITL F24/F25.
+> DT-058 ✅ (F22 B2). §4 (auto-revisión) → **DT-059 ✅ (F25, 2026-07-30**, rama
+> `feature/fase25-dt059`; ver `docs/decisions/FASE25_HALLAZGOS.md`). Pendientes: §2 Tanda 2
+> (reingesta A/B) → DT-060; §5 (UI captura manual) → HITL F24/F25.
 >
 > Regla de oro transversal (acordada): **procedencia (provenance) + estado candidato/verificado**
 > en todo dato acumulado, para que un error extraído una vez NO se reuse como "hecho" en informes
@@ -123,7 +124,12 @@ haya evidencia → rellena con "Dato no disponible". Solución:
 - Cap 4 es donde el KB de oportunidades/eventos (§1.3) más aportará → no cerrar esa puerta
   eliminándolo.
 
-## 4. Loop de auto-revisión (extiende T22.7 / DT-048 — DT-059)
+## 4. Loop de auto-revisión (extiende T22.7 / DT-048 — DT-059) ✅ IMPLEMENTADO (F25)
+
+> **Cerrado 2026-07-30** (rama `feature/fase25-dt059`; ver `FASE25_HALLAZGOS.md`). Hallazgo: el
+> LLM-judge de T22.7/DT-048 **nunca se había implementado** (solo la rúbrica como doc; `eval_gate`
+> mide retrieval) → T1 lo construyó. Todo tras flag `selfreview_enabled` **default-OFF**
+> (invariante). Las decisiones de abajo se implementaron tal cual.
 
 Patrón **Reflection/Reflexion/evaluator-optimizer** (ver Fuentes). Grafo cíclico: generar →
 juez con rúbrica → revisar → repetir hasta umbral. Ya tenemos rúbrica v1.0 (F20), `eval_gate` y el
