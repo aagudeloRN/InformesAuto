@@ -108,6 +108,13 @@ class Settings(BaseSettings):
     # Ingesta PDF (RN-010)
     pdf_batch_size_pages: int = 20
 
+    # Auto-revisión por-nodo (DT-059) — loop generar→juez→revisar con la rúbrica v1.0.
+    # Flag maestro default-OFF: apagado = comportamiento actual idéntico (invariante). El
+    # evaluador reusa el LLM resiliente ya construido (sin nombre de modelo en código, ADR-002).
+    selfreview_enabled: bool = False
+    selfreview_min_total: int = 11  # gate de la rúbrica (>=11/15 y sin dimensión en 0)
+    selfreview_max_iter: int = 3    # tope de iteraciones de revisión por capítulo
+
     # NER de entidades (DT-057/T3) — motor y modelos por config, nunca hardcodeados en app-code.
     # Motor pluggable: "spacy" (librería, CPU, sin VRAM) hoy; otros motores se añaden en el wrapper.
     # Corpus EMIS bilingüe (~79% inglés / ~24% español): se elige el modelo por idioma del chunk.

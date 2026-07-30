@@ -27,10 +27,12 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.domain.chains.chain_03b_mercado import build_chain_03b
     from ic.domain.chains.chain_04_tendencias import build_chain_04
     from ic.domain.chains.chain_05_ecosistema import build_chain_05
+    from ic.domain.chains.chain_judge import CRITERIOS_CAPITULO
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
     from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
     from ic.domain.use_cases.generate_mercado import GenerateMercado
     from ic.domain.use_cases.generate_tendencias import GenerateTendencias
+    from ic.domain.use_cases.self_review_hooks import review_web_cap
     from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
     from ic.infrastructure.sources.cached_connector import (
         CachedOpenAlexConnector,
@@ -67,13 +69,23 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 kb_competidores = EntidadRepository(db_kb).list_competidores_by_sector(g_code or "")
         except Exception:  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
             logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)
-        return GenerateBenchmarking(
+        cap = GenerateBenchmarking(
             chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=web,
             entidades_chain=build_chain_entidades(ctx.api_llm or ctx.llm),
             kb_competidores=kb_competidores,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+        )
+        # DT-059/T3: auto-revisión sabor web (re-busca por faltantes + KB). Flag OFF = no-op.
+        return review_web_cap(
+            settings=s, llm=ctx.api_llm or ctx.llm,
+            capitulo_nombre="Cap 2 — Análisis Competitivo",
+            criterios=CRITERIOS_CAPITULO["Cap 2 — Análisis Competitivo"],
+            cap_obj=cap, run_key=ctx.run_key, store=store, web=web,
+            sector_gics=g, sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+            retrieval_query=f"{g} competitors benchmarking {e}",
+            kb_competidores=kb_competidores,
         )
 
     def _fn_mercado(store, web, _oal):
@@ -89,22 +101,38 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     def _fn_cap3(store, web, oal):
         if ctx.api_llm is None:
             return None
-        return GenerateTendencias(
+        cap = GenerateTendencias(
             chain=build_chain_04(ctx.api_llm), store=store,
             web_connector=web, openalex_connector=oal,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,
         )
+        return review_web_cap(
+            settings=s, llm=ctx.api_llm,
+            capitulo_nombre="Cap 3 — Análisis Sectorial Tendencial",
+            criterios=CRITERIOS_CAPITULO["Cap 3 — Análisis Sectorial Tendencial"],
+            cap_obj=cap, run_key=ctx.run_key, store=store, web=web,
+            sector_gics=g, sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+            retrieval_query=f"{g} tendencias sectoriales tecnológicas {e}",
+        )
 
     def _fn_cap4(store, web, _oal):
         if ctx.api_llm is None:
             return None
-        return GenerateEcosistema(
+        cap = GenerateEcosistema(
             chain=build_chain_05(ctx.api_llm), store=store, web_connector=web,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+        )
+        return review_web_cap(
+            settings=s, llm=ctx.api_llm,
+            capitulo_nombre="Cap 4 — Panorama Ecosistema",
+            criterios=CRITERIOS_CAPITULO["Cap 4 — Panorama Ecosistema"],
+            cap_obj=cap, run_key=ctx.run_key, store=store, web=web,
+            sector_gics=g, sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+            retrieval_query=f"{g} ecosistema inversiones fusiones adquisiciones alianzas {e}",
         )
 
     # T22.3 (DT-030): --resume salta los caps ya persistidos; solo se computan los faltantes.
