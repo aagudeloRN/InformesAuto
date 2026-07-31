@@ -22,3 +22,5 @@ output/
 # Corpus sectorial: permanente pero local; solo indice.csv se versiona (Fase 13, ADR-012)
 documentos_sectoriales/*.pdf
 !documentos_sectoriales/indice.csv
+# Metadatos "alternate data stream" de Windows (basura, nunca versionar)
+*:Zone.Identifier
