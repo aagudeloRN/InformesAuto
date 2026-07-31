@@ -1,9 +1,15 @@
 # Propuesta — Base de conocimiento de empresas (directorio + acumulación)
 
-> **Estado:** PROPUESTA (no implementada). Registrada como **DT-050**. Documentada durante el
-> cierre de F21 (2026-07-24) a partir de dos activos aportados por el usuario. La curación humana
-> se deja para después (el usuario indicó "todavía no").
-> **No es un ADR** (no es una decisión cerrada): es el diseño a discutir/aprobar en Plan Mode.
+> **Estado:** IMPLEMENTADA en Fase 29 (2026-07-31, rama `feature/fase29-dt050`). Ver
+> `FASE29_HALLAZGOS.md` para el diseño final y las desviaciones respecto de esta propuesta:
+> - El mapeo Sector(Local)→GICS NO necesitó tabla texto→GICS: el CIIU viene **embebido** en el texto
+>   → mapeo por **división** (`ciiu_division_to_gics`).
+> - En lugar de una tabla `empresas_directorio` separada se reusó la KB `entidades` (dedup por NIT,
+>   `alcance=local`, `segmento`) + tabla nueva `entidad_sectores` (multi-sector con provenance).
+> - Anclaje = contexto estructurado **y** búsqueda dirigida (flag `anclaje_local_enabled`, default OFF).
+> - Curación humana sigue pendiente (HITL, F24/F25); el directorio entra como `candidato`.
+> Registrada como **DT-050**. Documentada durante el cierre de F21 (2026-07-24).
+> **No es un ADR**: es el diseño discutido/aprobado en Plan Mode (Fase 29).
 
 ## 1. Problema que resuelve
 
