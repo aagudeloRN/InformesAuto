@@ -154,10 +154,16 @@ def ensure_entidades_tables(engine) -> None:  # type: ignore[no-untyped-def]
             f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_nit "
             f"ON {schema}.entidades (nit) WHERE nit IS NOT NULL"
         ))
-        # Dedup por nombre normalizado + sector (fallback sin NIT). COALESCE para sector NULL.
+        # Dedup por (nombre_normalizado, sector) SOLO para entidades sin NIT (NER/LLM). Las que
+        # tienen NIT se deduplican por NIT: dos empresas reales pueden compartir nombre + sector,
+        # y el NIT es la clave real. Por eso el índice es PARCIAL (WHERE nit IS NULL): si no, el
+        # INSERT de una fila EMIS con NIT choca contra un candidato NER homónimo (DT-050). Migración
+        # idempotente: se retira el índice global antiguo y se crea el parcial (nombre nuevo).
+        conn.execute(text(f"DROP INDEX IF EXISTS {schema}.ux_entidad_nombre_sector"))
         conn.execute(text(
-            f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_nombre_sector "
-            f"ON {schema}.entidades (nombre_normalizado, COALESCE(sector_gics, ''))"
+            f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_nombre_sector_nonit "
+            f"ON {schema}.entidades (nombre_normalizado, COALESCE(sector_gics, '')) "
+            f"WHERE nit IS NULL"
         ))
         conn.execute(text(
             f"CREATE INDEX IF NOT EXISTS ix_entidad_sector "

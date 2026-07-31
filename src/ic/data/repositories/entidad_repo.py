@@ -88,7 +88,7 @@ class EntidadRepository:
         conflicto = (
             "(nit) WHERE nit IS NOT NULL"
             if fila.nit
-            else "(nombre_normalizado, COALESCE(sector_gics, ''))"
+            else "(nombre_normalizado, COALESCE(sector_gics, '')) WHERE nit IS NULL"
         )
         sql = text(
             f"INSERT INTO {tabla} (tipo, nombre, nombre_normalizado, nit, ciudad, pais, "

@@ -134,7 +134,11 @@ def test_upsert_sin_nit_usa_conflicto_nombre_sector():
         EntidadRow(nombre="Colanta", nombre_normalizado="colanta", sector_gics="3020")
     )
     sql = sess.sqls[-1]
-    assert "ON CONFLICT (nombre_normalizado, COALESCE(sector_gics, '')) DO UPDATE" in sql
+    # DT-050: índice nombre+sector PARCIAL (WHERE nit IS NULL) → el arbitro incluye el predicado.
+    assert (
+        "ON CONFLICT (nombre_normalizado, COALESCE(sector_gics, '')) WHERE nit IS NULL DO UPDATE"
+        in sql
+    )
 
 
 def test_upsert_no_degrada_estado_y_fusiona_aliases():
