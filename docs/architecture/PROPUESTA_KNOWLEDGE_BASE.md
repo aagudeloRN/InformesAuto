@@ -109,6 +109,17 @@ por-entidad nutre el KB de vuelta.
 > anclaje. La semilla curada de DT-061b es ahora cold-start/fallback. Ver
 > `docs/decisions/FASE27_HALLAZGOS.md`.
 
+> **DT-062b ✅ (F28, 2026-07-31)** — reuso por **sub-actividad**, no por grupo. DT-062 reusaba los
+> globales por grupo GICS (3020): tabaco (302030)/bebidas (302010) veían los food (302020). Dos
+> causas: (a) el prompt recibía el **código crudo** (`302020`), sin steering → recall del grupo
+> entero; (b) en `filter_rank_competidores` el puente `verificado OR sub` dejaba pasar cualquier
+> `verificado` sin mirar su sub. Fix (Plan Mode, toca la regla cerrada de DT-061): (1) **etiqueta
+> legible** de sub-actividad al prompt (`sub_gics_label`); (2) **filtro sub-estricto** en el tier de
+> clase mundial (con `alcance` pedido: `r.sub_gics == sub_gics`, sin puente `verificado` ni fallback
+> a grupo → ancla vacía dispara el descubrimiento de esa sub); el path grupo/local conserva el puente
+> (invariante DT-061). (3) el guard de coste cuenta ahora **por sub** → se descubre una vez por
+> sub-actividad. Ver `docs/decisions/FASE28_HALLAZGOS.md`.
+
 ## 2. Ingesta RAG enriquecida — batch en la reingesta por sector (DT-057)
 
 La reingesta cuesta ~2 días → se batchea todo lo que **no se backfillea barato**. (Metadata
