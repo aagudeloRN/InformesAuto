@@ -97,6 +97,18 @@ por-entidad nutre el KB de vuelta.
 > gated por corroboración para el tier global), **DT-060** (reingesta paralela A/B, techo de
 > evidencia). Ver `docs/decisions/FASE26_HALLAZGOS.md`.
 
+> **DT-062 ✅ (F27, 2026-07-31)** — el **motor de recall** del tier global (2.1.1). El LLM recomienda
+> actores de clase mundial del sector (`chain_02c_pares_globales`, parser puro); cada candidato se
+> corrobora por **web dirigida** (Tavily, no corpus EMIS sesgado a lo local); solo los corroborados
+> (≥2 fuentes, gate puro `domain/kb/corroboracion.py`) se siembran `verificado`/`alcance=global` con
+> provenance `fuente=llm` — los no corroborados quedan `candidato`/`fuente=llm` **sin `alcance=global`**
+> (nunca citables, RN-001). Caso de uso `DiscoverGlobales` sin BD (persistencia por callback);
+> cableado en `generate_n1` tras flag `discover_globales_enabled` (default OFF = DT-061b) + script
+> offline `descubrir_globales_llm.py`. E2E dry-run 3020: **12 recomendados → 12 corroborados (0
+> falsos)**, 10 nuevos vs la semilla (Nestlé/PepsiCo/Unilever/Cargill/Mondelez…) → Nestlé entra al
+> anclaje. La semilla curada de DT-061b es ahora cold-start/fallback. Ver
+> `docs/decisions/FASE27_HALLAZGOS.md`.
+
 ## 2. Ingesta RAG enriquecida — batch en la reingesta por sector (DT-057)
 
 La reingesta cuesta ~2 días → se batchea todo lo que **no se backfillea barato**. (Metadata
