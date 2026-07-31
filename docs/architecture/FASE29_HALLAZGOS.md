@@ -71,8 +71,17 @@ purga).
 
 ## Deuda / sucesores
 
-- **DT-050b (migrar global al JOIN):** unificar `list_competidores_by_sector` sobre `entidad_sectores`,
-  con el E2E 3020 (disjuntas food/beverage/tobacco + restore) como gate duro.
+- **DT-050b (reconciliación curada + HITL, y migración del global al JOIN):** tras la siembra el KB
+  tiene duplicados **inertes** (empresa con NIT ↔ candidato NER homónimo sin NIT; el anclaje los
+  separa por `alcance`). **No auto-fusionar en ingesta** (RN-001: homónimos nacional/internacional,
+  la normalización colapsa formas legales, el candidato no está verificado). Reconciliación = pase
+  **curado y reversible**: anclar en el NIT, adjuntar provenance sin pisar, gate de confianza alto →
+  el resto a **cola HITL (F24/F25)** que promueve `candidato`→`verificado` y ejecuta el merge; nunca
+  fusionar dos NIT distintos; tabla de auditoría de fusiones. Incluye migrar
+  `list_competidores_by_sector` (global) al JOIN `entidad_sectores`, con el E2E 3020 (disjuntas
+  food/beverage/tobacco + restore) como gate duro. Ver memoria `project_dt050b_reconciliacion`.
+- **Fix post-merge (`f9b159b`):** índice nombre+sector PARCIAL (`WHERE nit IS NULL`) — la siembra EMIS
+  con NIT chocaba contra un candidato NER homónimo sin NIT.
 - **Startups globales** (scaleups/unicornios) → sub-tier del componente GLOBAL (patrón DT-062). Parqueado.
 - **Curación humana** del directorio (panel HITL, F24/F25): pasar `candidato`→`verificado`.
 - **Rendimiento de la siembra:** los upserts commitean por-llamada (~98k). Correr en tmux/nohup; si
