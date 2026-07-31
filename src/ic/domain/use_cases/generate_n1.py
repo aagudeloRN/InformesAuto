@@ -19,20 +19,30 @@ logger = logging.getLogger(__name__)
 def run_n1_parallel(ctx: _PipelineContext) -> None:
     """Ejecuta Caps 2/3/4 en paralelo + párrafos introductivos N1."""
     from ic.data.database import SessionLocal
-    from ic.data.models.entidad import ALCANCE_GLOBAL, ensure_entidades_tables
+    from ic.data.models.entidad import (
+        ALCANCE_GLOBAL,
+        ESTADO_CANDIDATO,
+        ESTADO_VERIFICADO,
+        FUENTE_LLM,
+        TIPO_COMPETIDOR,
+        ensure_entidades_tables,
+    )
     from ic.data.repositories.embedding_repo import EmbeddingRepository
-    from ic.data.repositories.entidad_repo import EntidadRepository
+    from ic.data.repositories.entidad_repo import EntidadRepository, EntidadRow
     from ic.domain.chains.chain_02b_entidades import build_chain_entidades
+    from ic.domain.chains.chain_02c_pares_globales import build_chain_pares_globales
     from ic.domain.chains.chain_03_benchmarking import build_chain_03
     from ic.domain.chains.chain_03b_mercado import build_chain_03b
     from ic.domain.chains.chain_04_tendencias import build_chain_04
     from ic.domain.chains.chain_05_ecosistema import build_chain_05
     from ic.domain.chains.chain_judge import CRITERIOS_CAPITULO
+    from ic.domain.use_cases.discover_globales import DiscoverGlobales
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
     from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
     from ic.domain.use_cases.generate_mercado import GenerateMercado
     from ic.domain.use_cases.generate_tendencias import GenerateTendencias
     from ic.domain.use_cases.self_review_hooks import review_web_cap
+    from ic.infrastructure.ner.entity_recognizer import normalize_entity
     from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
     from ic.infrastructure.sources.cached_connector import (
         CachedOpenAlexConnector,
@@ -47,6 +57,44 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     # DT-061: sub-código GICS de la empresa analizada (food/beverage/tobacco dentro del grupo) para
     # anclar competidores de la MISMA sub-actividad. None → anclaje a nivel de grupo (invariante).
     sub_code = resolve_sub_gics(ctx.empresa.texto, g_code)
+
+    def _descubrir_globales(store, web) -> None:
+        """DT-062: siembra globales LLM corroborados por web. Best-effort; nunca rompe la corrida.
+
+        Guard de coste: si el KB ya tiene globales suficientes para el sector, no re-descubre (KB
+        caliente). Corroborado → verificado/alcance=global; si no → candidato/fuente=llm no citable.
+        """
+        if not g_code:
+            return
+        try:
+            with SessionLocal() as db_kb:
+                ensure_entidades_tables(db_kb.get_bind())
+                repo = EntidadRepository(db_kb)
+                ya = repo.list_competidores_by_sector(
+                    g_code, sub_gics=sub_code, alcance=ALCANCE_GLOBAL, limit=100
+                )
+                if len(ya) >= 8:  # KB caliente: el anclaje ya está bien poblado.
+                    return
+
+                def _seed(nombre: str, corroborado: bool, _hits: int) -> None:
+                    estado = ESTADO_VERIFICADO if corroborado else ESTADO_CANDIDATO
+                    eid = repo.upsert_entidad(EntidadRow(
+                        nombre=nombre, nombre_normalizado=normalize_entity(nombre),
+                        tipo=TIPO_COMPETIDOR, sector_gics=g_code, sub_gics=sub_code,
+                        alcance=ALCANCE_GLOBAL if corroborado else None, estado=estado,
+                    ))
+                    repo.add_atributo(
+                        eid, "origen", "llm-corroborado" if corroborado else "llm",
+                        FUENTE_LLM, estado=estado,
+                    )
+
+                DiscoverGlobales(
+                    chain=build_chain_pares_globales(ctx.api_llm or ctx.llm),
+                    web_connector=web, store=store,
+                    min_corrob=s.discover_globales_min_corrob,
+                ).discover(sector_gics=g, sub_gics=sub_code, seed_repo_fn=_seed)
+        except Exception:  # noqa: BLE001 — el descubrimiento es un boost; nunca rompe la corrida.
+            logger.warning("Descubrimiento LLM de globales falló (sector %s)", g_code)
 
     # T16.0-B: cada thread abre su propia sesión y crea sus propios wrappers cached.
     # SQLAlchemy Session no es thread-safe — nunca compartir entre threads paralelos.
@@ -67,6 +115,10 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         # propia por thread; [] → comportamiento B1 (SQLAlchemy Session no es thread-safe).
         # DT-061b: la lista anclada es la de competidores de CLASE MUNDIAL → filtra alcance=global
         # (los jugadores locales grandes son otro componente, DT-050).
+        # DT-062: descubrimiento LLM de globales corroborados por web (motor de recall del
+        # componente de clase mundial). Flag OFF = anclaje solo con la semilla curada (DT-061b).
+        if s.discover_globales_enabled:
+            _descubrir_globales(store, web)
         kb_competidores: list[str] = []
         try:
             with SessionLocal() as db_kb:

@@ -84,3 +84,17 @@ class TestDiscoverGlobales:
         assert conteos == {"recomendados": 0, "corroborados": 0, "no_corroborados": 0}
         store.ingest.assert_not_called()
         seed.assert_not_called()
+
+
+class TestInvarianteFlag:
+    """El descubrimiento debe llegar apagado por defecto: flag OFF = anclaje DT-061b (solo semilla
+    curada). generate_n1._fn_cap2 solo lo ejecuta bajo `if s.discover_globales_enabled`; que el
+    default sea False es la garantía de la invariante (evita shippear el motor encendido)."""
+
+    def test_flag_off_por_defecto(self):
+        # Se comprueba el default declarado (sin instanciar Settings, que exige campos del .env).
+        from ic.shared.config import Settings
+
+        campos = Settings.model_fields
+        assert campos["discover_globales_enabled"].default is False
+        assert campos["discover_globales_min_corrob"].default == 2
