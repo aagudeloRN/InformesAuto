@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from ic.data.models.entidad import (
     ESTADO_CANDIDATO,
     ESTADO_DESCARTADO,
+    ESTADO_VERIFICADO,
     TIPO_COMPETIDOR,
     Entidad,
     EntidadAtributo,
@@ -35,6 +36,7 @@ class EntidadRow:
     ciudad: str | None = None
     pais: str | None = None
     sector_gics: str | None = None
+    sub_gics: str | None = None
     estado: str = ESTADO_CANDIDATO
     aliases: list[str] = field(default_factory=list)
     n_menciones: int | None = None
@@ -62,6 +64,7 @@ class EntidadRepository:
             "ciudad": fila.ciudad,
             "pais": fila.pais,
             "sector_gics": fila.sector_gics,
+            "sub_gics": fila.sub_gics,
             "estado": fila.estado,
             "aliases": aliases_json,
             "n_menciones": fila.n_menciones,
@@ -77,15 +80,17 @@ class EntidadRepository:
         )
         sql = text(
             f"INSERT INTO {tabla} (tipo, nombre, nombre_normalizado, nit, ciudad, pais, "
-            " sector_gics, estado, aliases, n_menciones, n_chunks, n_sectores) "
+            " sector_gics, sub_gics, estado, aliases, n_menciones, n_chunks, n_sectores) "
             "VALUES (:tipo, :nombre, :nombre_normalizado, :nit, :ciudad, :pais, :sector_gics, "
-            " :estado, CAST(:aliases AS jsonb), :n_menciones, :n_chunks, :n_sectores) "
+            " :sub_gics, :estado, CAST(:aliases AS jsonb), :n_menciones, :n_chunks, :n_sectores) "
             f"ON CONFLICT {conflicto} DO UPDATE SET "
             "  nombre = EXCLUDED.nombre, "
             "  tipo = EXCLUDED.tipo, "
             "  ciudad = COALESCE(EXCLUDED.ciudad, {t}.ciudad), "
             "  pais = COALESCE(EXCLUDED.pais, {t}.pais), "
             "  sector_gics = COALESCE(EXCLUDED.sector_gics, {t}.sector_gics), "
+            # No degrada: el merge (NULL) conserva el sub_gics; la siembra/curación lo fija.
+            "  sub_gics = COALESCE(EXCLUDED.sub_gics, {t}.sub_gics), "
             # No degradar: verificado se conserva aunque llegue un candidato.
             "  estado = CASE WHEN {t}.estado = 'verificado' THEN 'verificado' "
             "                ELSE EXCLUDED.estado END, "
@@ -138,11 +143,15 @@ class EntidadRepository:
         )
         self._db.commit()
 
-    def list_competidores_by_sector(self, sector_gics: str, limit: int = 8) -> list[str]:
-        """Nombres canónicos de competidores/empresas del sector para anclar (T3).
+    def list_competidores_by_sector(
+        self, sector_gics: str, sub_gics: str | None = None, limit: int = 8
+    ) -> list[str]:
+        """Nombres canónicos de competidores/empresas del sector para anclar (DT-056/DT-061).
 
-        Excluye entidades `descartado` (gate RN-001). Ordena por señal (n_chunks desc): las de
-        mayor evidencia sector-específica primero. Devuelve la forma display (`nombre`).
+        Excluye entidades `descartado` (gate RN-001). Cuando `sub_gics` (DT-061) se resuelve para
+        la empresa analizada, prioriza los pares de la MISMA sub-actividad y los `verificado`
+        (siembra curada) por delante de los candidatos NER del grupo. Orden:
+        verificado → match de sub_gics → evidencia (n_chunks). Devuelve la forma display (`nombre`).
         """
         if not sector_gics:
             return []
@@ -151,11 +160,20 @@ class EntidadRepository:
             f"SELECT nombre FROM {tabla} "
             "WHERE sector_gics = :sector AND estado <> :descartado "
             "  AND tipo IN ('competidor', 'empresa') "
-            "ORDER BY COALESCE(n_chunks, 0) DESC, COALESCE(n_menciones, 0) DESC "
+            "ORDER BY (estado = :verificado) DESC, "
+            "         (:sub IS NOT NULL AND sub_gics = :sub) DESC, "
+            "         COALESCE(n_chunks, 0) DESC, COALESCE(n_menciones, 0) DESC "
             "LIMIT :limit"
         )
         rows = self._db.execute(
-            sql, {"sector": sector_gics, "descartado": ESTADO_DESCARTADO, "limit": limit}
+            sql,
+            {
+                "sector": sector_gics,
+                "sub": sub_gics,
+                "descartado": ESTADO_DESCARTADO,
+                "verificado": ESTADO_VERIFICADO,
+                "limit": limit,
+            },
         ).fetchall()
         return [r[0] for r in rows]
 

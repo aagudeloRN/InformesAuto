@@ -57,6 +57,9 @@ def test_ensure_tablas_idempotente():
     assert "ux_entidad_nombre_sector" in unido
     # Idempotencia de atributos por (entidad, clave, fuente).
     assert "ux_entidad_atributo_clave_fuente" in unido
+    # DT-061: sub_gics añadido idempotente a tablas existentes + índice de anclaje fino.
+    assert "ADD COLUMN IF NOT EXISTS sub_gics TEXT" in unido
+    assert "ix_entidad_sub_gics" in unido
 
 
 # --- Upsert de entidad ---
@@ -143,6 +146,18 @@ def test_upsert_no_degrada_estado_y_fusiona_aliases():
     assert "jsonb_agg(DISTINCT a" in sql  # unión de aliases
 
 
+def test_upsert_incluye_sub_gics_sin_degradar():
+    # DT-061: el sub_gics viaja en el INSERT y se conserva con COALESCE (no lo pisa un NULL).
+    sess = _FakeSession()
+    EntidadRepository(sess).upsert_entidad(
+        EntidadRow(nombre="Colanta", nombre_normalizado="colanta",
+                   sector_gics="3020", sub_gics="302020")
+    )
+    sql = sess.sqls[-1]
+    assert "sub_gics = COALESCE(EXCLUDED.sub_gics" in sql
+    assert sess.params[-1]["sub_gics"] == "302020"
+
+
 def test_add_atributo_idempotente_por_clave_fuente():
     sess = _FakeSession()
     EntidadRepository(sess).add_atributo(
@@ -163,8 +178,21 @@ def test_list_competidores_ordena_por_senal_y_excluye_descartado():
     assert nombres == ["Alpina", "Colanta", "Nestlé"]
     sql = sess.sqls[-1]
     assert "estado <> :descartado" in sql
-    assert "ORDER BY COALESCE(n_chunks, 0) DESC" in sql
+    assert "COALESCE(n_chunks, 0) DESC" in sql
     assert sess.params[-1]["limit"] == 8
+    # Sin sub_gics resuelto → se pasa NULL (invariante DT-061: comportamiento de grupo).
+    assert sess.params[-1]["sub"] is None
+
+
+def test_list_competidores_con_sub_gics_prioriza_verificado_y_subsector():
+    # DT-061: cuando la empresa analizada resuelve un sub-código, el orden lo prioriza.
+    sess = _FakeSession(select_rows=[("Colanta",), ("Alquería",)])
+    EntidadRepository(sess).list_competidores_by_sector("3020", sub_gics="302020")
+    sql = sess.sqls[-1]
+    assert "(estado = :verificado) DESC" in sql
+    assert "(:sub IS NOT NULL AND sub_gics = :sub) DESC" in sql
+    assert sess.params[-1]["sub"] == "302020"
+    assert sess.params[-1]["verificado"] == ESTADO_VERIFICADO
 
 
 def test_list_competidores_sector_vacio_no_consulta():

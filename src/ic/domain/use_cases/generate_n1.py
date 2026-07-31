@@ -39,11 +39,14 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         CachedWebConnector,
     )
     from ic.infrastructure.sources.openalex_connector import OpenAlexConnector
-    from ic.shared.constants.gics_groups import extract_gics_code
+    from ic.shared.constants.gics_groups import extract_gics_code, resolve_sub_gics
 
     ctx.step_fn(3, "N1 — Caps 2/3/4 en paralelo")
     e, g, s = ctx.params.empresa, ctx.gics.grupo_gics, ctx.settings
     g_code = extract_gics_code(g)
+    # DT-061: sub-código GICS de la empresa analizada (food/beverage/tobacco dentro del grupo) para
+    # anclar competidores de la MISMA sub-actividad. None → anclaje a nivel de grupo (invariante).
+    sub_code = resolve_sub_gics(ctx.empresa.texto, g_code)
 
     # T16.0-B: cada thread abre su propia sesión y crea sus propios wrappers cached.
     # SQLAlchemy Session no es thread-safe — nunca compartir entre threads paralelos.
@@ -66,7 +69,9 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         try:
             with SessionLocal() as db_kb:
                 ensure_entidades_tables(db_kb.get_bind())
-                kb_competidores = EntidadRepository(db_kb).list_competidores_by_sector(g_code or "")
+                kb_competidores = EntidadRepository(db_kb).list_competidores_by_sector(
+                    g_code or "", sub_gics=sub_code
+                )
         except Exception:  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
             logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)
         cap = GenerateBenchmarking(

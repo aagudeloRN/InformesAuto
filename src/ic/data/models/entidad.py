@@ -53,6 +53,9 @@ class Entidad(Base):
     ciudad: Mapped[str | None] = mapped_column(Text, nullable=True)
     pais: Mapped[str | None] = mapped_column(Text, nullable=True)
     sector_gics: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Sub-código GICS de 6 dígitos (DT-061): granularidad food/beverage/tobacco dentro del grupo.
+    # NULL en candidatos NER; lo fijan solo los pares sembrados verificados (curación/DT-050).
+    sub_gics: Mapped[str | None] = mapped_column(Text, nullable=True)
     estado: Mapped[str] = mapped_column(Text, nullable=False, default=ESTADO_CANDIDATO)
     # Formas superficiales vistas del mismo nombre normalizado (variantes marca/empresa).
     aliases: Mapped[list | None] = mapped_column(JSONB, nullable=True)
@@ -97,6 +100,7 @@ def ensure_entidades_tables(engine) -> None:  # type: ignore[no-untyped-def]
             " ciudad TEXT,"
             " pais TEXT,"
             " sector_gics TEXT,"
+            " sub_gics TEXT,"
             " estado TEXT NOT NULL DEFAULT 'candidato',"
             " aliases JSONB DEFAULT '[]'::jsonb,"
             " n_menciones BIGINT,"
@@ -119,6 +123,14 @@ def ensure_entidades_tables(engine) -> None:  # type: ignore[no-untyped-def]
         conn.execute(text(
             f"CREATE INDEX IF NOT EXISTS ix_entidad_sector "
             f"ON {schema}.entidades (sector_gics)"
+        ))
+        # DT-061: sub-código GICS en tablas ya existentes (idempotente) + índice de anclaje fino.
+        conn.execute(text(
+            f"ALTER TABLE {schema}.entidades ADD COLUMN IF NOT EXISTS sub_gics TEXT"
+        ))
+        conn.execute(text(
+            f"CREATE INDEX IF NOT EXISTS ix_entidad_sub_gics "
+            f"ON {schema}.entidades (sub_gics)"
         ))
         conn.execute(text(
             f"CREATE TABLE IF NOT EXISTS {schema}.entidad_atributos ("
