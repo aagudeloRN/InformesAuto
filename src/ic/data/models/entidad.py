@@ -46,6 +46,8 @@ FUENTE_EMIS = "emis"
 FUENTE_DB_EXTERNA = "db_externa"
 FUENTE_INFORME = "informe"
 FUENTE_WEB = "web"
+# El nombre lo recomendó el LLM (DT-062); solo es citable si la web lo corrobora (RN-001).
+FUENTE_LLM = "llm"
 
 
 class Entidad(Base):
