@@ -24,6 +24,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         ESTADO_CANDIDATO,
         ESTADO_VERIFICADO,
         FUENTE_LLM,
+        SEGMENTO_STARTUP,
         TIPO_COMPETIDOR,
         ensure_entidades_tables,
     )
@@ -36,6 +37,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.domain.chains.chain_04_tendencias import build_chain_04
     from ic.domain.chains.chain_05_ecosistema import build_chain_05
     from ic.domain.chains.chain_judge import CRITERIOS_CAPITULO
+    from ic.domain.kb.relevance import format_jugadores_locales
     from ic.domain.use_cases.discover_globales import DiscoverGlobales
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
     from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
@@ -125,18 +127,35 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         if s.discover_globales_enabled:
             _descubrir_globales(store, web)
         kb_competidores: list[str] = []
+        kb_locales: list[str] = []
+        jugadores_locales_ctx = ""
         try:
             with SessionLocal() as db_kb:
                 ensure_entidades_tables(db_kb.get_bind())
-                kb_competidores = EntidadRepository(db_kb).list_competidores_by_sector(
+                repo_kb = EntidadRepository(db_kb)
+                kb_competidores = repo_kb.list_competidores_by_sector(
                     g_code or "", sub_gics=sub_code, alcance=ALCANCE_GLOBAL
                 )
+                # DT-050: anclaje del tier LOCAL (2.1.2 regionales + 2.1.3 startups) desde el
+                # directorio. Flag OFF → nada (invariante). No diluye el global: el path global usa
+                # alcance=global; este usa alcance=local con su propio método.
+                if s.anclaje_local_enabled and g_code:
+                    n = s.anclaje_local_top_n
+                    regionales = repo_kb.list_locales_by_sector(
+                        g_code, solo_establecidas=True, sub_gics=sub_code, limit=n
+                    )
+                    startups = repo_kb.list_locales_by_sector(
+                        g_code, segmento=SEGMENTO_STARTUP, sub_gics=sub_code, limit=n
+                    )
+                    jugadores_locales_ctx = format_jugadores_locales(regionales, startups)
+                    kb_locales = [r.nombre for r in (*regionales, *startups)]
         except Exception:  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
             logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)
         cap = GenerateBenchmarking(
             chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=web,
             entidades_chain=build_chain_entidades(ctx.api_llm or ctx.llm),
-            kb_competidores=kb_competidores,
+            kb_competidores=kb_competidores, kb_locales=kb_locales,
+            jugadores_locales_ctx=jugadores_locales_ctx,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,

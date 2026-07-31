@@ -121,6 +121,13 @@ class Settings(BaseSettings):
     discover_globales_enabled: bool = False
     discover_globales_min_corrob: int = 2  # nº de fuentes web que deben mencionar el candidato
 
+    # Anclaje del tier LOCAL (DT-050) — inyecta jugadores del directorio (EmpresasColombia +
+    # StartIA) a 2.1.2 (regionales) y 2.1.3 (startups) del Cap 2, como contexto estructurado +
+    # búsqueda web dirigida. Flag maestro default-OFF: apagado = comportamiento actual (el LLM
+    # llena el tier local solo desde web/RAG), prompt idéntico (invariante).
+    anclaje_local_enabled: bool = False
+    anclaje_local_top_n: int = 6  # tope de jugadores locales por subsección (regionales/startups)
+
     # NER de entidades (DT-057/T3) — motor y modelos por config, nunca hardcodeados en app-code.
     # Motor pluggable: "spacy" (librería, CPU, sin VRAM) hoy; otros motores se añaden en el wrapper.
     # Corpus EMIS bilingüe (~79% inglés / ~24% español): se elige el modelo por idioma del chunk.

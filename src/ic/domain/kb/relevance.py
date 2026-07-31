@@ -74,6 +74,48 @@ class CompetidorRow:
     n_menciones: int = 0
 
 
+@dataclass(frozen=True)
+class LocalRow:
+    """Fila del directorio local (DT-050) para el anclaje de los tiers 2.1.2/2.1.3."""
+
+    nombre: str
+    ciudad: str | None = None
+    actividad: str | None = None
+    tamano: str | None = None
+    segmento: str | None = None
+
+
+def _linea_local(r: LocalRow) -> str:
+    partes = [r.nombre]
+    for extra in (r.ciudad, r.actividad, r.tamano):
+        if extra:
+            partes.append(extra)
+    return "- " + " — ".join(partes)
+
+
+def format_jugadores_locales(
+    regionales: list[LocalRow], startups: list[LocalRow]
+) -> str:
+    """Bloque de contexto estructurado con jugadores locales del directorio (DT-050). Puro.
+
+    Ground-truth para anclar 2.1.2 (regionales) y 2.1.3 (startups) sin depender solo de la web
+    (DT-049). Devuelve "" si no hay nada (invariante: prompt idéntico cuando el flag está OFF o el
+    directorio no tiene locales del sector). RN-001: solo lista lo recuperado del directorio.
+    """
+    bloques: list[str] = []
+    if regionales:
+        bloques.append(
+            "Referentes regionales (Colombia) del directorio:\n"
+            + "\n".join(_linea_local(r) for r in regionales)
+        )
+    if startups:
+        bloques.append(
+            "Startups regionales del directorio:\n"
+            + "\n".join(_linea_local(r) for r in startups)
+        )
+    return "\n\n".join(bloques)
+
+
 def filter_rank_competidores(
     rows: list[CompetidorRow],
     sub_gics: str | None = None,

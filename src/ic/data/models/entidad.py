@@ -49,6 +49,10 @@ FUENTE_WEB = "web"
 # El nombre lo recomendó el LLM (DT-062); solo es citable si la web lo corrobora (RN-001).
 FUENTE_LLM = "llm"
 
+# Segmento de la entidad (DT-050): separa el tier de startups (2.1.3) del regional (2.1.2). NULL =
+# empresa establecida (default). Solo el corpus StartIA carga `startup`.
+SEGMENTO_STARTUP = "startup"
+
 
 class Entidad(Base):
     __tablename__ = "entidades"
@@ -66,6 +70,8 @@ class Entidad(Base):
     sub_gics: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Alcance global/local (DT-061b): el anclaje de clase mundial (2.1.1) filtra `global`.
     alcance: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Segmento (DT-050): `startup` (tier 2.1.3) vs NULL (empresa establecida, tier 2.1.2).
+    segmento: Mapped[str | None] = mapped_column(Text, nullable=True)
     estado: Mapped[str] = mapped_column(Text, nullable=False, default=ESTADO_CANDIDATO)
     # Formas superficiales vistas del mismo nombre normalizado (variantes marca/empresa).
     aliases: Mapped[list | None] = mapped_column(JSONB, nullable=True)
@@ -90,6 +96,28 @@ class EntidadAtributo(Base):
     confianza: Mapped[float | None] = mapped_column(Float, nullable=True)
     fecha: Mapped[date | None] = mapped_column(Date, nullable=True)
     documento_id: Mapped[str | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    estado: Mapped[str] = mapped_column(Text, nullable=False, default=ESTADO_CANDIDATO)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EntidadSector(Base):
+    """Membresía sectorial de una entidad (DT-050). Multi-sector es feature, no duplicado.
+
+    Una empresa puede pertenecer a varios sectores/verticales (transversalidad real: filas EMIS con
+    varias actividades CIIU, startups multi-vertical). Cada membresía lleva su procedencia
+    (`fuente`) y estado (RN-001). El anclaje hace join por `sector_gics`; `n_sectores` = COUNT real.
+    """
+
+    __tablename__ = "entidad_sectores"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    entidad_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sector_gics: Mapped[str] = mapped_column(Text, nullable=False)
+    sub_gics: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # etiqueta de origen (texto CIIU o vertical StartIA)
+    vertical: Mapped[str | None] = mapped_column(Text, nullable=True)
+    alcance: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fuente: Mapped[str] = mapped_column(Text, nullable=False)
     estado: Mapped[str] = mapped_column(Text, nullable=False, default=ESTADO_CANDIDATO)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -146,6 +174,33 @@ def ensure_entidades_tables(engine) -> None:  # type: ignore[no-untyped-def]
         # DT-061b: alcance global/local (idempotente) para el anclaje de clase mundial.
         conn.execute(text(
             f"ALTER TABLE {schema}.entidades ADD COLUMN IF NOT EXISTS alcance TEXT"
+        ))
+        # DT-050: segmento (startup) para separar el tier 2.1.3 del 2.1.2 (idempotente).
+        conn.execute(text(
+            f"ALTER TABLE {schema}.entidades ADD COLUMN IF NOT EXISTS segmento TEXT"
+        ))
+        # DT-050: membresías sectoriales (multi-sector). Único por (entidad, sector, sub_gics) para
+        # idempotencia; COALESCE del sub para tratar NULL como valor en el índice.
+        conn.execute(text(
+            f"CREATE TABLE IF NOT EXISTS {schema}.entidad_sectores ("
+            " id BIGSERIAL PRIMARY KEY,"
+            " entidad_id BIGINT NOT NULL,"
+            " sector_gics TEXT NOT NULL,"
+            " sub_gics TEXT,"
+            " vertical TEXT,"
+            " alcance TEXT,"
+            " fuente TEXT NOT NULL,"
+            " estado TEXT NOT NULL DEFAULT 'candidato',"
+            " created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+            ")"
+        ))
+        conn.execute(text(
+            f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_sector "
+            f"ON {schema}.entidad_sectores (entidad_id, sector_gics, COALESCE(sub_gics, ''))"
+        ))
+        conn.execute(text(
+            f"CREATE INDEX IF NOT EXISTS ix_entidad_sector_gics "
+            f"ON {schema}.entidad_sectores (sector_gics)"
         ))
         conn.execute(text(
             f"CREATE TABLE IF NOT EXISTS {schema}.entidad_atributos ("

@@ -11,6 +11,7 @@ corresponder a varios grupos GICS.
 from __future__ import annotations
 
 import csv
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -118,3 +119,131 @@ def ciiu_to_gics_candidates(ciiu: str | int | None) -> list[str]:
         if code and code not in codigos:
             codigos.append(code)
     return codigos
+
+
+# --- Grano por DIVISIÓN CIIU (DT-050) -----------------------------------------------------------
+# El mapeo por Sección (arriba) es multivaluado (Sección C → 10 grupos GICS): sirve para *acotar*
+# la clasificación del LLM, pero es demasiado grueso para *asignar* un sector a las ~98k empresas
+# del directorio EMIS. La columna "Sector (Local)" de EmpresasColombia trae el CIIU Rev.4 embebido
+# entre paréntesis (p. ej. "…(M7010)", "…(F4111)", "…(A0141)"); con la DIVISIÓN (2 díg) se resuelve
+# un grupo GICS único en el 99 %+ de los casos. Tabla finita y revisable (curación humana futura).
+# Puro, sin modelo (ADR-002).
+
+# Código CIIU con letra de Sección + 3-4 dígitos, embebido en el texto local: "…(M7010)".
+_CIIU_EMBEBIDO_RE = re.compile(r"\(([A-U])(\d{3,4})\)")
+
+# División (2 primeros dígitos) → código de Grupo GICS (4 díg). Elección del grupo dominante de la
+# división; los casos genuinamente ambiguos (comercio) se afinan con `_CIIU_CLASE_OVERRIDES`.
+_CIIU_DIVISION_GICS: dict[int, str] = {
+    # A — Agricultura, ganadería, pesca → producción agroindustrial de alimentos.
+    1: "3020", 2: "3020", 3: "3020",
+    # B — Minería.
+    5: "1010", 6: "1010", 7: "1510", 8: "1510", 9: "1010",
+    # C — Manufactura.
+    10: "3020", 11: "3020", 12: "3020",          # alimentos, bebidas, tabaco
+    13: "2520", 14: "2520", 15: "2520",          # textiles, confección, cuero/calzado
+    16: "1510", 17: "1510",                       # madera, papel
+    18: "2020",                                   # impresión (servicios comerciales)
+    19: "1010",                                   # coque y refinación de petróleo
+    20: "1510", 22: "1510", 23: "1510", 24: "1510",  # químicos, caucho/plástico, minerales, metales
+    21: "3520",                                   # farmacéutica
+    25: "2010", 27: "2010", 28: "2010", 30: "2010", 33: "2010",  # metalmecánica/maquinaria
+    26: "4520",                                   # electrónica/informática/óptica
+    29: "2510",                                   # vehículos automotores
+    31: "2520", 32: "2520",                       # muebles, otras manufacturas
+    # D — Electricidad/gas.
+    35: "5510",
+    # E — Agua/residuos.
+    36: "5510", 37: "2020", 38: "2020", 39: "2020",
+    # F — Construcción.
+    41: "2010", 42: "2010", 43: "2010",
+    # G — Comercio (ambiguo 2550/3010; ver overrides de clase para básicos).
+    45: "2550", 46: "2550", 47: "2550",
+    # H — Transporte y almacenamiento.
+    49: "2030", 50: "2030", 51: "2030", 52: "2030", 53: "2030",
+    # I — Alojamiento y servicio de comidas.
+    55: "2530", 56: "2530",
+    # J — Información y comunicaciones.
+    58: "5020", 59: "5020", 60: "5020",          # edición, cine/música, radiodifusión
+    61: "5010",                                   # telecomunicaciones
+    62: "4510", 63: "4510",                       # programación, servicios de información
+    # K — Financiero y seguros.
+    64: "4010", 65: "4030", 66: "4020",
+    # L — Inmobiliario.
+    68: "6020",
+    # M — Actividades profesionales, científicas y técnicas (publicidad → medios).
+    69: "2020", 70: "2020", 71: "2020", 72: "2020", 73: "5020", 74: "2020", 75: "2020",
+    # N — Servicios administrativos y de apoyo.
+    77: "2020", 78: "2020", 79: "2020", 80: "2020", 81: "2020", 82: "2020",
+    # O — Administración pública y defensa.
+    84: "2020",
+    # P — Educación.
+    85: "2530",
+    # Q — Salud humana y asistencia social.
+    86: "3510", 87: "3510", 88: "3510",
+    # R — Arte, entretenimiento y recreación.
+    90: "5020", 91: "5020", 92: "5020", 93: "2530",
+    # S — Otras actividades de servicios.
+    94: "2020", 95: "2530", 96: "2530",
+}
+
+# Overrides por CLASE (4 díg) para la ambigüedad de comercio (Sección G): alimentos/farmacia son
+# consumo básico (3010), no discrecional (2550). Solo se listan las clases básicas; el resto de G
+# cae en el default de división (2550).
+_CIIU_CLASE_OVERRIDES: dict[str, str] = {
+    # mayorista de básicos (alimentos/bebidas/tabaco)
+    "4630": "3010", "4631": "3010", "4632": "3010", "4633": "3010", "4634": "3010",
+    "4711": "3010", "4719": "3010",  # minorista no especializado (predomina alimentos)
+    # minorista de alimentos y bebidas
+    "4721": "3010", "4722": "3010", "4723": "3010", "4724": "3010", "4729": "3010",
+    "4773": "3010",  # minorista de productos farmacéuticos y medicinales
+}
+
+
+def extract_ciiu_from_text(texto: str | None) -> str | None:
+    """Extrae el código CIIU numérico embebido en el texto "Sector (Local)". Puro.
+
+    "Elaboración De Productos Lácteos (C1040)" → "1040". Devuelve la primera coincidencia (una
+    empresa multi-actividad se separa aguas arriba). None si no hay código embebido.
+    """
+    if not texto:
+        return None
+    m = _CIIU_EMBEBIDO_RE.search(texto)
+    return m.group(2) if m else None
+
+
+def extract_all_ciiu_from_text(texto: str | None) -> list[str]:
+    """Todos los códigos CIIU embebidos, en orden de aparición sin duplicados. Puro.
+
+    Una fila EMIS multi-actividad ("… (M7010); … (M7020)") produce varias membresías sectoriales.
+    """
+    if not texto:
+        return []
+    vistos: list[str] = []
+    for _, digitos in _CIIU_EMBEBIDO_RE.findall(texto):
+        if digitos not in vistos:
+            vistos.append(digitos)
+    return vistos
+
+
+def ciiu_division_to_gics(ciiu: str | int | None) -> str | None:
+    """Resuelve un ÚNICO código GICS de grupo para un CIIU, por división (2 díg). Puro (DT-050).
+
+    1. Override por clase (4 díg) para el comercio de básicos (alimentos/farmacia → 3010).
+    2. División (2 díg) → grupo GICS dominante.
+    3. Fallback: primer candidato del mapeo por Sección (grueso) si la división no está mapeada.
+
+    None si no hay CIIU o no se puede resolver (p. ej. Sección U sin correspondencia).
+    """
+    if ciiu is None:
+        return None
+    digitos = "".join(c for c in str(ciiu) if c.isdigit())
+    if len(digitos) < 2:
+        return None
+    if len(digitos) >= 4 and digitos[:4] in _CIIU_CLASE_OVERRIDES:
+        return _CIIU_CLASE_OVERRIDES[digitos[:4]]
+    division = int(digitos[:2])
+    if division in _CIIU_DIVISION_GICS:
+        return _CIIU_DIVISION_GICS[division]
+    candidatos = ciiu_to_gics_candidates(digitos)
+    return candidatos[0] if candidatos else None
