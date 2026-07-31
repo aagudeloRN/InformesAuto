@@ -49,7 +49,7 @@ T4 (stretch) — tabla `entidad_sectores` para membresías multi-sector con prov
 
 ## PRUEBAS / DONE
 Parsers/mapeos puros con fixtures (sin BD). Anclaje local devuelve locales, no diluye el global.
-Gate ruff 0 + pytest -m "not slow" verde. 1 commit atómico por tarea. Docs FASE28_HALLAZGOS +
+Gate ruff 0 + pytest -m "not slow" verde. 1 commit atómico por tarea. Docs FASE29_HALLAZGOS +
 ROADMAP + PROPUESTA + memoria. Merge `--no-ff` tras aprobación. Dejar prompt de la siguiente ventana.
 
 ## LECTURAS OBLIGATORIAS
@@ -58,5 +58,5 @@ ROADMAP + PROPUESTA + memoria. Merge `--no-ff` tras aprobación. Dejar prompt de
   (upsert por NIT, `list_competidores_by_sector`), `scripts/curar_kb_competidores.py` (patrón siembra),
   `shared/constants/gics_groups.py` (`extract_gics_code`, crosswalk), `domain/use_cases/generate_n1.py`
   (anclaje). `documentos_sectoriales/FuentesEMIS/EmpresasColombia/` y `FuentesExternas/startia_clean.xlsx`.
-- memory: `project_dt050_fuentes_decisiones`, `project_fase27_dt062_estado`, `feedback_extract_gics_code`,
-  `feedback_modelos_llm`.
+- memory: `project_dt050_fuentes_decisiones`, `project_fase28_dt062b_estado`,
+  `project_fase27_dt062_estado`, `feedback_extract_gics_code`, `feedback_modelos_llm`.
