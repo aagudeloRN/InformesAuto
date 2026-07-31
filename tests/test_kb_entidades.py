@@ -88,7 +88,7 @@ class _FakeSession:
         s = str(sql)
         if "RETURNING id" in s:
             return _FakeUpsertResult(42)
-        if "SELECT nombre FROM" in s:
+        if "SELECT nombre" in s:
             return _FakeSelectResult(self._select_rows)
         return _FakeScalarResult(0)
 
@@ -172,27 +172,35 @@ def test_add_atributo_idempotente_por_clave_fuente():
 # --- Consulta de anclaje ---
 
 
-def test_list_competidores_ordena_por_senal_y_excluye_descartado():
-    sess = _FakeSession(select_rows=[("Alpina",), ("Colanta",), ("Nestlé",)])
+def _row(nombre, nombre_norm, sub_gics, estado, n_chunks, n_menciones):
+    """Tupla en el orden del SELECT del repo (nombre, norm, sub_gics, estado, chunks, menc)."""
+    return (nombre, nombre_norm, sub_gics, estado, n_chunks, n_menciones)
+
+
+def test_list_competidores_excluye_descartado_y_ordena_por_senal():
+    # Sin sub_gics: comportamiento de grupo (solo ruido excluido), orden por evidencia.
+    sess = _FakeSession(select_rows=[
+        _row("Colanta", "colanta", None, ESTADO_CANDIDATO, 5, 10),
+        _row("Alpina", "alpina", None, ESTADO_CANDIDATO, 9, 3),
+    ])
     nombres = EntidadRepository(sess).list_competidores_by_sector("3020", limit=8)
-    assert nombres == ["Alpina", "Colanta", "Nestlé"]
+    assert nombres == ["Alpina", "Colanta"]  # más chunks primero
     sql = sess.sqls[-1]
     assert "estado <> :descartado" in sql
-    assert "COALESCE(n_chunks, 0) DESC" in sql
-    assert sess.params[-1]["limit"] == 8
-    # Sin sub_gics resuelto → se pasa NULL (invariante DT-061: comportamiento de grupo).
-    assert sess.params[-1]["sub"] is None
+    assert "nombre_normalizado" in sql  # trae columnas para el filtro puro
+    assert "sub" not in sess.params[-1]  # el orden/filtro ya no vive en SQL
 
 
-def test_list_competidores_con_sub_gics_prioriza_verificado_y_subsector():
-    # DT-061: cuando la empresa analizada resuelve un sub-código, el orden lo prioriza.
-    sess = _FakeSession(select_rows=[("Colanta",), ("Alquería",)])
-    EntidadRepository(sess).list_competidores_by_sector("3020", sub_gics="302020")
-    sql = sess.sqls[-1]
-    assert "(estado = :verificado) DESC" in sql
-    assert "(:sub IS NOT NULL AND sub_gics = :sub) DESC" in sql
-    assert sess.params[-1]["sub"] == "302020"
-    assert sess.params[-1]["verificado"] == ESTADO_VERIFICADO
+def test_list_competidores_con_sub_gics_restringe_y_excluye_ruido():
+    # DT-061 end-to-end (repo → filtro puro): resuelto sub food, cae bebida e industria News.
+    sess = _FakeSession(select_rows=[
+        _row("Colanta", "colanta", "302020", ESTADO_VERIFICADO, 4, 4),
+        _row("Postobón SA", "postobon sa", None, ESTADO_CANDIDATO, 20, 40),
+        _row("Coca-Cola Co", "coca cola co", "302010", ESTADO_CANDIDATO, 15, 30),
+        _row("Beverage Industry News", "beverage industry news", None, ESTADO_CANDIDATO, 8, 8),
+    ])
+    nombres = EntidadRepository(sess).list_competidores_by_sector("3020", sub_gics="302020")
+    assert nombres == ["Colanta"]  # solo el par food verificado; bebidas y medio excluidos
 
 
 def test_list_competidores_sector_vacio_no_consulta():

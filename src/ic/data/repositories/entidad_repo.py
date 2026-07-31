@@ -23,6 +23,7 @@ from ic.data.models.entidad import (
     Entidad,
     EntidadAtributo,
 )
+from ic.domain.kb.relevance import CompetidorRow, filter_rank_competidores
 
 
 @dataclass
@@ -148,34 +149,35 @@ class EntidadRepository:
     ) -> list[str]:
         """Nombres canónicos de competidores/empresas del sector para anclar (DT-056/DT-061).
 
-        Excluye entidades `descartado` (gate RN-001). Cuando `sub_gics` (DT-061) se resuelve para
-        la empresa analizada, prioriza los pares de la MISMA sub-actividad y los `verificado`
-        (siembra curada) por delante de los candidatos NER del grupo. Orden:
-        verificado → match de sub_gics → evidencia (n_chunks). Devuelve la forma display (`nombre`).
+        Trae los candidatos del grupo (excluye `descartado`, gate RN-001) y **delega** el filtro
+        de relevancia y el orden en `filter_rank_competidores` (dominio puro): excluye ruido
+        (medios/métricas) y, si `sub_gics` se resolvió, restringe a la sub-actividad/verificados
+        para dejar fuera la industria ajena. Devuelve la forma display (`nombre`).
         """
         if not sector_gics:
             return []
         tabla = Entidad.__table__.fullname
         sql = text(
-            f"SELECT nombre FROM {tabla} "
+            f"SELECT nombre, nombre_normalizado, sub_gics, estado, n_chunks, n_menciones "
+            f"FROM {tabla} "
             "WHERE sector_gics = :sector AND estado <> :descartado "
-            "  AND tipo IN ('competidor', 'empresa') "
-            "ORDER BY (estado = :verificado) DESC, "
-            "         (:sub IS NOT NULL AND sub_gics = :sub) DESC, "
-            "         COALESCE(n_chunks, 0) DESC, COALESCE(n_menciones, 0) DESC "
-            "LIMIT :limit"
+            "  AND tipo IN ('competidor', 'empresa')"
         )
         rows = self._db.execute(
-            sql,
-            {
-                "sector": sector_gics,
-                "sub": sub_gics,
-                "descartado": ESTADO_DESCARTADO,
-                "verificado": ESTADO_VERIFICADO,
-                "limit": limit,
-            },
+            sql, {"sector": sector_gics, "descartado": ESTADO_DESCARTADO}
         ).fetchall()
-        return [r[0] for r in rows]
+        candidatos = [
+            CompetidorRow(
+                nombre=r[0],
+                nombre_normalizado=r[1] or "",
+                sub_gics=r[2],
+                verificado=(r[3] == ESTADO_VERIFICADO),
+                n_chunks=int(r[4] or 0),
+                n_menciones=int(r[5] or 0),
+            )
+            for r in rows
+        ]
+        return filter_rank_competidores(candidatos, sub_gics=sub_gics, limit=limit)
 
     def count(self) -> int:
         tabla = Entidad.__table__.fullname
