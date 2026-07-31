@@ -23,7 +23,11 @@ from ic.data.models.entidad import (
     Entidad,
     EntidadAtributo,
 )
-from ic.domain.kb.relevance import CompetidorRow, filter_rank_competidores
+from ic.domain.kb.relevance import (
+    CompetidorRow,
+    es_ruido_competidor,
+    filter_rank_competidores,
+)
 
 
 @dataclass
@@ -178,6 +182,41 @@ class EntidadRepository:
             for r in rows
         ]
         return filter_rank_competidores(candidatos, sub_gics=sub_gics, limit=limit)
+
+    def descartar_ruido_competidores(self, dry_run: bool = False) -> list[str]:
+        """Marca `descartado` el ruido residual del KB (medios/métricas) — curación DT-061/T3.
+
+        Idempotente (re-run no re-marca: excluye ya-descartados) y **no degrada** `verificado`
+        (guard `estado <> verificado` en el UPDATE, RN-001). El criterio de ruido es el predicado
+        puro `es_ruido_competidor`; devuelve los nombres normalizados marcados (o los que se
+        marcarían en `dry_run`).
+        """
+        tabla = Entidad.__table__.fullname
+        sel = text(
+            f"SELECT id, nombre_normalizado FROM {tabla} "
+            "WHERE estado NOT IN (:descartado, :verificado) "
+            "  AND tipo IN ('competidor', 'empresa')"
+        )
+        rows = self._db.execute(
+            sel, {"descartado": ESTADO_DESCARTADO, "verificado": ESTADO_VERIFICADO}
+        ).fetchall()
+        upd = text(
+            f"UPDATE {tabla} SET estado = :descartado, updated_at = now() "
+            "WHERE id = :id AND estado <> :verificado"
+        )
+        marcados: list[str] = []
+        for id_, norm in rows:
+            if not es_ruido_competidor(norm or ""):
+                continue
+            marcados.append(norm)
+            if not dry_run:
+                self._db.execute(
+                    upd,
+                    {"id": id_, "descartado": ESTADO_DESCARTADO, "verificado": ESTADO_VERIFICADO},
+                )
+        if not dry_run and marcados:
+            self._db.commit()
+        return marcados
 
     def count(self) -> int:
         tabla = Entidad.__table__.fullname

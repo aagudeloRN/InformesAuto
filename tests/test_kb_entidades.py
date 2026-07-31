@@ -88,7 +88,7 @@ class _FakeSession:
         s = str(sql)
         if "RETURNING id" in s:
             return _FakeUpsertResult(42)
-        if "SELECT nombre" in s:
+        if s.startswith("SELECT nombre") or s.startswith("SELECT id"):
             return _FakeSelectResult(self._select_rows)
         return _FakeScalarResult(0)
 
