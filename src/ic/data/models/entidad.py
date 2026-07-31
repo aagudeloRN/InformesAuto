@@ -28,6 +28,12 @@ ESTADO_CANDIDATO = "candidato"  # extraído/sin verificar (web, NER)
 ESTADO_VERIFICADO = "verificado"  # fuente curada o aprobado por humano
 ESTADO_DESCARTADO = "descartado"  # marcado como ruido (no se reusa)
 
+# Alcance de una entidad (DT-061b): separa el descubrimiento de competidores de CLASE MUNDIAL
+# (`global`) del de jugadores locales grandes (`local`, fuente natural DT-050 base Colombia). NULL =
+# sin clasificar (candidatos NER). El anclaje de la sección 2.1.1 filtra `global`.
+ALCANCE_GLOBAL = "global"
+ALCANCE_LOCAL = "local"
+
 # Tipos de entidad (patrón único, PROPUESTA §1).
 TIPO_COMPETIDOR = "competidor"
 TIPO_EMPRESA = "empresa"
@@ -56,6 +62,8 @@ class Entidad(Base):
     # Sub-código GICS de 6 dígitos (DT-061): granularidad food/beverage/tobacco dentro del grupo.
     # NULL en candidatos NER; lo fijan solo los pares sembrados verificados (curación/DT-050).
     sub_gics: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Alcance global/local (DT-061b): el anclaje de clase mundial (2.1.1) filtra `global`.
+    alcance: Mapped[str | None] = mapped_column(Text, nullable=True)
     estado: Mapped[str] = mapped_column(Text, nullable=False, default=ESTADO_CANDIDATO)
     # Formas superficiales vistas del mismo nombre normalizado (variantes marca/empresa).
     aliases: Mapped[list | None] = mapped_column(JSONB, nullable=True)
@@ -101,6 +109,7 @@ def ensure_entidades_tables(engine) -> None:  # type: ignore[no-untyped-def]
             " pais TEXT,"
             " sector_gics TEXT,"
             " sub_gics TEXT,"
+            " alcance TEXT,"
             " estado TEXT NOT NULL DEFAULT 'candidato',"
             " aliases JSONB DEFAULT '[]'::jsonb,"
             " n_menciones BIGINT,"
@@ -131,6 +140,10 @@ def ensure_entidades_tables(engine) -> None:  # type: ignore[no-untyped-def]
         conn.execute(text(
             f"CREATE INDEX IF NOT EXISTS ix_entidad_sub_gics "
             f"ON {schema}.entidades (sub_gics)"
+        ))
+        # DT-061b: alcance global/local (idempotente) para el anclaje de clase mundial.
+        conn.execute(text(
+            f"ALTER TABLE {schema}.entidades ADD COLUMN IF NOT EXISTS alcance TEXT"
         ))
         conn.execute(text(
             f"CREATE TABLE IF NOT EXISTS {schema}.entidad_atributos ("

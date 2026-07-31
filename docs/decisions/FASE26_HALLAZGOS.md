@@ -74,77 +74,118 @@ determinista y aísla el efecto. KB real (17 260 entidades):
 - **El loop DT-059 seguía sin poder fabricar evidencia**: el fix es aguas arriba (relevancia), no en
   el loop.
 
-### RECOMENDACIONES (siguiente ventana)
-1. **DT-050 — base Colombia (98k):** indexar `FuentesEMIS/EmpresasColombia` (10 xlsx) como tabla
-   relacional `empresas_co` (upsert por NIT, sector→GICS vía `ciiu_gics`) → fuente `verificado` de
-   pares **regionales** (arregla también fichas 2.1.2). Reusa el esquema `sub_gics`; no es reingesta.
-2. **DT-062 — semilla LLM gated:** el LLM propone pares **globales** (`candidato`/`fuente=llm`),
-   citables solo si la búsqueda dirigida los corrobora (RN-001/TIER 4). Recall global sin alucinar.
+### RECOMENDACIONES (siguiente ventana) — reordenadas tras DT-061b
+
+Con el eje `alcance`, cada tier del informe tiene su fuente:
+
+1. **DT-062 (sucesor recomendado) — descubrimiento LLM de competidores globales.** El LLM recomienda
+   actores globales representativos del sector (`candidato`/`fuente=llm`), **corroborados por web
+   dirigida** (Tavily, no corpus EMIS que está sesgado a lo local), sembrados `alcance=global`. Es el
+   **motor principal** del componente de clase mundial (2.1.1); la semilla curada de DT-061b es el
+   cold-start. Mejora recall/representatividad (p. ej. que Nestlé no quede fuera del top-8).
+2. **DT-050 — base Colombia (98k):** `FuentesEMIS/EmpresasColombia` → tabla `empresas_co` (upsert por
+   NIT, sector→GICS vía `ciiu_gics`), fuente `verificado` `alcance=local` del componente **regional**
+   (2.1.2). Reusa el esquema `sub_gics`/`alcance`; no es reingesta.
 3. **DT-060 — reingesta paralela A/B:** mejor extracción (tablas/estructura EMIS) sube el techo de
-   evidencia (fichas 2.1.2/2.1.3, Cap 4 vacíos); paralelizable como se vio en corridas previas.
+   evidencia (fichas, Cap 4 vacíos); paralelizable como se vio en corridas previas.
+
+### DT-061b — eje `alcance` global/local (refinamiento, 2026-07-31, commit `f6ab4d6`)
+
+Decisión del usuario tras revisar el resultado: **este componente es para competidores de CLASE
+MUNDIAL**; los jugadores locales grandes (Colanta, Alquería…) son **otro componente** (2.1.2 /
+DT-050). DT-061 mezclaba ambos bajo `verificado`, así que el anclaje mostraba lácteas locales en vez
+de actores globales. Se separa el eje **alcance** del eje sub-actividad:
+
+- Columna `entidades.alcance` (`global`/`local`; migración idempotente); `filter_rank_competidores`
+  gana **filtro duro por alcance** (la lista de clase mundial no se diluye con locales);
+  `generate_n1._fn_cap2` ancla con `alcance=global`.
+- Semilla re-scopeada: globales (Nestlé, Danone, Lactalis, FrieslandCampina, Fonterra, Arla, Yili,
+  Mengniu, Saputo, Savencia, Grupo Lala, Parmalat, **Nutresa** como frontera global) vs. locales
+  (Colanta, Alquería, Coolechera, Colácteos, Freskaleche, Gloria, Colombina, Team Foods, Casa Luker,
+  Ramo). **Global/local es un juicio de curación** ("¿es referencia mundial?"), no país de sede.
+- **E2E anclaje world-class:** `[Saputo, Savencia, Grupo Lala, Danone, Yili, Mengniu, Parmalat,
+  Nutresa]` — **8/8 globales, 0 locales, 0 ajenos**; el componente local queda aparte. Re-run
+  idempotente. Gate ruff 0, **501 fast tests**.
+- **Refinamiento pendiente (→ DT-062):** el `limit=8` con orden por evidencia deja algunos globales
+  icónicos (Nestlé) fuera del top-8; el motor LLM de DT-062 mejora recall/representatividad.
+- **Corpus sesgado a lo local:** para el componente global la corroboración debe ser vía **web**
+  (Tavily), no vía corpus EMIS (que no menciona a Yili/Fonterra) → clave para DT-062.
 
 ### Verificación
-- `uv run ruff check src/ tests/` → 0. `uv run pytest -m "not slow" -q` → **497 passed**, 2 skipped.
-- Invariante: sin sub-código (sector no resuelto) → anclaje a nivel de grupo, solo ruido excluido.
-- Migración `ADD COLUMN IF NOT EXISTS` + índice, idempotente. Sin tocar vectores, sin `down -v`.
+- `uv run ruff check src/ tests/` → 0. `uv run pytest -m "not slow" -q` → **501 passed**, 2 skipped.
+- Invariante: sin sub-código (sector no resuelto) → anclaje a nivel de grupo, solo ruido excluido;
+  sin `alcance` pedido → no se filtra por alcance (otros componentes intactos).
+- Migración `ADD COLUMN IF NOT EXISTS` (sub_gics, alcance) + índice, idempotente. Sin tocar
+  vectores, sin `down -v`.
 
 ---
 
-## §2 — Prompt de arranque de la siguiente ventana (DT-050 — base Colombia)
+## §2 — Prompt de arranque de la siguiente ventana (DT-062 — descubrimiento LLM de competidores globales)
 
 ```
 ## ROL
 Eres Claude Code, ingeniero del proyecto InformesAuto (~/Test/InformesAuto): informes de
-inteligencia competitiva (RAG local pgvector + Ollama, LangChain, arquitectura por capas). DT-061
-(relevancia y granularidad de competidores) está CERRADO y MERGEADO a develop (rama
-feature/fase26-dt061): sub-código GICS (sub_gics + resolve_sub_gics), filtro de relevancia puro
-(domain/kb/relevance.py: es_ruido_competidor + filter_rank_competidores), curación/siembra
-(scripts/curar_kb_competidores.py + shared/data/pares_sectoriales.py). E2E: anclaje food de Alpina
-0/8 ajenos, 8/8 pares reales. Gate: ruff 0 (src/ tests/), 497 fast tests, 2 skipped.
+inteligencia competitiva (RAG local pgvector + Ollama, LangChain, arquitectura por capas). DT-061 +
+DT-061b (relevancia, granularidad y alcance de competidores) están CERRADOS y MERGEADOS a develop
+(rama feature/fase26-dt061 + feature/fase26-dt061b-alcance): sub-código GICS (sub_gics +
+resolve_sub_gics), filtro de relevancia puro (domain/kb/relevance.py: es_ruido_competidor +
+filter_rank_competidores con sub_gics y alcance), eje alcance global/local (columna alcance), curación/
+siembra (scripts/curar_kb_competidores.py + shared/data/pares_sectoriales.py). E2E: anclaje
+world-class de Alpina 8/8 globales, 0 locales, 0 ajenos. Gate: ruff 0 (src/ tests/), 501 fast tests.
 
-Hoy ejecutas DT-050 — BASE DE EMPRESAS COLOMBIA (fuente verificada regional para el anclaje).
-Rama nueva feature/fase27-dt050 desde develop.
+Hoy ejecutas DT-062 — DESCUBRIMIENTO LLM DE COMPETIDORES GLOBALES (motor principal del componente de
+clase mundial, 2.1.1). Rama nueva feature/fase27-dt062 desde develop.
 
 ## PROBLEMA / OPORTUNIDAD
-La semilla de pares de DT-061 es MÍNIMA y global. Hay ~98k empresas colombianas con sector en
-documentos_sectoriales/FuentesEMIS/EmpresasColombia (10 xlsx). Indexarlas da pares REGIONALES
-verificados (arregla fichas 2.1.2 Regionales) y una base viva que las corridas enriquecen con lo
-hallado en web. NO es reingesta ni embeddings: es una TABLA RELACIONAL en el esquema propio.
+La semilla de globales de DT-061b es un cold-start MÍNIMO y curado a mano; no escala por sector y el
+limit=8 con orden por evidencia deja fuera globales icónicos (Nestlé). El LLM tiene alto recall de
+actores globales famosos (bajo riesgo de alucinar el NOMBRE), y el corpus EMIS está sesgado a lo
+local (no menciona Yili/Fonterra). Idea: el LLM RECOMIENDA actores globales representativos del
+sector → se siembran como candidato/fuente=llm → la búsqueda WEB dirigida (Tavily) los corrobora →
+solo los corroborados se citan (RN-001/TIER 4). El nombre lo aporta el LLM; los atributos, la
+evidencia.
 
 ## RESTRICCIONES (CLAUDE.md TIER 1)
-- Sin nombres de modelo en código. domain/ no importa SQLAlchemy/httpx/Streamlit; librería externa
-  por wrapper en infrastructure/. BD compartida: esquema propio, migración idempotente ensure_*,
-  NUNCA down -v, datos en bind mount. RN-001: verificado (registro) vs candidato (web), provenance.
-- PLAN MODE obligatorio (nueva tabla + mapping sector→GICS + wiring al anclaje → decisiones).
+- Sin nombres de modelo en código (gateway/config, ADR-002). domain/ no importa SQLAlchemy/httpx/
+  Streamlit; librería externa por wrapper en infrastructure/. BD compartida: esquema propio, migración
+  idempotente ensure_*, NUNCA down -v. RN-001: candidato (llm) vs verificado (corroborado); provenance
+  fuente=llm; NUNCA citar un nombre sin corroboración de evidencia.
+- Corroboración vía WEB, no corpus (el corpus es local). PLAN MODE obligatorio (cadena LCEL nueva +
+  gate de corroboración + siembra alcance=global → decisiones de diseño).
 
 ## TAREAS (afinar en Plan Mode)
-T1 — Leer las columnas reales de los xlsx (NIT, nombre, sector CIIU/GICS/texto, ciudad, tamaño).
-  Definir tabla empresas_co en el esquema propio (upsert idempotente por NIT).
-T2 — Mapear sector del Excel → GICS (grupo) y, si es CIIU, → sub-actividad (reusar ciiu_gics.py).
-T3 — Script de indexación (batch, idempotente, --dry-run) de las ~98k. NO embeddings.
-T4 — Cablear empresas_co como fuente verificada del anclaje (list_competidores_by_sector /
-  siembra) por sector+sub_gics+geografía, reusando el filtro de relevancia de DT-061.
-T5 (stretch) — Enriquecimiento: las búsquedas web de la corrida actualizan atributos (candidato).
+T1 — Cadena LCEL chain_02c_pares_globales(sector_gics, sub-actividad) → array JSON de actores
+  globales representativos (patrón chain_02b_entidades: parser puro, cota, dedup). Modelo inyectado.
+T2 — Gate de corroboración: cada candidato del LLM dispara búsqueda web dirigida; si hay evidencia
+  suficiente (umbral existente) → sembrar verificado/alcance=global; si no → queda candidato/fuente=llm
+  (no citable). Reusar el patrón identificar→enriquecer de generate_benchmarking.
+T3 — Cablear como fuente del anclaje world-class (complementa la semilla curada; el LLM lidera el
+  recall, la semilla es fallback/cold-start). Flag para activarlo; invariante OFF = comportamiento
+  DT-061b actual.
+T4 (stretch) — Persistir alcance=global desde el LLM en el KB con provenance, idempotente.
 
 ## PRUEBAS POR TAREA (gate = ruff 0 + pytest -m "not slow")
-- Parsing/mapping puros (sin BD): fixture de filas → EntidadRow/empresas_co con GICS+sub correctos.
-- Idempotencia del upsert por NIT (fake session / re-run = 0 nuevas).
-- Anclaje: dado empresas_co sembrado, pares regionales del sector real; invariante sin sector.
+- Parser puro de la cadena (fixtures; no fabrica, dedup, cota). Sin BD ni modelo real.
+- Gate de corroboración: candidato con evidencia → verificado; sin evidencia → candidato (no citable).
+- Invariante: flag OFF → anclaje = DT-061b (solo semilla curada). Sin romper sub_gics/alcance/ruido.
 
 ## DONE
-1. empresas_co indexada e idempotente. 2. Anclaje usa pares regionales verificados. 3. Gate verde.
-4. 1 commit atómico por tarea. 5. Docs/roadmap/memoria (DT-050). 6. Decidir siguiente (DT-062 LLM
-   gated o DT-060 reingesta).
+1. El componente de clase mundial recibe globales recomendados por LLM y corroborados por web.
+2. Ningún nombre se cita sin evidencia (RN-001/TIER 4). 3. Gate verde. 4. 1 commit atómico por tarea.
+5. Docs/roadmap/memoria (DT-062). 6. Decidir siguiente (DT-050 base Colombia local, o DT-060 reingesta).
 
 ## LECTURAS OBLIGATORIAS
-- docs/decisions/FASE26_HALLAZGOS.md (este cierre) + docs/architecture/PROPUESTA_BASE_EMPRESAS.md.
-- Código: data/repositories/entidad_repo.py (upsert, list_competidores_by_sector, sub_gics),
-  domain/kb/relevance.py, shared/data/pares_sectoriales.py, shared/constants/ciiu_gics.py +
-  gics_groups.py (resolve_sub_gics), scripts/curar_kb_competidores.py (patrón).
-- memory: project_fase26_dt061_estado, project_fase24_dt056_estado, feedback_extract_gics_code.
+- docs/decisions/FASE26_HALLAZGOS.md §1/§1b (este cierre + eje alcance) +
+  docs/architecture/PROPUESTA_KNOWLEDGE_BASE.md §1.4.
+- Código: domain/chains/chain_02b_entidades.py (patrón de cadena+parser), domain/use_cases/
+  generate_benchmarking.py (_identificar_entidades/_buscar_por_entidad), domain/kb/relevance.py
+  (filtro por alcance), data/repositories/entidad_repo.py (upsert alcance, list_competidores_by_sector),
+  shared/data/pares_sectoriales.py (semilla curada), scripts/curar_kb_competidores.py (patrón).
+- memory: project_fase26_dt061_estado, project_fase24_dt056_estado, feedback_modelos_llm.
 
 ## CIERRE DOCUMENTADO
-FASE27_HALLAZGOS.md con AVANCES/RETOS/RECOMENDACIONES + números (nº empresas indexadas, cobertura
-por sector, pares regionales añadidos al anclaje). Sincronizar ROADMAP + PROPUESTA. Merge a develop
---no-ff tras aprobación. Dejar prompt de la siguiente ventana con esta MISMA estructura.
+FASE27_HALLAZGOS.md con AVANCES/RETOS/RECOMENDACIONES + números (nº globales recomendados vs
+corroborados por sector; cobertura del componente world-class). Sincronizar ROADMAP + PROPUESTA §1.4.
+Merge a develop --no-ff tras aprobación. Dejar prompt de la siguiente ventana (DT-050 base Colombia)
+con esta MISMA estructura.
 ```

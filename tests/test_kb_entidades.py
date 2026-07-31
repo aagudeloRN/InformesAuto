@@ -60,6 +60,8 @@ def test_ensure_tablas_idempotente():
     # DT-061: sub_gics añadido idempotente a tablas existentes + índice de anclaje fino.
     assert "ADD COLUMN IF NOT EXISTS sub_gics TEXT" in unido
     assert "ix_entidad_sub_gics" in unido
+    # DT-061b: alcance global/local añadido idempotente.
+    assert "ADD COLUMN IF NOT EXISTS alcance TEXT" in unido
 
 
 # --- Upsert de entidad ---
@@ -172,9 +174,9 @@ def test_add_atributo_idempotente_por_clave_fuente():
 # --- Consulta de anclaje ---
 
 
-def _row(nombre, nombre_norm, sub_gics, estado, n_chunks, n_menciones):
-    """Tupla en el orden del SELECT del repo (nombre, norm, sub_gics, estado, chunks, menc)."""
-    return (nombre, nombre_norm, sub_gics, estado, n_chunks, n_menciones)
+def _row(nombre, nombre_norm, sub_gics, estado, n_chunks, n_menciones, alcance=None):
+    """Tupla en el orden del SELECT del repo (norm, sub_gics, alcance, estado, chunks, menc)."""
+    return (nombre, nombre_norm, sub_gics, alcance, estado, n_chunks, n_menciones)
 
 
 def test_list_competidores_excluye_descartado_y_ordena_por_senal():
@@ -201,6 +203,18 @@ def test_list_competidores_con_sub_gics_restringe_y_excluye_ruido():
     ])
     nombres = EntidadRepository(sess).list_competidores_by_sector("3020", sub_gics="302020")
     assert nombres == ["Colanta"]  # solo el par food verificado; bebidas y medio excluidos
+
+
+def test_list_competidores_alcance_global_excluye_locales():
+    # DT-061b: la sección de clase mundial (alcance=global) deja fuera a los locales grandes.
+    sess = _FakeSession(select_rows=[
+        _row("Nestlé", "nestlé", "302020", ESTADO_VERIFICADO, 3, 3, alcance="global"),
+        _row("Colanta", "colanta", "302020", ESTADO_VERIFICADO, 9, 9, alcance="local"),
+    ])
+    nombres = EntidadRepository(sess).list_competidores_by_sector(
+        "3020", sub_gics="302020", alcance="global"
+    )
+    assert nombres == ["Nestlé"]  # Colanta (local) no entra al componente global
 
 
 def test_list_competidores_sector_vacio_no_consulta():

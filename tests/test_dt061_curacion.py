@@ -59,6 +59,14 @@ def test_semilla_3020_tiene_pares_lacteos_reales():
     assert "Alpina" not in nombres  # la empresa analizada se omite a propósito
 
 
+def test_semilla_alcance_global_vs_local():
+    # DT-061b: los globales son clase mundial; las lácteas locales colombianas van a 'local'.
+    pares = {p["nombre"]: p["alcance"] for p in pares_de_sector("3020")}
+    assert pares["Nestlé"] == "global" and pares["Danone"] == "global"
+    assert pares["Yili"] == "global" and pares["Grupo Nutresa"] == "global"
+    assert pares["Colanta"] == "local" and pares["Alquería"] == "local"
+
+
 def test_semilla_shape_y_sub_gics_valido():
     for sector, pares in PARES_VERIFICADOS.items():
         assert sector.isdigit() and len(sector) == 4
@@ -66,6 +74,7 @@ def test_semilla_shape_y_sub_gics_valido():
         for p in pares:
             assert p["nombre"] and p["nombre_normalizado"]
             assert p["sub_gics"] in _SUBS_VALIDOS
+            assert p["alcance"] in {"global", "local"}
             assert p["nombre_normalizado"] not in vistos  # sin duplicados
             vistos.add(p["nombre_normalizado"])
 
@@ -83,5 +92,5 @@ def test_seed_rows_son_verificados():
 
     filas = _seed_rows("3020")
     assert filas and all(f.estado == ESTADO_VERIFICADO for f in filas)
-    assert all(f.sector_gics == "3020" and f.sub_gics for f in filas)
+    assert all(f.sector_gics == "3020" and f.sub_gics and f.alcance for f in filas)
     assert ESTADO_CANDIDATO != ESTADO_VERIFICADO  # sanity

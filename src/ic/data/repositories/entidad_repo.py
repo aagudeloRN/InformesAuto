@@ -42,6 +42,7 @@ class EntidadRow:
     pais: str | None = None
     sector_gics: str | None = None
     sub_gics: str | None = None
+    alcance: str | None = None
     estado: str = ESTADO_CANDIDATO
     aliases: list[str] = field(default_factory=list)
     n_menciones: int | None = None
@@ -70,6 +71,7 @@ class EntidadRepository:
             "pais": fila.pais,
             "sector_gics": fila.sector_gics,
             "sub_gics": fila.sub_gics,
+            "alcance": fila.alcance,
             "estado": fila.estado,
             "aliases": aliases_json,
             "n_menciones": fila.n_menciones,
@@ -85,17 +87,19 @@ class EntidadRepository:
         )
         sql = text(
             f"INSERT INTO {tabla} (tipo, nombre, nombre_normalizado, nit, ciudad, pais, "
-            " sector_gics, sub_gics, estado, aliases, n_menciones, n_chunks, n_sectores) "
+            " sector_gics, sub_gics, alcance, estado, aliases, n_menciones, n_chunks, n_sectores) "
             "VALUES (:tipo, :nombre, :nombre_normalizado, :nit, :ciudad, :pais, :sector_gics, "
-            " :sub_gics, :estado, CAST(:aliases AS jsonb), :n_menciones, :n_chunks, :n_sectores) "
+            " :sub_gics, :alcance, :estado, CAST(:aliases AS jsonb), :n_menciones, :n_chunks, "
+            " :n_sectores) "
             f"ON CONFLICT {conflicto} DO UPDATE SET "
             "  nombre = EXCLUDED.nombre, "
             "  tipo = EXCLUDED.tipo, "
             "  ciudad = COALESCE(EXCLUDED.ciudad, {t}.ciudad), "
             "  pais = COALESCE(EXCLUDED.pais, {t}.pais), "
             "  sector_gics = COALESCE(EXCLUDED.sector_gics, {t}.sector_gics), "
-            # No degrada: el merge (NULL) conserva el sub_gics; la siembra/curación lo fija.
+            # No degrada: el merge (NULL) conserva sub_gics/alcance; la siembra/curación los fija.
             "  sub_gics = COALESCE(EXCLUDED.sub_gics, {t}.sub_gics), "
+            "  alcance = COALESCE(EXCLUDED.alcance, {t}.alcance), "
             # No degradar: verificado se conserva aunque llegue un candidato.
             "  estado = CASE WHEN {t}.estado = 'verificado' THEN 'verificado' "
             "                ELSE EXCLUDED.estado END, "
@@ -149,20 +153,25 @@ class EntidadRepository:
         self._db.commit()
 
     def list_competidores_by_sector(
-        self, sector_gics: str, sub_gics: str | None = None, limit: int = 8
+        self,
+        sector_gics: str,
+        sub_gics: str | None = None,
+        alcance: str | None = None,
+        limit: int = 8,
     ) -> list[str]:
         """Nombres canónicos de competidores/empresas del sector para anclar (DT-056/DT-061).
 
         Trae los candidatos del grupo (excluye `descartado`, gate RN-001) y **delega** el filtro
         de relevancia y el orden en `filter_rank_competidores` (dominio puro): excluye ruido
-        (medios/métricas) y, si `sub_gics` se resolvió, restringe a la sub-actividad/verificados
-        para dejar fuera la industria ajena. Devuelve la forma display (`nombre`).
+        (medios/métricas), restringe a la sub-actividad/verificados si `sub_gics` se resolvió, y —si
+        `alcance` se pide (p. ej. `global` para la sección de clase mundial)— filtra ese alcance.
+        Devuelve la forma display (`nombre`).
         """
         if not sector_gics:
             return []
         tabla = Entidad.__table__.fullname
         sql = text(
-            f"SELECT nombre, nombre_normalizado, sub_gics, estado, n_chunks, n_menciones "
+            f"SELECT nombre, nombre_normalizado, sub_gics, alcance, estado, n_chunks, n_menciones "
             f"FROM {tabla} "
             "WHERE sector_gics = :sector AND estado <> :descartado "
             "  AND tipo IN ('competidor', 'empresa')"
@@ -175,13 +184,16 @@ class EntidadRepository:
                 nombre=r[0],
                 nombre_normalizado=r[1] or "",
                 sub_gics=r[2],
-                verificado=(r[3] == ESTADO_VERIFICADO),
-                n_chunks=int(r[4] or 0),
-                n_menciones=int(r[5] or 0),
+                alcance=r[3],
+                verificado=(r[4] == ESTADO_VERIFICADO),
+                n_chunks=int(r[5] or 0),
+                n_menciones=int(r[6] or 0),
             )
             for r in rows
         ]
-        return filter_rank_competidores(candidatos, sub_gics=sub_gics, limit=limit)
+        return filter_rank_competidores(
+            candidatos, sub_gics=sub_gics, alcance=alcance, limit=limit
+        )
 
     def descartar_ruido_competidores(self, dry_run: bool = False) -> list[str]:
         """Marca `descartado` el ruido residual del KB (medios/métricas) — curación DT-061/T3.

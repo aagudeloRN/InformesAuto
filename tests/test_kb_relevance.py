@@ -83,6 +83,31 @@ def test_sub_sin_pares_relevantes_cae_al_grupo():
     assert nombres == ["Nutresa", "Alimentos XYZ"]
 
 
+def test_alcance_global_filtra_locales():
+    # DT-061b: componente de clase mundial → solo actores globales; locales y sin-clasificar fuera.
+    rows = [
+        CompetidorRow("Nestlé", "nestlé", "302020", alcance="global", verificado=True,
+                      n_chunks=3, n_menciones=3),
+        CompetidorRow("Danone", "danone", "302020", alcance="global", verificado=True,
+                      n_chunks=2, n_menciones=2),
+        CompetidorRow("Colanta", "colanta", "302020", alcance="local", verificado=True,
+                      n_chunks=9, n_menciones=9),
+        CompetidorRow("Nutresa NER", "nutresa ner", None, alcance=None, verificado=False,
+                      n_chunks=20, n_menciones=20),
+    ]
+    nombres = filter_rank_competidores(rows, sub_gics="302020", alcance="global")
+    assert nombres == ["Nestlé", "Danone"]  # locales y sin-clasificar excluidos
+
+
+def test_sin_alcance_no_filtra_por_alcance():
+    # Invariante: si no se pide alcance, no se filtra por él (otros componentes intactos).
+    rows = [
+        CompetidorRow("Colanta", "colanta", "302020", alcance="local", verificado=True,
+                      n_chunks=5, n_menciones=5),
+    ]
+    assert filter_rank_competidores(rows, sub_gics="302020") == ["Colanta"]
+
+
 def test_respeta_limit():
     rows = [
         CompetidorRow(f"E{i}", f"e{i}", None, verificado=False, n_chunks=i, n_menciones=i)
