@@ -83,6 +83,20 @@ sector, tamaño, geografía, actividad — criterio DT-050 §133) para obtener l
 competidores antes de buscar. Menos alucinación, fichas pre-pobladas, y cada búsqueda dirigida
 por-entidad nutre el KB de vuelta.
 
+> **DT-061 ✅ (F26, 2026-07-31)** — el criterio de **actividad** de §1.4 SÍ se aplica ahora. La
+> causa raíz era anclar por `sector_gics=3020` (industry group Alimentos/Bebidas/Tabaco, demasiado
+> grueso): para una láctea traía bebidas/tabaco. Fix (sin reingesta): (1) **granularidad de
+> sub-sector** vía sub-código GICS de 6 díg (`resolve_sub_gics`, columna `sub_gics`) — solo la
+> empresa analizada y los pares sembrados cargan sub-código; (2) **filtro de relevancia puro**
+> (`domain/kb/relevance.py`) que excluye medios/métricas y restringe a la sub-actividad/verificados
+> (cae la industria ajena); (3) **curación + siembra** (`scripts/curar_kb_competidores.py`): purga
+> el ruido residual y siembra pares reales verificados. E2E Alpina (anclaje food): **antes** 8 con
+> 5 de industria ajena (Postobón/FEMSA/Coca-Cola/Fedepalma/Sports Drinks) → **después** 8/8 pares
+> lácteos/food reales, 0 ajenos; 247 ruido descartado, 18 pares sembrados. Siguen: **DT-050** (base
+> Colombia 98k como fuente verificada regional, mismo esquema `sub_gics`), **DT-062** (semilla LLM
+> gated por corroboración para el tier global), **DT-060** (reingesta paralela A/B, techo de
+> evidencia). Ver `docs/decisions/FASE26_HALLAZGOS.md`.
+
 ## 2. Ingesta RAG enriquecida — batch en la reingesta por sector (DT-057)
 
 La reingesta cuesta ~2 días → se batchea todo lo que **no se backfillea barato**. (Metadata

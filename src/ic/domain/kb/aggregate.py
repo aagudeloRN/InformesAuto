@@ -20,6 +20,8 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
+from ic.domain.kb.relevance import es_ruido_competidor
+
 # Umbral de dispersión: aparecer en ≥ este nº de sectores es señal de publisher/fuente, no de
 # competidor. Verificado en BD: TBRC(19)/OECD(16)/IMF(17)/DANE(20)/Deloitte(16) vs competidores
 # reales concentrados en 1 sector. Configurable desde el script si hiciera falta afinar.
@@ -116,6 +118,9 @@ def _clasificar_signal(
     # Omnipresente cross-sector → publisher.
     if n_sectores >= umbral:
         return SIGNAL_PUBLISHER
+    # Medio o fragmento de métrica OCR (DT-061): "… Industry News", "ProfitMargin" → ruido.
+    if es_ruido_competidor(nombre_normalizado):
+        return SIGNAL_RUIDO
     # Término genérico / geografía (nombre completo) o acrónimo corto → ruido.
     if nombre_normalizado in _GENERIC_NOISE or _ACRONIMO_RE.match(nombre_normalizado):
         return SIGNAL_RUIDO

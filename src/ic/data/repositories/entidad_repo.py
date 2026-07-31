@@ -18,9 +18,15 @@ from sqlalchemy.orm import Session
 from ic.data.models.entidad import (
     ESTADO_CANDIDATO,
     ESTADO_DESCARTADO,
+    ESTADO_VERIFICADO,
     TIPO_COMPETIDOR,
     Entidad,
     EntidadAtributo,
+)
+from ic.domain.kb.relevance import (
+    CompetidorRow,
+    es_ruido_competidor,
+    filter_rank_competidores,
 )
 
 
@@ -35,6 +41,7 @@ class EntidadRow:
     ciudad: str | None = None
     pais: str | None = None
     sector_gics: str | None = None
+    sub_gics: str | None = None
     estado: str = ESTADO_CANDIDATO
     aliases: list[str] = field(default_factory=list)
     n_menciones: int | None = None
@@ -62,6 +69,7 @@ class EntidadRepository:
             "ciudad": fila.ciudad,
             "pais": fila.pais,
             "sector_gics": fila.sector_gics,
+            "sub_gics": fila.sub_gics,
             "estado": fila.estado,
             "aliases": aliases_json,
             "n_menciones": fila.n_menciones,
@@ -77,15 +85,17 @@ class EntidadRepository:
         )
         sql = text(
             f"INSERT INTO {tabla} (tipo, nombre, nombre_normalizado, nit, ciudad, pais, "
-            " sector_gics, estado, aliases, n_menciones, n_chunks, n_sectores) "
+            " sector_gics, sub_gics, estado, aliases, n_menciones, n_chunks, n_sectores) "
             "VALUES (:tipo, :nombre, :nombre_normalizado, :nit, :ciudad, :pais, :sector_gics, "
-            " :estado, CAST(:aliases AS jsonb), :n_menciones, :n_chunks, :n_sectores) "
+            " :sub_gics, :estado, CAST(:aliases AS jsonb), :n_menciones, :n_chunks, :n_sectores) "
             f"ON CONFLICT {conflicto} DO UPDATE SET "
             "  nombre = EXCLUDED.nombre, "
             "  tipo = EXCLUDED.tipo, "
             "  ciudad = COALESCE(EXCLUDED.ciudad, {t}.ciudad), "
             "  pais = COALESCE(EXCLUDED.pais, {t}.pais), "
             "  sector_gics = COALESCE(EXCLUDED.sector_gics, {t}.sector_gics), "
+            # No degrada: el merge (NULL) conserva el sub_gics; la siembra/curación lo fija.
+            "  sub_gics = COALESCE(EXCLUDED.sub_gics, {t}.sub_gics), "
             # No degradar: verificado se conserva aunque llegue un candidato.
             "  estado = CASE WHEN {t}.estado = 'verificado' THEN 'verificado' "
             "                ELSE EXCLUDED.estado END, "
@@ -138,26 +148,75 @@ class EntidadRepository:
         )
         self._db.commit()
 
-    def list_competidores_by_sector(self, sector_gics: str, limit: int = 8) -> list[str]:
-        """Nombres canónicos de competidores/empresas del sector para anclar (T3).
+    def list_competidores_by_sector(
+        self, sector_gics: str, sub_gics: str | None = None, limit: int = 8
+    ) -> list[str]:
+        """Nombres canónicos de competidores/empresas del sector para anclar (DT-056/DT-061).
 
-        Excluye entidades `descartado` (gate RN-001). Ordena por señal (n_chunks desc): las de
-        mayor evidencia sector-específica primero. Devuelve la forma display (`nombre`).
+        Trae los candidatos del grupo (excluye `descartado`, gate RN-001) y **delega** el filtro
+        de relevancia y el orden en `filter_rank_competidores` (dominio puro): excluye ruido
+        (medios/métricas) y, si `sub_gics` se resolvió, restringe a la sub-actividad/verificados
+        para dejar fuera la industria ajena. Devuelve la forma display (`nombre`).
         """
         if not sector_gics:
             return []
         tabla = Entidad.__table__.fullname
         sql = text(
-            f"SELECT nombre FROM {tabla} "
+            f"SELECT nombre, nombre_normalizado, sub_gics, estado, n_chunks, n_menciones "
+            f"FROM {tabla} "
             "WHERE sector_gics = :sector AND estado <> :descartado "
-            "  AND tipo IN ('competidor', 'empresa') "
-            "ORDER BY COALESCE(n_chunks, 0) DESC, COALESCE(n_menciones, 0) DESC "
-            "LIMIT :limit"
+            "  AND tipo IN ('competidor', 'empresa')"
         )
         rows = self._db.execute(
-            sql, {"sector": sector_gics, "descartado": ESTADO_DESCARTADO, "limit": limit}
+            sql, {"sector": sector_gics, "descartado": ESTADO_DESCARTADO}
         ).fetchall()
-        return [r[0] for r in rows]
+        candidatos = [
+            CompetidorRow(
+                nombre=r[0],
+                nombre_normalizado=r[1] or "",
+                sub_gics=r[2],
+                verificado=(r[3] == ESTADO_VERIFICADO),
+                n_chunks=int(r[4] or 0),
+                n_menciones=int(r[5] or 0),
+            )
+            for r in rows
+        ]
+        return filter_rank_competidores(candidatos, sub_gics=sub_gics, limit=limit)
+
+    def descartar_ruido_competidores(self, dry_run: bool = False) -> list[str]:
+        """Marca `descartado` el ruido residual del KB (medios/métricas) — curación DT-061/T3.
+
+        Idempotente (re-run no re-marca: excluye ya-descartados) y **no degrada** `verificado`
+        (guard `estado <> verificado` en el UPDATE, RN-001). El criterio de ruido es el predicado
+        puro `es_ruido_competidor`; devuelve los nombres normalizados marcados (o los que se
+        marcarían en `dry_run`).
+        """
+        tabla = Entidad.__table__.fullname
+        sel = text(
+            f"SELECT id, nombre_normalizado FROM {tabla} "
+            "WHERE estado NOT IN (:descartado, :verificado) "
+            "  AND tipo IN ('competidor', 'empresa')"
+        )
+        rows = self._db.execute(
+            sel, {"descartado": ESTADO_DESCARTADO, "verificado": ESTADO_VERIFICADO}
+        ).fetchall()
+        upd = text(
+            f"UPDATE {tabla} SET estado = :descartado, updated_at = now() "
+            "WHERE id = :id AND estado <> :verificado"
+        )
+        marcados: list[str] = []
+        for id_, norm in rows:
+            if not es_ruido_competidor(norm or ""):
+                continue
+            marcados.append(norm)
+            if not dry_run:
+                self._db.execute(
+                    upd,
+                    {"id": id_, "descartado": ESTADO_DESCARTADO, "verificado": ESTADO_VERIFICADO},
+                )
+        if not dry_run and marcados:
+            self._db.commit()
+        return marcados
 
     def count(self) -> int:
         tabla = Entidad.__table__.fullname
