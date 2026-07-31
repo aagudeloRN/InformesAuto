@@ -115,6 +115,12 @@ class Settings(BaseSettings):
     selfreview_min_total: int = 11  # gate de la rúbrica (>=11/15 y sin dimensión en 0)
     selfreview_max_iter: int = 3    # tope de iteraciones de revisión por capítulo
 
+    # Descubrimiento LLM de competidores globales (DT-062) — el LLM recomienda actores de clase
+    # mundial, corroborados por web dirigida (RN-001), sembrados alcance=global. Flag maestro
+    # default-OFF: apagado = anclaje solo con la semilla curada de DT-061b (invariante).
+    discover_globales_enabled: bool = False
+    discover_globales_min_corrob: int = 2  # nº de fuentes web que deben mencionar el candidato
+
     # NER de entidades (DT-057/T3) — motor y modelos por config, nunca hardcodeados en app-code.
     # Motor pluggable: "spacy" (librería, CPU, sin VRAM) hoy; otros motores se añaden en el wrapper.
     # Corpus EMIS bilingüe (~79% inglés / ~24% español): se elige el modelo por idioma del chunk.
