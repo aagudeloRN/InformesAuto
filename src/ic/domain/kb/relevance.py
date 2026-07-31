@@ -8,8 +8,16 @@ Dos responsabilidades, ambas deterministas y testeables con fixtures:
   ``aggregate`` (publishers/geografías/títulos de informe), que no atrapaba estos casos.
 - ``filter_rank_competidores``: dada la lista cruda del KB para un grupo, excluye ruido y —cuando
   la empresa analizada resolvió un **sub-código** (food/beverage/tobacco)— **restringe** a los
-  pares de esa sub-actividad o ``verificado`` (curados), dejando fuera la industria ajena
-  (bebidas/tabaco) que compartía el industry group 3020. Orden: verificado → match de sub → señal.
+  pares de esa sub-actividad, dejando fuera la industria ajena (bebidas/tabaco) que compartía el
+  industry group 3020. Orden: verificado → match de sub → señal.
+
+  Dos regímenes de restricción por sub (DT-062b):
+  - **Tier de clase mundial** (``alcance`` pedido, p. ej. ``global``): sub-**estricto**, sin puente
+    ``verificado`` y sin fallback a grupo. Los globales se siembran ``verificado`` por sub; un
+    ``verificado`` de OTRA sub (food) no debe colarse en el ancla de tabaco/bebidas. Mejor ancla
+    vacía → el guard de coste dispara el descubrimiento de esa sub.
+  - **Grupo/local** (sin ``alcance``): se conserva el puente ``verificado OR sub`` y el fallback a
+    grupo (invariante DT-061: curados sin sub tag deben mostrarse; nunca se pierde todo el set).
 
 RN-001: solo **excluye/ordena** lo presente; no fabrica nombres ni atributos.
 """
@@ -79,18 +87,26 @@ def filter_rank_competidores(
       alcance: solo actores marcados así entran (los locales y los sin clasificar se dejan para su
       propio componente, DT-050). Filtro duro (no fallback): la lista de clase mundial no debe
       diluirse con jugadores locales.
-    - Si ``sub_gics`` se resolvió y existen pares relevantes (``verificado`` o del mismo
-      ``sub_gics``), **restringe** a ellos → cae la industria ajena. Sin ``sub_gics`` o sin
-      relevantes → conserva el set (invariante), solo con el ruido excluido.
+    - Si ``sub_gics`` se resolvió, **restringe** por sub-actividad → cae la industria ajena. El
+      régimen depende de ``alcance`` (DT-062b):
+      - Con ``alcance`` (tier de clase mundial): sub-**estricto** (``r.sub_gics == sub_gics``), sin
+        puente ``verificado`` ni fallback a grupo. Puede quedar vacío (mejor que sub ajena: el
+        guard dispara el descubrimiento de esa sub).
+      - Sin ``alcance`` (grupo/local): puente ``verificado OR sub`` con fallback a grupo si no hay
+        relevantes (invariante DT-061). Sin ``sub_gics`` → conserva el set, solo sin ruido.
     - Orden: ``verificado`` → match de ``sub_gics`` → evidencia (chunks, menciones).
     """
     limpios = [r for r in rows if not es_ruido_competidor(r.nombre_normalizado)]
     if alcance:
         limpios = [r for r in limpios if r.alcance == alcance]
     if sub_gics:
-        relevantes = [r for r in limpios if r.verificado or r.sub_gics == sub_gics]
-        if relevantes:
-            limpios = relevantes
+        if alcance:
+            # Tier de clase mundial: sub-ESTRICTO (sin puente verificado, sin fallback a grupo).
+            limpios = [r for r in limpios if r.sub_gics == sub_gics]
+        else:
+            relevantes = [r for r in limpios if r.verificado or r.sub_gics == sub_gics]
+            if relevantes:
+                limpios = relevantes
     ordenados = sorted(
         limpios,
         key=lambda r: (

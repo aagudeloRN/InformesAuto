@@ -61,8 +61,13 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     def _descubrir_globales(store, web) -> None:
         """DT-062: siembra globales LLM corroborados por web. Best-effort; nunca rompe la corrida.
 
-        Guard de coste: si el KB ya tiene globales suficientes para el sector, no re-descubre (KB
-        caliente). Corroborado → verificado/alcance=global; si no → candidato/fuente=llm no citable.
+        Guard de coste **por sub-actividad** (DT-062b): la query del guard filtra por ``sub_code`` y
+        —con el filtro sub-estricto del tier global— solo cuenta globales de ESA sub, así el
+        descubrimiento se dispara una vez por sub-actividad (no por grupo): tabaco y bebidas ya no
+        reusan la lista food. Si el KB ya tiene ≥8 globales de la sub, no re-descubre (KB caliente).
+        El tag ``sub_gics=sub_code`` al sembrar es veraz porque el prompt se steerea con la etiqueta
+        de esa sub (T1): el LLM recomienda los globales de la sub-actividad analizada.
+        Corroborado → verificado/alcance=global; si no → candidato/fuente=llm no citable.
         """
         if not g_code:
             return

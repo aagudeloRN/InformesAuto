@@ -99,6 +99,32 @@ def test_alcance_global_filtra_locales():
     assert nombres == ["Nestlé", "Danone"]  # locales y sin-clasificar excluidos
 
 
+def test_alcance_global_sub_estricto_excluye_sub_ajena():
+    # DT-062b: en el tier de clase mundial, un `verificado` de OTRA sub (food) NO debe colarse en
+    # el ancla de tabaco. Sub-estricto sin puente verificado → tabaco con solo globales food = [].
+    rows = [
+        CompetidorRow("Nestlé", "nestlé", "302020", alcance="global", verificado=True,
+                      n_chunks=3, n_menciones=3),
+        CompetidorRow("Danone", "danone", "302020", alcance="global", verificado=True,
+                      n_chunks=2, n_menciones=2),
+    ]
+    # Empresa de tabaco (302030): ninguno de los globales food coincide → ancla vacía.
+    assert filter_rank_competidores(rows, sub_gics="302030", alcance="global") == []
+    # Invariante food: una empresa food/302020 sigue viendo sus globales food.
+    assert filter_rank_competidores(rows, sub_gics="302020", alcance="global") == [
+        "Nestlé", "Danone",
+    ]
+
+
+def test_alcance_global_sub_estricto_no_fallback_a_grupo():
+    # Sin fallback a grupo en el tier global: si no hay match de sub, queda vacío (no "conserva").
+    rows = [
+        CompetidorRow("Nestlé", "nestlé", "302020", alcance="global", verificado=True,
+                      n_chunks=3, n_menciones=3),
+    ]
+    assert filter_rank_competidores(rows, sub_gics="302010", alcance="global") == []
+
+
 def test_sin_alcance_no_filtra_por_alcance():
     # Invariante: si no se pide alcance, no se filtra por él (otros componentes intactos).
     rows = [

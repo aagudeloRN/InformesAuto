@@ -1,20 +1,22 @@
 # Prompt de arranque — DT-050 (base Colombia local + startia)
 
 > Pegar como primer mensaje de una ventana limpia. Misma estructura que el prompt DT-062.
-> **Orden:** esta ventana va DESPUÉS de DT-062b (reuso por sub-actividad,
-> `PROMPT_SIGUIENTE_DT062B.md`). Al arrancar, DT-062 **y** DT-062b deben estar cerrados/mergeados.
+> **Orden:** esta ventana va DESPUÉS de DT-062b (reuso por sub-actividad). DT-062 **y** DT-062b ya
+> están CERRADOS y MERGEADOS a develop (F27 merge `45ba54d`, F28 rama `feature/fase28-dt062b`).
 
 ## ROL
 Eres Claude Code, ingeniero del proyecto InformesAuto (~/Test/InformesAuto): informes de
 inteligencia competitiva (RAG local pgvector + Ollama, LangChain, arquitectura por capas). DT-062
-(descubrimiento LLM de globales corroborado por web) está CERRADO y MERGEADO a develop: el tier de
-clase mundial (2.1.1) ya recibe globales recomendados por LLM y corroborados por web
-(`chain_02c_pares_globales`, `domain/kb/corroboracion.py`, `DiscoverGlobales`, flag
-`discover_globales_enabled`, `scripts/descubrir_globales_llm.py`). Gate: ruff 0 (src/ tests/), 516
+(descubrimiento LLM de globales corroborado por web) y DT-062b (reuso por **sub-actividad**, no por
+grupo) están CERRADOS y MERGEADOS a develop: el tier de clase mundial (2.1.1) recibe globales
+recomendados por LLM y corroborados por web, restringidos a la sub-actividad de la empresa analizada
+(`chain_02c_pares_globales` steereado con `sub_gics_label`, `domain/kb/corroboracion.py`,
+`filter_rank_competidores` sub-estricto en el tier global, `DiscoverGlobales`, flag
+`discover_globales_enabled`, `scripts/descubrir_globales_llm.py`). Gate: ruff 0 (src/ tests/), 522
 fast tests.
 
 Hoy ejecutas DT-050 — BASE COLOMBIA LOCAL + STARTIA (el componente LOCAL, `alcance=local`, tiers
-2.1.2 regional y 2.1.3 startups). Rama nueva `feature/fase28-dt050` desde develop.
+2.1.2 regional y 2.1.3 startups). Rama nueva `feature/fase29-dt050` desde develop.
 
 ## PROBLEMA / OPORTUNIDAD
 Con el eje `alcance`, el tier global ya tiene motor (DT-062). Falta el **local**: hoy los jugadores

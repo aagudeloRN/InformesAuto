@@ -42,6 +42,24 @@ _SUB_GICS_3020_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 
+# Etiqueta legible de cada sub-actividad, para steerear el prompt del LLM (DT-062b): pasarle el
+# código crudo ("302020") no lo orienta; el nombre de la sub-actividad ("bebidas"/"tabaco"/…) sí,
+# así el LLM recomienda los globales de ESA sub y no los del grupo entero.
+SUB_GICS_LABELS: dict[str, str] = {
+    SUB_GICS_302010_BEVERAGES: "bebidas",
+    SUB_GICS_302020_FOOD: "alimentos procesados y lácteos",
+    SUB_GICS_302030_TOBACCO: "tabaco",
+}
+
+
+def sub_gics_label(sub_code: str | None) -> str:
+    """Etiqueta legible de la sub-actividad para el prompt del LLM. Puro (DT-062b).
+
+    ``None`` o sub-código desconocido → ``"general"`` (comportamiento previo: sin steering fino).
+    """
+    return SUB_GICS_LABELS.get(sub_code or "", "general")
+
+
 def resolve_sub_gics(descripcion: str | None, grupo_code: str | None) -> str | None:
     """Resuelve el sub-código GICS (6 dígitos) de la empresa analizada. Puro, sin modelo (ADR-002).
 
