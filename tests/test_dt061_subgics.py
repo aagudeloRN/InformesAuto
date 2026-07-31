@@ -11,6 +11,7 @@ from ic.shared.constants.gics_groups import (
     SUB_GICS_302020_FOOD,
     SUB_GICS_302030_TOBACCO,
     resolve_sub_gics,
+    sub_gics_label,
 )
 
 
@@ -51,3 +52,18 @@ def test_otro_grupo_devuelve_none():
 def test_descripcion_vacia_devuelve_none():
     assert resolve_sub_gics(None, "3020") is None
     assert resolve_sub_gics("", "3020") is None
+
+
+# --- DT-062b: etiqueta legible de sub-actividad para steerear el prompt del LLM ------------------
+
+
+def test_sub_gics_label_mapea_cada_sub():
+    assert sub_gics_label(SUB_GICS_302020_FOOD) == "alimentos procesados y lácteos"
+    assert sub_gics_label(SUB_GICS_302010_BEVERAGES) == "bebidas"
+    assert sub_gics_label(SUB_GICS_302030_TOBACCO) == "tabaco"
+
+
+def test_sub_gics_label_none_o_desconocido_es_general():
+    # None o sub-código sin etiqueta → "general" (comportamiento previo, sin steering fino).
+    assert sub_gics_label(None) == "general"
+    assert sub_gics_label("999999") == "general"

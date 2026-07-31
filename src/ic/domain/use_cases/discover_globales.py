@@ -22,6 +22,7 @@ from ic.domain.chains.chain_02c_pares_globales import parse_pares_globales
 from ic.domain.kb.corroboracion import contar_corroboracion, es_corroborado
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
+from ic.shared.constants.gics_groups import sub_gics_label
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +55,11 @@ class DiscoverGlobales:
         siembra (``verificado``/``alcance=global``). No corroborado: siembra solo como candidato
         (``fuente=llm``, sin ``alcance=global`` → nunca entra al anclaje 2.1.1); no se ingiere.
         """
+        # DT-062b: steerear con la ETIQUETA legible de la sub-actividad (no el código crudo), para
+        # que el recall del LLM sea de ESA sub (food ≠ bebidas ≠ tabaco) y no del grupo entero.
         raw = self._chain.invoke({
             "sector_gics": sector_gics,
-            "sub_actividad": sub_gics or "general",
+            "sub_actividad": sub_gics_label(sub_gics),
         })
         candidatos = parse_pares_globales(raw)
         corroborados = 0
