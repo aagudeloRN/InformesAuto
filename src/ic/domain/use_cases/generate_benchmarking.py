@@ -98,6 +98,8 @@ class GenerateBenchmarking:
         web_connector: WebConnector,
         entidades_chain: Runnable | None = None,
         kb_competidores: list[str] | None = None,
+        kb_locales: list[str] | None = None,
+        jugadores_locales_ctx: str = "",
     ) -> None:
         self._chain = chain
         self._store = store
@@ -109,6 +111,12 @@ class GenerateBenchmarking:
         # [] = comportamiento B1 (solo lo que el LLM ancle en la evidencia). Los nombres del KB
         # provienen de evidencia (candidatos NER consolidados), no se fabrican (RN-001).
         self._kb_competidores = kb_competidores or []
+        # DT-050: jugadores LOCALES del directorio (regionales + startups) para 2.1.2/2.1.3.
+        # `kb_locales` = nombres para la búsqueda dirigida; `jugadores_locales_ctx` = bloque de
+        # contexto estructurado inyectado al prompt. Vacíos → invariante (flag OFF). RN-001: son
+        # datos recuperados del directorio, no fabricados.
+        self._kb_locales = kb_locales or []
+        self._jugadores_locales_ctx = jugadores_locales_ctx or ""
 
     def _identificar_entidades(self, chunks, sector_gics: str) -> list[str]:
         """Entidades competidoras a explotar: KB (canónico) + las ancladas en la evidencia.
@@ -121,10 +129,11 @@ class GenerateBenchmarking:
             "retrieval_competidores": format_chunks_as_context(chunks),
         })
         del_llm = parse_entidades(raw)
-        # Fusión priorizando el KB, sin duplicar (casefold), respetando la cota.
+        # Fusión priorizando el KB (global + locales del directorio), sin duplicar (casefold),
+        # respetando la cota. Los locales entran a la búsqueda dirigida para poblar 2.1.2/2.1.3.
         fusionadas: list[str] = []
         vistos: set[str] = set()
-        for nombre in [*self._kb_competidores, *del_llm]:
+        for nombre in [*self._kb_competidores, *self._kb_locales, *del_llm]:
             clave = nombre.casefold()
             if clave in vistos:
                 continue
@@ -210,6 +219,7 @@ class GenerateBenchmarking:
             "descripcion_empresa": descripcion_empresa,
             "sector_gics": sector_gics,
             "retrieval_competidores": context,
+            "jugadores_locales": self._jugadores_locales_ctx,
         })
 
         if has_cjk_characters(texto_raw):
