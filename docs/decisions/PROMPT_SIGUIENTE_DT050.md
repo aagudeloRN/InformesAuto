@@ -1,6 +1,8 @@
 # Prompt de arranque — DT-050 (base Colombia local + startia)
 
 > Pegar como primer mensaje de una ventana limpia. Misma estructura que el prompt DT-062.
+> **Orden:** esta ventana va DESPUÉS de DT-062b (reuso por sub-actividad,
+> `PROMPT_SIGUIENTE_DT062B.md`). Al arrancar, DT-062 **y** DT-062b deben estar cerrados/mergeados.
 
 ## ROL
 Eres Claude Code, ingeniero del proyecto InformesAuto (~/Test/InformesAuto): informes de
