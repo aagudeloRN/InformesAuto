@@ -25,6 +25,20 @@ class TestGateCorroboracion:
     def test_sin_menciones(self):
         assert contar_corroboracion("Fonterra", ["Danone y Nestlé"]) == 0
 
+    def test_sufijos_societarios_no_dan_falso_negativo(self):
+        # Regresión (E2E 3020): el LLM emite "JBS S.A." / "Tyson Foods, Inc."; la web dice "JBS" /
+        # "Tyson Foods". Se matchea el núcleo, no la forma legal literal.
+        assert contar_corroboracion("JBS S.A.", [
+            "JBS is the world's largest meat company", "Report on JBS 2025",
+        ]) == 2
+        assert contar_corroboracion("Tyson Foods, Inc.", [
+            "Tyson Foods reported revenue", "perfil de tyson foods",
+        ]) == 2
+
+    def test_match_por_limite_de_palabra(self):
+        # "jbs" no debe casar dentro de otra palabra ("jbservice").
+        assert contar_corroboracion("JBS S.A.", ["jbservice unrelated"]) == 0
+
     def test_umbral(self):
         assert es_corroborado(2, 2) is True
         assert es_corroborado(3, 2) is True
