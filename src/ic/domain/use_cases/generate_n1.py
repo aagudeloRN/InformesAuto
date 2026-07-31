@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def run_n1_parallel(ctx: _PipelineContext) -> None:
     """Ejecuta Caps 2/3/4 en paralelo + párrafos introductivos N1."""
     from ic.data.database import SessionLocal
-    from ic.data.models.entidad import ensure_entidades_tables
+    from ic.data.models.entidad import ALCANCE_GLOBAL, ensure_entidades_tables
     from ic.data.repositories.embedding_repo import EmbeddingRepository
     from ic.data.repositories.entidad_repo import EntidadRepository
     from ic.domain.chains.chain_02b_entidades import build_chain_entidades
@@ -65,12 +65,14 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         # competidor (enriquece las fichas de 2.1 más allá de las queries a nivel sector).
         # DT-056/T3: anclar con la lista canónica del KB por sector (cierra causas A/E). Sesión
         # propia por thread; [] → comportamiento B1 (SQLAlchemy Session no es thread-safe).
+        # DT-061b: la lista anclada es la de competidores de CLASE MUNDIAL → filtra alcance=global
+        # (los jugadores locales grandes son otro componente, DT-050).
         kb_competidores: list[str] = []
         try:
             with SessionLocal() as db_kb:
                 ensure_entidades_tables(db_kb.get_bind())
                 kb_competidores = EntidadRepository(db_kb).list_competidores_by_sector(
-                    g_code or "", sub_gics=sub_code
+                    g_code or "", sub_gics=sub_code, alcance=ALCANCE_GLOBAL
                 )
         except Exception:  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
             logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)

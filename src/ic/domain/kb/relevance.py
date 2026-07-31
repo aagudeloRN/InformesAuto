@@ -60,24 +60,33 @@ class CompetidorRow:
     nombre: str
     nombre_normalizado: str
     sub_gics: str | None = None
+    alcance: str | None = None
     verificado: bool = False
     n_chunks: int = 0
     n_menciones: int = 0
 
 
 def filter_rank_competidores(
-    rows: list[CompetidorRow], sub_gics: str | None = None, limit: int = 8
+    rows: list[CompetidorRow],
+    sub_gics: str | None = None,
+    alcance: str | None = None,
+    limit: int = 8,
 ) -> list[str]:
-    """Excluye ruido, restringe por sub-actividad (si aplica) y ordena por relevancia. Puro.
+    """Excluye ruido, restringe por sub-actividad/alcance (si aplica) y ordena. Puro.
 
     - Siempre excluye medios/métricas (``es_ruido_competidor``).
+    - Si ``alcance`` se pide (p. ej. ``global`` para la sección de clase mundial), **filtra** a ese
+      alcance: solo actores marcados así entran (los locales y los sin clasificar se dejan para su
+      propio componente, DT-050). Filtro duro (no fallback): la lista de clase mundial no debe
+      diluirse con jugadores locales.
     - Si ``sub_gics`` se resolvió y existen pares relevantes (``verificado`` o del mismo
-      ``sub_gics``), **restringe** a ellos → cae la industria ajena (candidatos NER del grupo con
-      ``sub_gics`` desconocido). Sin ``sub_gics`` o sin relevantes → conserva el set del grupo
-      (invariante), solo con el ruido excluido.
-    - Orden: ``verificado`` primero → match de ``sub_gics`` → evidencia (chunks, menciones).
+      ``sub_gics``), **restringe** a ellos → cae la industria ajena. Sin ``sub_gics`` o sin
+      relevantes → conserva el set (invariante), solo con el ruido excluido.
+    - Orden: ``verificado`` → match de ``sub_gics`` → evidencia (chunks, menciones).
     """
     limpios = [r for r in rows if not es_ruido_competidor(r.nombre_normalizado)]
+    if alcance:
+        limpios = [r for r in limpios if r.alcance == alcance]
     if sub_gics:
         relevantes = [r for r in limpios if r.verificado or r.sub_gics == sub_gics]
         if relevantes:

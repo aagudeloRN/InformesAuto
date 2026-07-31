@@ -52,6 +52,7 @@ def _seed_rows(sector: str) -> list[EntidadRow]:
             tipo=TIPO_COMPETIDOR,
             sector_gics=sector,
             sub_gics=p["sub_gics"],
+            alcance=p["alcance"],
             estado=ESTADO_VERIFICADO,
         )
         for p in pares_de_sector(sector)
@@ -83,7 +84,8 @@ def main() -> int:
             logger.info("Sector %s: %d pares verificados a sembrar", sector, len(filas))
             if args.dry_run:
                 for f in filas:
-                    logger.info("  seed %-24s sub_gics=%s", f.nombre, f.sub_gics)
+                    logger.info("  seed %-24s sub_gics=%s alcance=%s",
+                                f.nombre, f.sub_gics, f.alcance)
                 continue
             for f in filas:
                 eid = repo.upsert_entidad(f)
