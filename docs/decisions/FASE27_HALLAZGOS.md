@@ -66,12 +66,22 @@ contiene → **falso negativo** (JBS, global obvio, quedó `hits=0` y fuera del 
 artículo inicial ni sufijos societarios) con límite de palabra. 3 tests de regresión. Es la razón por
 la que se decidió **sembrar de verdad** en el cierre (el dry-run ocultaba el bug por azar del LLM).
 
-**Persistencia + reuso verificados (post-fix):** el KB quedó con **26 globales verificados** para 3020
-(14 curados DT-061b + 12 LLM, menos solapes). La consulta del ancla —lo que un informe futuro lee
-**sin re-descubrir** (query pura a BD)— devuelve top-8 mezclando LLM (PepsiCo, Danone, Kraft Heinz,
-Heineken, Tyson) + semilla curada (Saputo, Savencia, Grupo Lala): el motor LLM y el cold-start
-coexisten. **Nestlé** (fuera del top-8 en DT-061b) ahora corrobora y entra. **Cobertura del componente
-world-class:** de cold-start manual mono-sector a motor de recall general, persistido y reusable.
+**Persistencia + reuso verificados (post-fix):** la siembra real dejó **26 globales verificados** para
+3020 (14 curados DT-061b + 12 LLM, menos solapes); la consulta del ancla —lo que un informe futuro lee
+**sin re-descubrir** (query pura a BD)— devolvió top-8 mezclando LLM (PepsiCo, Danone, Kraft Heinz,
+Heineken, Tyson) + semilla curada: el motor LLM y el cold-start coexisten y persisten. **Nestlé**
+(fuera del top-8 en DT-061b) corrobora y entra.
+
+**Limitación detectada → DT-062b (deuda abierta).** El reuso es hoy **por grupo (3020), no por
+sub-actividad**: se sembró todo con el `sub_gics` de la empresa analizada (302020) y en
+`filter_rank_competidores` un `verificado` **puentea** el filtro de sub → una empresa de **tabaco**
+(302030) vería globales de lácteos/bebidas. Verificado empíricamente (food/beverage/tobacco devuelven
+la misma lista). **Los 26 globales del LLM se purgaron tras la verificación** (KB de vuelta al baseline
+DT-061b: 13 curados, 0 provenance `llm`) para que DT-062b re-siembre **por sub-actividad correcta**.
+Fix DT-062b (Plan Mode, toca regla cerrada de DT-061): (1) steerear el prompt con etiqueta legible de
+sub-actividad; (2) etiquetar con el sub real; (3) filtro sub-estricto para el tier global (sin puente
+`verificado` cuando hay sub resuelta); (4) guard por sub. **Cobertura world-class:** de cold-start
+manual a motor de recall general — pendiente que sea por sub-sector, no por grupo.
 
 ### Persistencia y reuso entre corridas (diseño)
 
@@ -91,7 +101,8 @@ reusarlo en informes futuros del mismo sector; la **evidencia** sigue la políti
   nombres del KB lideran esa búsqueda, DT-056). *Posible mejora futura:* exceptuar de la purga la
   evidencia de corroboración de un global verificado (hoy fuera de alcance).
 - **`--dry-run` NO persiste** (usa un store inerte y omite el upsert): sirve para medir
-  recomendados/corroborados sin escribir. La siembra real del cierre (arriba) sí persistió 3020.
+  recomendados/corroborados sin escribir. La siembra real del cierre persistió 3020 y luego se
+  **purgó** (era verificación; el reuso correcto por sub-actividad llega con DT-062b).
 
 ### RETOS / lecciones
 - **El sub-código numérico no steerea el prompt.** Se pasó `sub_actividad="302020"` como código
@@ -108,7 +119,11 @@ reusarlo en informes futuros del mismo sector; la **evidencia** sigue la políti
   `data→domain` para el gate puro (como en DT-061). El upsert existente no degrada `verificado`.
 
 ### RECOMENDACIONES (siguiente ventana)
-1. **DT-050 (sucesor recomendado) — base Colombia local + startia.** Componente LOCAL
+0. **DT-062b (sucesor inmediato) — reuso por sub-actividad, no por grupo.** Ver "Limitación detectada"
+   arriba: steerear el prompt por etiqueta de sub-actividad, etiquetar con el sub real, filtro
+   sub-estricto para el tier global (Plan Mode: toca la regla `verificado`-puentea-sub de DT-061) y
+   guard por sub. Sin esto, tabaco/bebidas verían lácteos.
+1. **DT-050 — base Colombia local + startia.** Componente LOCAL
    (`alcance=local`): `EmpresasColombia` (~98k, upsert por NIT) + `startia_clean.xlsx` (388 startups
    Medellín, `segmento=startup`, sector vía crosswalk). Alimenta 2.1.2 (regional) y 2.1.3 (startups).
    Ver memory `project_dt050_fuentes_decisiones`.
