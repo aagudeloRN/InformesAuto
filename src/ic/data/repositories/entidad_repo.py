@@ -124,6 +124,34 @@ class EntidadRepository:
         self._db.commit()
         return int(entidad_id)
 
+    def get_id_by_nombre_sector(
+        self, nombre_normalizado: str, sector_gics: str | None
+    ) -> int | None:
+        """Id de una entidad ya consolidada por nombre normalizado (+sector). None si no existe.
+
+        Solo LOOKUP (DT-064/T3): las fichas se persisten únicamente sobre entidades **ya ancladas**
+        (globales/locales del KB); no se crea nada aquí. Si hay sector se restringe a él (evita
+        casar un homónimo de otro grupo); si no, casa por nombre. Prefiere no-descartado/verificado.
+        """
+        if not nombre_normalizado:
+            return None
+        tabla = Entidad.__table__.fullname
+        cond_sector = " AND sector_gics = :sector" if sector_gics else ""
+        sql = text(
+            f"SELECT id FROM {tabla} "
+            "WHERE nombre_normalizado = :norm AND estado <> :descartado" + cond_sector + " "
+            "ORDER BY (estado = :verificado) DESC, id ASC LIMIT 1"
+        )
+        params = {
+            "norm": nombre_normalizado,
+            "descartado": ESTADO_DESCARTADO,
+            "verificado": ESTADO_VERIFICADO,
+        }
+        if sector_gics:
+            params["sector"] = sector_gics
+        row = self._db.execute(sql, params).fetchone()
+        return int(row[0]) if row else None
+
     def add_atributo(
         self,
         entidad_id: int,

@@ -24,6 +24,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         ESTADO_CANDIDATO,
         ESTADO_VERIFICADO,
         FUENTE_LLM,
+        FUENTE_WEB,
         SEGMENTO_STARTUP,
         TIPO_COMPETIDOR,
         ensure_entidades_tables,
@@ -37,6 +38,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.domain.chains.chain_04_tendencias import build_chain_04
     from ic.domain.chains.chain_05_ecosistema import build_chain_05
     from ic.domain.chains.chain_judge import CRITERIOS_CAPITULO
+    from ic.domain.kb.ficha_parser import parse_fichas_competidores
     from ic.domain.kb.relevance import format_jugadores_locales
     from ic.domain.use_cases.discover_globales import DiscoverGlobales
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
@@ -125,6 +127,36 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             )
             return fn(store, cached_web, cached_oal)
 
+    def _persistir_fichas_ancladas(cap, kb_competidores, kb_locales) -> None:
+        """DT-064/T3: persiste los campos de ficha de los competidores ANCLADOS (reuso sectorial).
+
+        Solo entidades ya ancladas (globales + locales del KB) → no persiste competidores del RAG.
+        Idempotente (add_atributo por entidad+clave+fuente); best-effort: nunca rompe la corrida.
+        """
+        if cap is None or not getattr(cap, "texto", ""):
+            return
+        anclados = {normalize_entity(n) for n in (*kb_competidores, *kb_locales)}
+        if not anclados:
+            return
+        try:
+            fichas = [
+                f for f in parse_fichas_competidores(cap.texto)
+                if normalize_entity(f.nombre) in anclados
+            ]
+            if not fichas:
+                return
+            with SessionLocal() as db_p:
+                ensure_entidades_tables(db_p.get_bind())
+                repo_p = EntidadRepository(db_p)
+                for f in fichas:
+                    ent_id = repo_p.get_id_by_nombre_sector(normalize_entity(f.nombre), g_code)
+                    if ent_id is None:
+                        continue
+                    for clave, valor in f.campos.items():
+                        repo_p.add_atributo(ent_id, clave, valor, FUENTE_WEB)
+        except Exception:  # noqa: BLE001 — la persistencia de fichas es un boost; nunca rompe.
+            logger.warning("No se pudieron persistir las fichas del Cap 2", exc_info=True)
+
     def _fn_cap2(store, web, _oal):
         # T22.4 (DT-054): cadena de identificación de entidades para búsqueda dirigida por
         # competidor (enriquece las fichas de 2.1 más allá de las queries a nivel sector).
@@ -171,7 +203,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,
         )
         # DT-059/T3: auto-revisión sabor web (re-busca por faltantes + KB). Flag OFF = no-op.
-        return review_web_cap(
+        cap = review_web_cap(
             settings=s, llm=ctx.api_llm or ctx.llm,
             capitulo_nombre="Cap 2 — Análisis Competitivo",
             criterios=CRITERIOS_CAPITULO["Cap 2 — Análisis Competitivo"],
@@ -182,6 +214,9 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             # DT-064/T2: reinyecta los sujetos anclados (globales + locales) al rescatar el Cap 2.
             jugadores_locales_ctx=jugadores_locales_ctx,
         )
+        # DT-064/T3: extrae y persiste los campos de ficha de los competidores anclados (reuso).
+        _persistir_fichas_ancladas(cap, kb_competidores, kb_locales)
+        return cap
 
     def _fn_mercado(store, web, _oal):
         if ctx.api_llm is None:
