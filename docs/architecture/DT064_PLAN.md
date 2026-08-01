@@ -25,6 +25,30 @@
 Que las fichas de 2.1.1/2.1.2/2.1.3 sean sobre las empresas **ancladas** (correctas), con **datos**
 reales cuando existan, **persistidos** para reuso, y con la **redacción estable** (anti-negativas).
 
+## Activo nuevo: 5 informes manuales (verdad de terreno) — `docs/ReportesHumanos/` (NO trackeado)
+
+`InformeSectoryCompetitivo{Alsec, Andercol, Emtelco, Guane, Noel}.docx`. **Usan EXACTAMENTE la misma
+estructura** que genera el sistema (2.1 Jugadores Clave, 2.2 División, 2.3 Mercado, 2.4 Módulos, 2.5
+Brechas, 3.x Tendencial, 4.x Ecosistema) → comparación 1:1. Las fichas de competidor están en tablas.
+Cobertura: **alimentos** (Alsec, Noel) + **no-alimentos** (Andercol químicos ~1510, Emtelco BPO/telecom
+~2020/5010, Guane software ~4510) → resuelve el anti-sesgo con ground truth real.
+
+Son **la especificación de las fichas** (qué campos, cómo elige globales/regionales/startups, profundidad,
+tono) + semilla de KB (competidores y datos reales por sector) + set de evaluación. Proprietarios: NO
+commitear (en `.gitignore`).
+
+## Secuencia acordada (interleave — usuario 2026-08-01)
+
+1. **Comparación ligera YA (spec de fichas):** leer las fichas 2.1 de 2 informes (1 food = Noel, 1
+   no-food = Emtelco o Andercol) → extraer el **esquema de ficha del humano** (campos, criterio de
+   globales/regionales/startups, profundidad). ~1–2 h de lectura dirigida, no una fase.
+2. **DT-064 T1/T2** (anclar los sujetos en benchmarking + self-review) — fix estructural, no depende de
+   los informes; mata Bavaria/BAT. Se puede hacer primero/en paralelo.
+3. **DT-064 T3/T4/T5** ya con el esquema humano → fichas con los campos correctos + persistencia + pre-fill
+   + anti-negativas.
+4. Después: **sembrar el KB** con competidores/datos de los 5 informes + armar el **set de evaluación**
+   (regresión medible) y el **gap analysis** completo (calibra la rúbrica v1.0 contra criterio humano).
+
 ## Tareas propuestas (afinar en Plan Mode)
 
 - **T1 — Anclar los SUJETOS de las fichas (no solo enriquecer RAG).** Pasar al prompt de benchmarking
@@ -92,11 +116,24 @@ EMIS↔NER + HITL, y migrar el path global al JOIN `entidad_sectores`).
 > el anclaje** y la síntesis escribe las fichas desde el RAG contaminado → en el .docx salen Bavaria
 > (cerveza) y British American Tobacco (tabaco) en 2.1.1.
 >
-> HOY EJECUTAS **DT-064** (Plan Mode obligatorio): fichas de competidores **ancladas** (los sujetos de
-> 2.1.1/2.1.2/2.1.3 son la lista anclada, no lo que surge del RAG) + **enriquecidas y persistidas**
-> (extraer país/ingresos/portafolio/cuota → `entidad_atributos`, reuso sectorial + pre-fill del prompt)
-> + **anti-variabilidad** (detector de negativas → retry/escala; self-review anclaje-aware). Tareas
-> T1–T5 en `DT064_PLAN.md`.
+> NUEVO ACTIVO: 5 informes manuales del cliente en `docs/ReportesHumanos/` (NO trackeados, `.gitignore`)
+> — MISMA estructura que genera el sistema (comparación 1:1). Cobertura: alimentos (Alsec, Noel) +
+> no-alimentos (Andercol químicos, Emtelco BPO/telecom, Guane software). Son la **especificación de las
+> fichas** + semilla de KB + set de evaluación.
+>
+> SECUENCIA ACORDADA (interleave):
+> 1. **Comparación ligera PRIMERO**: extraer las fichas 2.1 de Noel (food) + Emtelco o Andercol
+>    (no-food) → derivar el ESQUEMA de ficha del humano (campos, criterio globales/regionales/startups,
+>    profundidad). Es el spec de las tareas T3/T4. (~lectura dirigida, no una fase.)
+> 2. **DT-064 T1/T2** (Plan Mode): anclar los SUJETOS de las fichas (globales `kb_competidores`
+>    obligatorios en `chain_03_benchmarking`; RAG solo llena campos) + self-review anclaje-aware
+>    (`review_web_cap` reinyecta los sujetos). Fix estructural, mata Bavaria/BAT; no depende de los
+>    informes.
+> 3. **DT-064 T3/T4/T5** ya con el esquema humano: extraer + PERSISTIR datos de ficha por competidor
+>    (`entidad_atributos`, patrón DT-056) → reuso sectorial + pre-fill del prompt (menos negativas) +
+>    detector de negativas/ausencia (puro, como `has_cjk_characters`) → retry/escala.
+> 4. Después: sembrar el KB con competidores/datos de los 5 informes + set de evaluación + gap analysis
+>    (calibra la rúbrica v1.0). Ver `DT064_PLAN.md` (tareas T1–T5 detalladas).
 >
 > RESTRICCIONES (CLAUDE.md TIER 1): sin nombres de modelo en código; wrappers en `infrastructure/`;
 > migraciones idempotentes `ensure_*`, nunca `down -v`; provenance + candidato/verificado (RN-001);

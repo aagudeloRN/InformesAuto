@@ -24,3 +24,5 @@ documentos_sectoriales/*.pdf
 !documentos_sectoriales/indice.csv
 # Metadatos "alternate data stream" de Windows (basura, nunca versionar)
 *:Zone.Identifier
+# Informes manuales del cliente (verdad de terreno para gap analysis/eval; proprietarios, local)
+docs/ReportesHumanos/
