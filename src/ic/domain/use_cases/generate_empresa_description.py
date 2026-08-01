@@ -2,6 +2,7 @@ from langchain_core.runnables import Runnable
 
 from ic.domain.absent_data import build_absent_paragraph
 from ic.infrastructure.sources.web_connector import WebConnector
+from ic.shared.text_productos import extract_productos_servicios
 from ic.shared.text_utils import format_web_results_as_context, has_cjk_characters
 from ic.shared.types import DescripcionEmpresa
 
@@ -55,4 +56,9 @@ class GenerateEmpresaDescription:
                 ),
             )
 
-        return DescripcionEmpresa(nombre_empresa=nombre_empresa, actividad_ciiu=ciiu, texto=texto)
+        return DescripcionEmpresa(
+            nombre_empresa=nombre_empresa,
+            actividad_ciiu=ciiu,
+            texto=texto,
+            productos_servicios=extract_productos_servicios(texto),
+        )

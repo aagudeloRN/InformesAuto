@@ -25,6 +25,10 @@ class DescripcionEmpresa:
     nombre_empresa: str
     actividad_ciiu: str | None
     texto: str
+    # DT-063: bloque "## Productos y servicios" extraído de la descripción (Cap 1). Señal de
+    # precisión que guía el descubrimiento de competidores (steer del prompt global + re-rank de
+    # locales por solape de actividad), en vez del sub-código GICS. "" → fallback a nivel grupo.
+    productos_servicios: str = ""
 
 
 @dataclass
