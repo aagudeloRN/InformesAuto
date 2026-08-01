@@ -70,6 +70,39 @@ competidores correctos SÍ se identificaron y anclaron.
 **Pendiente:** confirmar disjunción con una cervecera y una tabacalera (globales de cerveza / tabaco
 respectivamente); y atacar la fiabilidad de redacción de fichas (DT-049 / evidencia).
 
+## Quick-win (NurtureKB) — CERRADO
+
+Aprovechar la descripción de Cap 1 (ya pagada) de la empresa analizada:
+- **NurtureKB** guarda ahora `alcance=local` + atributo `productos_perfil` de la empresa analizada
+  (`feat(dt063): NurtureKB…`). `list_locales_by_sector` incluye `productos_perfil` en el descriptor
+  del re-rank. **Verificado en vivo:** Alpina quedó en el KB (`alcance=local`, `verificado`, 3020) con
+  `descripcion` + `productos_perfil` → se reusará como competidor regional rankeado por solape cuando
+  se analice otra láctea (idea del usuario, ciclo cerrado). 550 fast tests.
+
+## Hallazgo del E2E con self-review (semilla de DT-064)
+
+E2E con `selfreview_enabled=true`: **el self-review rescata capítulos** (Cap 2 **6→11**, Cap 5 9→14,
+Cap 6 10→15; Cap 4 4→4 sin mejora por evidencia delgada). Las 7 tablas de fichas se renderizaron.
+
+**Pero el contenido de las fichas es incorrecto** — al inspeccionar el .docx:
+- 2.1.1 Globales: **Bavaria (cerveza), British American Tobacco (tabaco)** ❌
+- 2.1.2 Regionales: Brinsa (sal), Gaseosas de Córdoba — colombianas pero no lácteas
+- 2.1.3 Startups: EATCLOUD, AGROFERTAS
+
+**El conjunto anclado era correcto (Danone/Kellogg's/Fonterra… lácteos), pero las fichas NO lo usan.**
+Dos causas de raíz (→ DT-064):
+1. **La síntesis escribe las fichas desde el RAG**, no desde la lista anclada. El RAG contiene
+   cerveza/tabaco (las queries genéricas de sector "Alimentos, bebidas y tabaco líderes globales" lo
+   traen). El anclaje DT-063 guía la *identificación de entidades* + *búsqueda dirigida*, pero el
+   prompt final elige nombres del RAG contaminado.
+2. **El self-review re-sintetiza SIN el anclaje**: `review_web_cap` regenera con su propio prompt y
+   **no recibe** `kb_competidores`/`jugadores_locales` → al rescatar (6→11) reescribió desde RAG →
+   volvieron Bavaria/BAT.
+
+Fix = **DT-064** (`docs/architecture/DT064_PLAN.md`): inyectar la lista anclada como **sujetos
+explícitos** de las fichas en benchmarking **y** en el self-review; **persistir** los datos de ficha
+por competidor (reuso + menos variabilidad); detector de negativas.
+
 ## Sucesores
 
 - Si el solape de keywords se queda corto (actividad CIIU coarsa) → **embeddings pgvector**
