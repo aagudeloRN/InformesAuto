@@ -35,6 +35,8 @@ USER_PROMPT_REVISE = (
     "BORRADOR ACTUAL:\n{borrador_actual}\n\n"
     "CARENCIAS A CORREGIR:\n{faltantes}\n\n"
     "EVIDENCIA DISPONIBLE (única fuente permitida):\n{evidencia}\n\n"
+    "ANCLA DE SUJETOS (si aparece un bloque abajo, respétalo: esos son los actores obligatorios de "
+    "las fichas; no los sustituyas por otros de la evidencia):\n{sujetos_anclados}\n\n"
     "Reescribe el capítulo '{capitulo_nombre}' corrigiendo las carencias, anclado en la evidencia."
 )
 

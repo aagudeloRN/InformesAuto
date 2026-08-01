@@ -25,6 +25,7 @@ from ic.domain.chains.chain_judge import build_chain_judge
 from ic.domain.chains.chain_revise import build_chain_revise
 from ic.domain.eval.rubric_score import RubricScore, parse_rubric_score
 from ic.domain.eval.self_review import RevisionTrace, run_self_review
+from ic.domain.kb.relevance import format_referentes_globales
 
 logger = logging.getLogger(__name__)
 
@@ -130,10 +131,20 @@ def review_web_cap(
     empresa_id=None,
     retrieval_query: str,
     kb_competidores: list[str] | None = None,
+    jugadores_locales_ctx: str = "",
 ):
-    """Sabor web (Caps 2/3/4): re-busca por faltantes + KB, re-recupera, re-sintetiza."""
+    """Sabor web (Caps 2/3/4): re-busca por faltantes + KB, re-recupera, re-sintetiza.
+
+    DT-064/T2: el rescate del Cap 2 reinyecta los sujetos anclados (globales del KB + locales del
+    directorio) en la re-síntesis, para que no revierta a las fichas del RAG contaminado. Cap 3/4
+    llaman sin `kb_competidores`/`jugadores_locales_ctx` → bloque vacío → invariante.
+    """
     revise_chain = build_chain_revise(llm)
     kb = list(kb_competidores or [])
+    # Sujetos obligatorios de las fichas: globales anclados + locales del directorio. "" = no-op.
+    sujetos_anclados = "\n\n".join(
+        b for b in (format_referentes_globales(kb), jugadores_locales_ctx) if b
+    )
 
     def revise_fn(cap, faltantes: list[str]):
         # Reflexion con herramientas: cada carencia del juez dispara una búsqueda dirigida.
@@ -154,6 +165,7 @@ def review_web_cap(
             "borrador_actual": getattr(cap, "texto", ""),
             "faltantes": _format_faltantes(faltantes),
             "evidencia": format_chunks_as_context(chunks),
+            "sujetos_anclados": sujetos_anclados,
         })
         return replace(cap, texto=nuevo_texto, chunks_usados=chunks, n_chunks_usados=len(chunks))
 
@@ -184,6 +196,7 @@ def review_integration_cap(
             "borrador_actual": getattr(cap, "texto", ""),
             "faltantes": _format_faltantes(faltantes),
             "evidencia": format_chunks_as_context(chunks),
+            "sujetos_anclados": "",  # Caps 5/6 no anclan fichas de competidor (invariante).
         })
         return replace(cap, texto=nuevo_texto)  # sin nuevo retrieval (solo re-síntesis)
 

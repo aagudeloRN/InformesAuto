@@ -179,6 +179,8 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             sector_gics=g, sector_gics_code=g_code, empresa_id=ctx.empresa_id,
             retrieval_query=f"{g} competitors benchmarking {e}",
             kb_competidores=kb_competidores,
+            # DT-064/T2: reinyecta los sujetos anclados (globales + locales) al rescatar el Cap 2.
+            jugadores_locales_ctx=jugadores_locales_ctx,
         )
 
     def _fn_mercado(store, web, _oal):
