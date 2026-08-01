@@ -16,6 +16,7 @@ tolerante (substring sobre texto sin acentos) pero nunca inventa un campo que no
 from __future__ import annotations
 
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from ic.domain.markdown_parser import parse_markdown
@@ -157,3 +158,33 @@ def parse_fichas_competidores(texto: str) -> list[FichaCompetidor]:
                 if nombre and campos:
                     fichas.append(FichaCompetidor(nombre=nombre, tier=tier, campos=campos))
     return fichas
+
+
+def merge_fichas_parciales(
+    fichas: list[FichaCompetidor], normalize: Callable[[str], str]
+) -> list[FichaCompetidor]:
+    """Fusiona las fichas parciales de un mismo competidor en una sola. Puro.
+
+    Los informes manuales parten cada tier en DOS tablas (ficha 7-col + "Mayor Fortaleza" 3-col) →
+    ``parse_fichas_competidores`` devuelve dos ``FichaCompetidor`` con el mismo competidor y campos
+    distintos. Aquí se agrupan por nombre normalizado (``normalize``, inyectado para no acoplar el
+    módulo a infraestructura) y se **unen** sus campos: no se pisa un valor ya presente y no vacío
+    (la primera tabla gana ante colisión). Conserva el nombre display y el tier de la primera
+    aparición; preserva el orden de aparición. Idempotente sobre una lista ya fusionada.
+    """
+    orden: list[str] = []
+    por_clave: dict[str, FichaCompetidor] = {}
+    for ficha in fichas:
+        clave = normalize(ficha.nombre)
+        if not clave:
+            continue
+        acc = por_clave.get(clave)
+        if acc is None:
+            acc = FichaCompetidor(nombre=ficha.nombre, tier=ficha.tier, campos=dict(ficha.campos))
+            por_clave[clave] = acc
+            orden.append(clave)
+            continue
+        for k, v in ficha.campos.items():
+            if not acc.campos.get(k):
+                acc.campos[k] = v
+    return [por_clave[c] for c in orden]
