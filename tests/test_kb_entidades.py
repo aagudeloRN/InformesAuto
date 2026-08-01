@@ -90,7 +90,11 @@ class _FakeSession:
         s = str(sql)
         if "RETURNING id" in s:
             return _FakeUpsertResult(42)
-        if s.startswith("SELECT nombre") or s.startswith("SELECT id"):
+        if (
+            s.startswith("SELECT nombre")
+            or s.startswith("SELECT e.nombre")
+            or s.startswith("SELECT id")
+        ):
             return _FakeSelectResult(self._select_rows)
         return _FakeScalarResult(0)
 
@@ -178,45 +182,50 @@ def test_add_atributo_idempotente_por_clave_fuente():
 # --- Consulta de anclaje ---
 
 
-def _row(nombre, nombre_norm, sub_gics, estado, n_chunks, n_menciones, alcance=None):
-    """Tupla en el orden del SELECT del repo (norm, sub_gics, alcance, estado, chunks, menc)."""
-    return (nombre, nombre_norm, sub_gics, alcance, estado, n_chunks, n_menciones)
+def _row(nombre, nombre_norm, estado, n_chunks, alcance=None, descriptor=""):
+    """Tupla en el orden del SELECT del repo (DT-063):
+    (nombre, norm, alcance, estado, n_chunks, productos_perfil)."""
+    return (nombre, nombre_norm, alcance, estado, n_chunks, descriptor)
 
 
-def test_list_competidores_excluye_descartado_y_ordena_por_senal():
-    # Sin sub_gics: comportamiento de grupo (solo ruido excluido), orden por evidencia.
+def test_list_competidores_sin_productos_ordena_por_evidencia():
+    # DT-063: sin productos → comportamiento de grupo (solo ruido excluido), orden por evidencia.
     sess = _FakeSession(select_rows=[
-        _row("Colanta", "colanta", None, ESTADO_CANDIDATO, 5, 10),
-        _row("Alpina", "alpina", None, ESTADO_CANDIDATO, 9, 3),
+        _row("Colanta", "colanta", ESTADO_CANDIDATO, 5),
+        _row("Alpina", "alpina", ESTADO_CANDIDATO, 9),
     ])
     nombres = EntidadRepository(sess).list_competidores_by_sector("3020", limit=8)
-    assert nombres == ["Alpina", "Colanta"]  # más chunks primero
+    assert nombres == ["Alpina", "Colanta"]  # más chunks primero (tiebreak)
     sql = sess.sqls[-1]
     assert "estado <> :descartado" in sql
-    assert "nombre_normalizado" in sql  # trae columnas para el filtro puro
-    assert "sub" not in sess.params[-1]  # el orden/filtro ya no vive en SQL
+    assert "productos_perfil" in sql  # trae el descriptor para el solape puro
 
 
-def test_list_competidores_con_sub_gics_restringe_y_excluye_ruido():
-    # DT-061 end-to-end (repo → filtro puro): resuelto sub food, cae bebida e industria News.
+def test_list_competidores_filtra_por_solape_de_producto():
+    # DT-063 end-to-end (repo → ranker puro): con productos lácteos, cae la bebida (sin solape) y el
+    # medio (ruido); solo queda el de perfil de producto lácteo.
     sess = _FakeSession(select_rows=[
-        _row("Colanta", "colanta", "302020", ESTADO_VERIFICADO, 4, 4),
-        _row("Postobón SA", "postobon sa", None, ESTADO_CANDIDATO, 20, 40),
-        _row("Coca-Cola Co", "coca cola co", "302010", ESTADO_CANDIDATO, 15, 30),
-        _row("Beverage Industry News", "beverage industry news", None, ESTADO_CANDIDATO, 8, 8),
+        _row("Colanta", "colanta", ESTADO_VERIFICADO, 4, descriptor="lácteos, leche, yogurt"),
+        _row("Postobón SA", "postobon sa", ESTADO_CANDIDATO, 20, descriptor="bebidas gaseosas"),
+        _row("Beverage Industry News", "beverage industry news", ESTADO_CANDIDATO, 8,
+             descriptor="lácteos noticias"),
     ])
-    nombres = EntidadRepository(sess).list_competidores_by_sector("3020", sub_gics="302020")
-    assert nombres == ["Colanta"]  # solo el par food verificado; bebidas y medio excluidos
+    nombres = EntidadRepository(sess).list_competidores_by_sector(
+        "3020", productos_terms={"lacteos", "leche", "yogurt"}
+    )
+    assert nombres == ["Colanta"]  # solape lácteo; bebida (sin solape) y medio (ruido) fuera
 
 
 def test_list_competidores_alcance_global_excluye_locales():
     # DT-061b: la sección de clase mundial (alcance=global) deja fuera a los locales grandes.
     sess = _FakeSession(select_rows=[
-        _row("Nestlé", "nestlé", "302020", ESTADO_VERIFICADO, 3, 3, alcance="global"),
-        _row("Colanta", "colanta", "302020", ESTADO_VERIFICADO, 9, 9, alcance="local"),
+        _row("Nestlé", "nestlé", ESTADO_VERIFICADO, 3, alcance="global",
+             descriptor="lácteos yogurt"),
+        _row("Colanta", "colanta", ESTADO_VERIFICADO, 9, alcance="local",
+             descriptor="lácteos leche"),
     ])
     nombres = EntidadRepository(sess).list_competidores_by_sector(
-        "3020", sub_gics="302020", alcance="global"
+        "3020", productos_terms={"lacteos"}, alcance="global"
     )
     assert nombres == ["Nestlé"]  # Colanta (local) no entra al componente global
 

@@ -22,7 +22,6 @@ from ic.domain.chains.chain_02c_pares_globales import parse_pares_globales
 from ic.domain.kb.corroboracion import contar_corroboracion, es_corroborado
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
-from ic.shared.constants.gics_groups import sub_gics_label
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ class DiscoverGlobales:
     def discover(
         self,
         sector_gics: str,
-        sub_gics: str | None,
+        productos: str,
         seed_repo_fn: SeedRepoFn,
     ) -> dict[str, int]:
         """Recomienda globales, corrobora por web y siembra vía callback. Devuelve conteos.
@@ -55,11 +54,12 @@ class DiscoverGlobales:
         siembra (``verificado``/``alcance=global``). No corroborado: siembra solo como candidato
         (``fuente=llm``, sin ``alcance=global`` → nunca entra al anclaje 2.1.1); no se ingiere.
         """
-        # DT-062b: steerear con la ETIQUETA legible de la sub-actividad (no el código crudo), para
-        # que el recall del LLM sea de ESA sub (food ≠ bebidas ≠ tabaco) y no del grupo entero.
+        # DT-063: steerear el recall del LLM por los PRODUCTOS/SERVICIOS de la empresa analizada
+        # (señal de precisión), con el sector solo como límite de dominio. Reemplaza el sub-código
+        # GICS (frágil): así una láctea recibe globales de lácteos, no del grupo entero.
         raw = self._chain.invoke({
             "sector_gics": sector_gics,
-            "sub_actividad": sub_gics_label(sub_gics),
+            "productos": productos or "(no especificados; usar el sector como referencia)",
         })
         candidatos = parse_pares_globales(raw)
         corroborados = 0
@@ -82,6 +82,6 @@ class DiscoverGlobales:
             "no_corroborados": len(candidatos) - corroborados,
         }
         logger.info(
-            "DiscoverGlobales sector=%s sub=%s: %s", sector_gics, sub_gics, conteos
+            "DiscoverGlobales sector=%s productos=%r: %s", sector_gics, productos[:80], conteos
         )
         return conteos

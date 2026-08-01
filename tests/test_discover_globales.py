@@ -65,7 +65,9 @@ class TestDiscoverGlobales:
         seed = MagicMock()
         conteos = DiscoverGlobales(
             chain=chain, web_connector=web, store=store, min_corrob=min_corrob,
-        ).discover(sector_gics="Alimentos", sub_gics="302020", seed_repo_fn=seed)
+        ).discover(
+            sector_gics="Alimentos", productos="lácteos, leche, yogurt", seed_repo_fn=seed
+        )
         return conteos, store, seed
 
     def test_corroborado_siembra_verificado_e_ingiere(self):

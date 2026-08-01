@@ -28,22 +28,26 @@ _ARRAY_RE = re.compile(r"\[.*?\]", re.DOTALL)
 
 SYSTEM_PROMPT_02C = (
     "Eres un analista de inteligencia competitiva con conocimiento de los líderes GLOBALES de cada "
-    "industria. Tu única tarea es listar las empresas de CLASE MUNDIAL (alcance global, referencia "
-    "internacional del sector) más representativas del sector {sector_gics} "
-    "(sub-actividad: {sub_actividad}).\n\n"
+    "industria. Tu tarea es listar las empresas de CLASE MUNDIAL (alcance global, referencia "
+    "internacional) que COMPITEN con una empresa cuyos productos y servicios son:\n"
+    "{productos}\n\n"
+    "El sector general es {sector_gics} (úsalo solo como límite de dominio, NO amplíes a toda la "
+    "industria: enfócate en los productos/servicios descritos arriba).\n\n"
     "REGLAS (obligatorias):\n"
-    "- Solo empresas REALES y reconocidas GLOBALMENTE como líderes del sector.\n"
+    "- Solo empresas REALES y reconocidas GLOBALMENTE como líderes en ESOS productos/servicios.\n"
+    "- NO incluyas jugadores de otras actividades del sector que NO compitan en esos productos.\n"
     "- NO incluyas jugadores puramente locales o regionales (esos son otro componente).\n"
     "- NO incluyas gremios, entes reguladores, medios ni fuentes (p. ej. Euromonitor, DANE).\n"
     "- Nombres de empresa, no de productos ni marcas genéricas.\n"
     "- Responde EXCLUSIVAMENTE con un array JSON de strings, sin texto antes ni después. "
     'Ejemplo del formato exacto: ["Empresa A", "Empresa B", "Empresa C"].\n'
-    "- Si no conoces líderes globales claros de ese sector, responde: []"
+    "- Si no conoces líderes globales claros para esos productos, responde: []"
 )
 
 USER_PROMPT_02C = (
-    "Sector: {sector_gics} (sub-actividad: {sub_actividad}).\n"
-    "Lista las empresas de clase mundial más representativas del sector. "
+    "Sector (límite de dominio): {sector_gics}.\n"
+    "Productos y servicios de la empresa analizada:\n{productos}\n\n"
+    "Lista las empresas de clase mundial que compiten en esos productos/servicios. "
     "Responde solo con el array JSON."
 )
 

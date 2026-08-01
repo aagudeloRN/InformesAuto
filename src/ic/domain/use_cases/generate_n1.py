@@ -51,24 +51,26 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         CachedWebConnector,
     )
     from ic.infrastructure.sources.openalex_connector import OpenAlexConnector
-    from ic.shared.constants.gics_groups import extract_gics_code, resolve_sub_gics
+    from ic.shared.constants.gics_groups import extract_gics_code
+    from ic.shared.text_productos import producto_terms
 
     ctx.step_fn(3, "N1 — Caps 2/3/4 en paralelo")
     e, g, s = ctx.params.empresa, ctx.gics.grupo_gics, ctx.settings
     g_code = extract_gics_code(g)
-    # DT-061: sub-código GICS de la empresa analizada (food/beverage/tobacco dentro del grupo) para
-    # anclar competidores de la MISMA sub-actividad. None → anclaje a nivel de grupo (invariante).
-    sub_code = resolve_sub_gics(ctx.empresa.texto, g_code)
+    # DT-063: la señal de precisión del descubrimiento son los PRODUCTOS/SERVICIOS de la empresa
+    # (Cap 1), no un sub-código GICS frágil. El grupo GICS queda como red de recall + guardrail; el
+    # solape producto↔candidato ordena globales y locales. Vacío → fallback a nivel grupo.
+    productos = ctx.empresa.productos_servicios
+    productos_terms = producto_terms(productos)
 
     def _descubrir_globales(store, web) -> None:
-        """DT-062: siembra globales LLM corroborados por web. Best-effort; nunca rompe la corrida.
+        """DT-062/DT-063: siembra globales LLM corroborados por web. Best-effort; nunca rompe.
 
-        Guard de coste **por sub-actividad** (DT-062b): la query del guard filtra por ``sub_code`` y
-        —con el filtro sub-estricto del tier global— solo cuenta globales de ESA sub, así el
-        descubrimiento se dispara una vez por sub-actividad (no por grupo): tabaco y bebidas ya no
-        reusan la lista food. Si el KB ya tiene ≥8 globales de la sub, no re-descubre (KB caliente).
-        El tag ``sub_gics=sub_code`` al sembrar es veraz porque el prompt se steerea con la etiqueta
-        de esa sub (T1): el LLM recomienda los globales de la sub-actividad analizada.
+        Guard de coste **por producto** (DT-063): el guard cuenta globales del grupo con SOLAPE de
+        producto ≥1; si ya hay ≥8, no re-descubre (KB caliente para esos productos). El recall del
+        LLM se steerea por los productos/servicios (no por un sub-código): una láctea recibe
+        globales de lácteos, no del grupo entero. Al sembrar un corroborado se guarda su **perfil de
+        producto** (`productos_perfil`) para que el anclaje futuro lo filtre por solape.
         Corroborado → verificado/alcance=global; si no → candidato/fuente=llm no citable.
         """
         if not g_code:
@@ -77,29 +79,37 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             with SessionLocal() as db_kb:
                 ensure_entidades_tables(db_kb.get_bind())
                 repo = EntidadRepository(db_kb)
+                # El ranker global exige solape (require_overlap): `ya` ya son globales de ESTOS
+                # productos. KB caliente para estos productos ⇒ no re-descubrir.
                 ya = repo.list_competidores_by_sector(
-                    g_code, sub_gics=sub_code, alcance=ALCANCE_GLOBAL, limit=100
+                    g_code, productos_terms=productos_terms, alcance=ALCANCE_GLOBAL, limit=100
                 )
-                if len(ya) >= 8:  # KB caliente: el anclaje ya está bien poblado.
+                if len(ya) >= 8:
                     return
 
                 def _seed(nombre: str, corroborado: bool, _hits: int) -> None:
                     estado = ESTADO_VERIFICADO if corroborado else ESTADO_CANDIDATO
                     eid = repo.upsert_entidad(EntidadRow(
                         nombre=nombre, nombre_normalizado=normalize_entity(nombre),
-                        tipo=TIPO_COMPETIDOR, sector_gics=g_code, sub_gics=sub_code,
+                        tipo=TIPO_COMPETIDOR, sector_gics=g_code,
                         alcance=ALCANCE_GLOBAL if corroborado else None, estado=estado,
                     ))
                     repo.add_atributo(
                         eid, "origen", "llm-corroborado" if corroborado else "llm",
                         FUENTE_LLM, estado=estado,
                     )
+                    # DT-063: perfil de producto del global (re-rank por solape del anclaje).
+                    if corroborado and productos:
+                        repo.add_atributo(
+                            eid, "productos_perfil", productos[:2000], FUENTE_LLM,
+                            estado=ESTADO_VERIFICADO,
+                        )
 
                 DiscoverGlobales(
                     chain=build_chain_pares_globales(ctx.api_llm or ctx.llm),
                     web_connector=web, store=store,
                     min_corrob=s.discover_globales_min_corrob,
-                ).discover(sector_gics=g, sub_gics=sub_code, seed_repo_fn=_seed)
+                ).discover(sector_gics=g, productos=productos, seed_repo_fn=_seed)
         except Exception:  # noqa: BLE001 — el descubrimiento es un boost; nunca rompe la corrida.
             logger.warning("Descubrimiento LLM de globales falló (sector %s)", g_code)
 
@@ -134,18 +144,18 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 ensure_entidades_tables(db_kb.get_bind())
                 repo_kb = EntidadRepository(db_kb)
                 kb_competidores = repo_kb.list_competidores_by_sector(
-                    g_code or "", sub_gics=sub_code, alcance=ALCANCE_GLOBAL
+                    g_code or "", productos_terms=productos_terms, alcance=ALCANCE_GLOBAL
                 )
-                # DT-050: anclaje del tier LOCAL (2.1.2 regionales + 2.1.3 startups) desde el
-                # directorio. Flag OFF → nada (invariante). No diluye el global: el path global usa
-                # alcance=global; este usa alcance=local con su propio método.
+                # DT-050/DT-063: anclaje del tier LOCAL (2.1.2 regionales + 2.1.3 startups) desde el
+                # directorio, re-rankeado por solape de producto. Flag OFF → nada (invariante). No
+                # diluye el global: el path global usa alcance=global con su propio método.
                 if s.anclaje_local_enabled and g_code:
                     n = s.anclaje_local_top_n
                     regionales = repo_kb.list_locales_by_sector(
-                        g_code, solo_establecidas=True, sub_gics=sub_code, limit=n
+                        g_code, solo_establecidas=True, productos_terms=productos_terms, limit=n
                     )
                     startups = repo_kb.list_locales_by_sector(
-                        g_code, segmento=SEGMENTO_STARTUP, sub_gics=sub_code, limit=n
+                        g_code, segmento=SEGMENTO_STARTUP, productos_terms=productos_terms, limit=n
                     )
                     jugadores_locales_ctx = format_jugadores_locales(regionales, startups)
                     kb_locales = [r.nombre for r in (*regionales, *startups)]

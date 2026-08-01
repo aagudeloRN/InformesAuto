@@ -26,11 +26,12 @@ from ic.data.models.entidad import (
     EntidadSector,
 )
 from ic.domain.kb.relevance import (
-    CompetidorRow,
     LocalRow,
+    ProductoRankRow,
     es_ruido_competidor,
-    filter_rank_competidores,
+    rank_by_product_overlap,
 )
+from ic.shared.text_productos import producto_overlap
 
 
 @dataclass
@@ -203,44 +204,50 @@ class EntidadRepository:
     def list_competidores_by_sector(
         self,
         sector_gics: str,
-        sub_gics: str | None = None,
+        productos_terms: set[str] | None = None,
         alcance: str | None = None,
         limit: int = 8,
     ) -> list[str]:
-        """Nombres canónicos de competidores/empresas del sector para anclar (DT-056/DT-061).
+        """Nombres canónicos de competidores del grupo para anclar (DT-056/DT-063).
 
-        Trae los candidatos del grupo (excluye `descartado`, gate RN-001) y **delega** el filtro
-        de relevancia y el orden en `filter_rank_competidores` (dominio puro): excluye ruido
-        (medios/métricas), restringe a la sub-actividad/verificados si `sub_gics` se resolvió, y —si
-        `alcance` se pide (p. ej. `global` para la sección de clase mundial)— filtra ese alcance.
-        Devuelve la forma display (`nombre`).
+        Trae los candidatos del grupo GICS (excluye `descartado`, gate RN-001) con su **perfil de
+        producto** (atributo `productos_perfil`, sembrado al descubrir el global) y **delega** el
+        orden en `rank_by_product_overlap` (dominio puro): excluye ruido, filtra `alcance` si se
+        pide (p. ej. `global` para 2.1.1) y ordena por SOLAPE con los productos de la empresa
+        analizada (DT-063, reemplaza el sub-código). Sin `productos_terms` → orden por evidencia.
         """
         if not sector_gics:
             return []
-        tabla = Entidad.__table__.fullname
+        ent = Entidad.__table__.fullname
+        atr = EntidadAtributo.__table__.fullname
         sql = text(
-            f"SELECT nombre, nombre_normalizado, sub_gics, alcance, estado, n_chunks, n_menciones "
-            f"FROM {tabla} "
-            "WHERE sector_gics = :sector AND estado <> :descartado "
-            "  AND tipo IN ('competidor', 'empresa')"
+            f"SELECT e.nombre, e.nombre_normalizado, e.alcance, e.estado, e.n_chunks, "
+            f"       a_prod.valor "
+            f"FROM {ent} e "
+            f"LEFT JOIN {atr} a_prod "
+            f"  ON a_prod.entidad_id = e.id AND a_prod.clave = 'productos_perfil' "
+            "WHERE e.sector_gics = :sector AND e.estado <> :descartado "
+            "  AND e.tipo IN ('competidor', 'empresa')"
         )
         rows = self._db.execute(
             sql, {"sector": sector_gics, "descartado": ESTADO_DESCARTADO}
         ).fetchall()
         candidatos = [
-            CompetidorRow(
+            ProductoRankRow(
                 nombre=r[0],
                 nombre_normalizado=r[1] or "",
-                sub_gics=r[2],
-                alcance=r[3],
-                verificado=(r[4] == ESTADO_VERIFICADO),
-                n_chunks=int(r[5] or 0),
-                n_menciones=int(r[6] or 0),
+                descriptor=r[5] or "",
+                alcance=r[2],
+                verificado=(r[3] == ESTADO_VERIFICADO),
+                tiebreak=int(r[4] or 0),
             )
             for r in rows
         ]
-        return filter_rank_competidores(
-            candidatos, sub_gics=sub_gics, alcance=alcance, limit=limit
+        # Tier de clase mundial: exigir solape (no traer globales de otra actividad; vacío → el
+        # guard dispara el descubrimiento por producto). Sin productos → orden por evidencia.
+        return rank_by_product_overlap(
+            candidatos, productos_terms or set(),
+            alcance=alcance, require_overlap=True, limit=limit,
         )
 
     def list_locales_by_sector(
@@ -249,15 +256,17 @@ class EntidadRepository:
         *,
         segmento: str | None = None,
         solo_establecidas: bool = False,
-        sub_gics: str | None = None,
+        productos_terms: set[str] | None = None,
         limit: int = 6,
     ) -> list[LocalRow]:
-        """Jugadores LOCALES del directorio para anclar 2.1.2/2.1.3 (DT-050). JOIN entidad_sectores.
+        """Jugadores LOCALES del directorio para anclar 2.1.2/2.1.3 (DT-050/DT-063). JOIN sectores.
 
         Filtra ``alcance='local'`` y (opcional) ``segmento`` (`startup` para 2.1.3;
         ``solo_establecidas`` = segmento IS NULL para 2.1.2). Excluye ``descartado`` (RN-001).
-        Ordena: verificado → match de sub-actividad → **tamaño** (ingreso operativo, mejor esfuerzo
-        numérico). Path del tier GLOBAL (``list_competidores_by_sector``) intacto.
+        Trae los más notables por **tamaño** (prefetch) y los **re-rankea por SOLAPE** de sus
+        actividad/vertical/descripción con los productos de la empresa analizada (DT-063): así una
+        láctea ve Colanta/Alquería antes que un cárnico grande del mismo grupo. `productos_terms`
+        vacío → orden por tamaño (fallback). Path GLOBAL (`list_competidores_by_sector`) aparte.
         """
         if not sector_gics:
             return []
@@ -274,28 +283,36 @@ class EntidadRepository:
             "NULLIF(regexp_replace(split_part(a_ing.valor, ',', 1), '[^0-9]', '', 'g'), '')"
             "::bigint"
         )
+        # Prefetch generoso por tamaño; el re-rank fino por solape se hace en dominio (puro).
+        prefetch = max(limit * 10, 40)
         sql = text(
             f"SELECT e.nombre, e.ciudad, es.vertical, a_ing.valor, e.segmento, "
-            f"       (e.estado = :verificado) AS verificado, "
-            f"       (es.sub_gics IS NOT DISTINCT FROM :sub_gics) AS sub_match, "
-            f"       {tamano_num} AS tam "
+            f"       (e.estado = :verificado) AS verificado, {tamano_num} AS tam, a_desc.valor "
             f"FROM {ent} e "
             f"JOIN {sec} es ON es.entidad_id = e.id "
             f"LEFT JOIN {atr} a_ing "
             f"  ON a_ing.entidad_id = e.id AND a_ing.clave = 'ingreso_operativo' "
+            f"LEFT JOIN {atr} a_desc "
+            f"  ON a_desc.entidad_id = e.id AND a_desc.clave = 'descripcion' "
             f"WHERE es.sector_gics = :sector AND e.alcance = :local "
             f"  AND e.estado <> :descartado AND e.tipo IN ('competidor', 'empresa'){cond_seg} "
-            f"ORDER BY verificado DESC, sub_match DESC, tam DESC NULLS LAST "
-            f"LIMIT :limit"
+            f"ORDER BY verificado DESC, tam DESC NULLS LAST "
+            f"LIMIT :prefetch"
         )
         rows = self._db.execute(
             sql,
             {
                 "sector": sector_gics, "local": ALCANCE_LOCAL, "descartado": ESTADO_DESCARTADO,
-                "verificado": ESTADO_VERIFICADO, "sub_gics": sub_gics, "segmento": segmento,
-                "limit": limit,
+                "verificado": ESTADO_VERIFICADO, "segmento": segmento, "prefetch": prefetch,
             },
         ).fetchall()
+        terms = productos_terms or set()
+
+        def _clave(r):
+            descriptor = f"{r[2] or ''} {r[7] or ''}"
+            return (-producto_overlap(descriptor, terms), not r[5], -(int(r[6]) if r[6] else 0))
+
+        rows = sorted(rows, key=_clave)[:limit]
         return [
             LocalRow(
                 nombre=r[0], ciudad=r[1], actividad=r[2],

@@ -26,6 +26,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ic.shared.text_productos import producto_overlap
+
 # Palabras propias de MEDIOS (no empresas del sector): un nombre con alguna de estas es un
 # publisher/medio, no un competidor. Match por token exacto (no substring) para no atrapar
 # empresas cuyo nombre las contenga como fragmento.
@@ -72,6 +74,61 @@ class CompetidorRow:
     verificado: bool = False
     n_chunks: int = 0
     n_menciones: int = 0
+
+
+@dataclass(frozen=True)
+class ProductoRankRow:
+    """Candidato a rankear por solape de producto (DT-063). La capa data lo construye desde SQL.
+
+    ``descriptor`` = texto que describe lo que el candidato HACE (global: perfil de producto de su
+    descubrimiento; local: actividad CIIU / vertical). ``tiebreak`` = señal de desempate (global:
+    n_chunks; local: tamaño). No se ve BD aquí (dominio puro).
+    """
+
+    nombre: str
+    nombre_normalizado: str
+    descriptor: str = ""
+    alcance: str | None = None
+    verificado: bool = False
+    tiebreak: int = 0
+
+
+def rank_by_product_overlap(
+    rows: list[ProductoRankRow],
+    productos_terms: set[str],
+    *,
+    alcance: str | None = None,
+    require_overlap: bool = False,
+    limit: int = 8,
+) -> list[str]:
+    """Ordena candidatos por SOLAPE con los productos de la empresa analizada (DT-063). Puro.
+
+    Reemplaza el filtro sub-estricto por sub-código GICS (frágil) por la señal genérica de producto:
+    - Excluye ruido (medios/métricas) y filtra ``alcance`` si se pide (duro, como antes).
+    - Puntúa cada candidato por nº de términos de producto presentes en su ``descriptor``.
+    - Si ``require_overlap`` **y** hay ``productos_terms``: **descarta** los de solape 0 (el tier de
+      clase mundial no debe traer globales de otra actividad; mejor vacío → dispara descubrimiento).
+    - Orden: **solape desc** → ``verificado`` → ``tiebreak`` (evidencia/tamaño).
+    - **Fallback:** ``productos_terms`` vacío → sin filtro de solape; orden por verificado/evidencia
+      (comportamiento a nivel grupo, nunca un sub adivinado).
+
+    RN-001: solo excluye/ordena lo presente; no fabrica.
+    """
+    limpios = [r for r in rows if not es_ruido_competidor(r.nombre_normalizado)]
+    if alcance:
+        limpios = [r for r in limpios if r.alcance == alcance]
+    if require_overlap and productos_terms:
+        limpios = [r for r in limpios if producto_overlap(r.descriptor, productos_terms) > 0]
+
+    ordenados = sorted(
+        limpios,
+        key=lambda r: (
+            -producto_overlap(r.descriptor, productos_terms),
+            not r.verificado,
+            -(r.tiebreak or 0),
+        ),
+    )
+    return [r.nombre for r in ordenados[:limit]]
 
 
 @dataclass(frozen=True)

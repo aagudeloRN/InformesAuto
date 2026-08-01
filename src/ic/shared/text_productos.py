@@ -67,3 +67,15 @@ def producto_terms(seccion: str | None, min_len: int = 4) -> set[str]:
         t for t in _TOKEN_RE.findall(_normalize(seccion))
         if len(t) >= min_len and t not in _STOPWORDS
     }
+
+
+def producto_overlap(descriptor: str | None, productos_terms: set[str]) -> int:
+    """Nº de términos de producto presentes en el ``descriptor`` de un candidato. Puro (DT-063).
+
+    ``descriptor`` = lo que el candidato HACE (perfil de producto del global; actividad/vertical del
+    local). 0 si no hay términos o descriptor → señal de "sin solape" (cae al desempate por
+    evidencia).
+    """
+    if not productos_terms or not descriptor:
+        return 0
+    return len(productos_terms & producto_terms(descriptor))
