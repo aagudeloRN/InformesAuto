@@ -39,7 +39,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.domain.chains.chain_05_ecosistema import build_chain_05
     from ic.domain.chains.chain_judge import CRITERIOS_CAPITULO
     from ic.domain.kb.ficha_parser import parse_fichas_competidores
-    from ic.domain.kb.relevance import format_jugadores_locales
+    from ic.domain.kb.relevance import format_fichas_conocidas, format_jugadores_locales
     from ic.domain.use_cases.discover_globales import DiscoverGlobales
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
     from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
@@ -171,6 +171,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         kb_competidores: list[str] = []
         kb_locales: list[str] = []
         jugadores_locales_ctx = ""
+        fichas_conocidas_ctx = ""
         try:
             with SessionLocal() as db_kb:
                 ensure_entidades_tables(db_kb.get_bind())
@@ -178,6 +179,12 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 kb_competidores = repo_kb.list_competidores_by_sector(
                     g_code or "", productos_terms=productos_terms, alcance=ALCANCE_GLOBAL
                 )
+                # DT-064/T4: pre-fill del prompt con los campos de ficha ya persistidos (T3) de los
+                # globales anclados → el LLM escribe desde hechos. Vacío → invariante.
+                if g_code and kb_competidores:
+                    fichas_conocidas_ctx = format_fichas_conocidas(
+                        repo_kb.list_ficha_atributos_by_sector(g_code, kb_competidores)
+                    )
                 # DT-050/DT-063: anclaje del tier LOCAL (2.1.2 regionales + 2.1.3 startups) desde el
                 # directorio, re-rankeado por solape de producto. Flag OFF → nada (invariante). No
                 # diluye el global: el path global usa alcance=global con su propio método.
@@ -198,6 +205,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             entidades_chain=build_chain_entidades(ctx.api_llm or ctx.llm),
             kb_competidores=kb_competidores, kb_locales=kb_locales,
             jugadores_locales_ctx=jugadores_locales_ctx,
+            fichas_conocidas_ctx=fichas_conocidas_ctx,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,

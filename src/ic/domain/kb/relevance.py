@@ -169,6 +169,29 @@ def format_referentes_globales(nombres: list[str] | None) -> str:
     )
 
 
+def format_fichas_conocidas(fichas: dict[str, dict[str, str]]) -> str:
+    """Bloque con los campos de ficha ya conocidos del KB (DT-064/T4). Puro.
+
+    Pre-carga hechos verificados/candidatos para que el LLM escriba DESDE datos (menos fabricación
+    y menos negativas). Devuelve "" si no hay nada (invariante: prompt idéntico cuando el KB está
+    vacío). RN-001: solo lista lo persistido en el KB, no fabrica campos.
+    """
+    bloques: list[str] = []
+    for nombre, campos in fichas.items():
+        if not campos:
+            continue
+        lineas = [f"- {nombre}:"]
+        lineas += [f"    {clave}: {valor}" for clave, valor in campos.items() if valor]
+        if len(lineas) > 1:
+            bloques.append("\n".join(lineas))
+    if not bloques:
+        return ""
+    return (
+        "Datos ya conocidos del KB para estos competidores (úsalos como base verificada; "
+        "complétalos con el RAG, no los contradigas):\n" + "\n".join(bloques)
+    )
+
+
 def format_jugadores_locales(
     regionales: list[LocalRow], startups: list[LocalRow]
 ) -> str:

@@ -25,6 +25,7 @@ from ic.data.models.entidad import (
     EntidadAtributo,
     EntidadSector,
 )
+from ic.domain.kb.ficha_parser import FICHA_KEYS
 from ic.domain.kb.relevance import (
     LocalRow,
     ProductoRankRow,
@@ -187,6 +188,41 @@ class EntidadRepository:
             },
         )
         self._db.commit()
+
+    def list_ficha_atributos_by_sector(
+        self, sector_gics: str, nombres: list[str]
+    ) -> dict[str, dict[str, str]]:
+        """Campos de ficha ya conocidos del KB para los competidores dados (DT-064/T4).
+
+        Devuelve ``{nombre: {clave: valor}}`` restringido a las claves de ficha
+        (``FICHA_KEYS``) y al sector. Alimenta el pre-fill del prompt (escribir desde hechos).
+        `verificado` gana sobre `candidato` si hay ambos para una clave. Vacío → ``{}``.
+        """
+        if not sector_gics or not nombres:
+            return {}
+        ent = Entidad.__table__.fullname
+        atr = EntidadAtributo.__table__.fullname
+        sql = text(
+            f"SELECT e.nombre, a.clave, a.valor "
+            f"FROM {ent} e JOIN {atr} a ON a.entidad_id = e.id "
+            "WHERE e.sector_gics = :sector AND a.clave = ANY(:claves) "
+            "  AND e.nombre = ANY(:nombres) AND a.valor IS NOT NULL "
+            "ORDER BY (a.estado = :verificado) DESC"
+        )
+        rows = self._db.execute(
+            sql,
+            {
+                "sector": sector_gics,
+                "claves": list(FICHA_KEYS),
+                "nombres": list(nombres),
+                "verificado": ESTADO_VERIFICADO,
+            },
+        ).fetchall()
+        fichas: dict[str, dict[str, str]] = {}
+        for nombre, clave, valor in rows:
+            campos = fichas.setdefault(nombre, {})
+            campos.setdefault(clave, valor)  # el primero (verificado) gana
+        return fichas
 
     def upsert_sector_membership(
         self,

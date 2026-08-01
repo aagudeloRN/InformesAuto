@@ -70,6 +70,7 @@ USER_PROMPT_03 = (
     "aquí ni en las fichas RAG):\n"
     "{jugadores_locales}\n\n"
     "{referentes_globales_anclados}\n\n"
+    "{fichas_conocidas}\n\n"
     "Desarrolla exactamente las siguientes secciones en este orden:\n\n"
     "## 2.1. Jugadores Clave - Líderes del Mercado\n\n"
     "Identifica y analiza 14 actores: 8 líderes globales, 3 referentes regionales (LatAm/Colombia) "  # noqa: E501

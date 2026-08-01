@@ -101,6 +101,7 @@ class GenerateBenchmarking:
         kb_competidores: list[str] | None = None,
         kb_locales: list[str] | None = None,
         jugadores_locales_ctx: str = "",
+        fichas_conocidas_ctx: str = "",
     ) -> None:
         self._chain = chain
         self._store = store
@@ -118,6 +119,8 @@ class GenerateBenchmarking:
         # datos recuperados del directorio, no fabricados.
         self._kb_locales = kb_locales or []
         self._jugadores_locales_ctx = jugadores_locales_ctx or ""
+        # DT-064/T4: bloque de fichas ya conocidas del KB (pre-fill). "" → invariante.
+        self._fichas_conocidas_ctx = fichas_conocidas_ctx or ""
 
     def _identificar_entidades(self, chunks, sector_gics: str) -> list[str]:
         """Entidades competidoras a explotar: KB (canónico) + las ancladas en la evidencia.
@@ -224,6 +227,8 @@ class GenerateBenchmarking:
             # DT-064/T1: sujetos globales anclados (kb_competidores) como actores obligatorios de
             # 2.1.1. Vacío → invariante (el LLM identifica los globales del RAG del sector).
             "referentes_globales_anclados": format_referentes_globales(self._kb_competidores),
+            # DT-064/T4: campos de ficha ya conocidos del KB (escribir desde hechos).
+            "fichas_conocidas": self._fichas_conocidas_ctx,
         })
 
         if has_cjk_characters(texto_raw):

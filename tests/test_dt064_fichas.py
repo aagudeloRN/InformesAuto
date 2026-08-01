@@ -12,6 +12,7 @@ from ic.domain.kb.ficha_parser import (
     TIER_STARTUP,
     parse_fichas_competidores,
 )
+from ic.domain.kb.relevance import format_fichas_conocidas
 
 # --------------------------------------------------------------------------- Parser puro
 
@@ -103,23 +104,28 @@ class _Row:
 
 
 class _FetchResult:
-    def __init__(self, row):
+    def __init__(self, row=None, rows=None):
         self._row = row
+        self._rows = rows or []
 
     def fetchone(self):
         return self._row
 
+    def fetchall(self):
+        return self._rows
+
 
 class _FakeSession:
-    def __init__(self, row=None):
+    def __init__(self, row=None, rows=None):
         self.sqls: list[str] = []
         self.params: list[dict] = []
         self._row = row
+        self._rows = rows
 
     def execute(self, sql, params=None):
         self.sqls.append(str(sql))
         self.params.append(params or {})
-        return _FetchResult(self._row)
+        return _FetchResult(self._row, self._rows)
 
 
 def test_get_id_con_sector_restringe_y_devuelve_id():
@@ -143,3 +149,42 @@ def test_get_id_nombre_vacio_no_consulta():
     sess = _FakeSession(row=_Row(1))
     assert EntidadRepository(sess).get_id_by_nombre_sector("", "3020") is None
     assert sess.sqls == []
+
+
+# --------------------------------------------------------------------------- T4: pre-fill
+
+
+def test_format_fichas_conocidas_vacio_es_noop():
+    assert format_fichas_conocidas({}) == ""
+    assert format_fichas_conocidas({"Nestlé": {}}) == ""  # sin campos → nada
+
+
+def test_format_fichas_conocidas_lista_hechos():
+    bloque = format_fichas_conocidas({
+        "Nestlé": {"pais_origen": "Suiza", "portafolio": "Galletas."},
+        "Danone": {"pais_origen": "Francia"},
+    })
+    assert "Nestlé" in bloque and "Danone" in bloque
+    assert "pais_origen: Suiza" in bloque
+    assert "no los contradigas" in bloque  # instrucción de uso
+
+
+def test_list_ficha_atributos_mapea_filas_a_dict():
+    rows = [
+        ("Nestlé", "pais_origen", "Suiza"),
+        ("Nestlé", "portafolio", "Galletas."),
+        ("Danone", "pais_origen", "Francia"),
+    ]
+    sess = _FakeSession(rows=rows)
+    fichas = EntidadRepository(sess).list_ficha_atributos_by_sector("3020", ["Nestlé", "Danone"])
+    assert fichas["Nestlé"] == {"pais_origen": "Suiza", "portafolio": "Galletas."}
+    assert fichas["Danone"] == {"pais_origen": "Francia"}
+    # restringe a claves de ficha y por sector/nombres
+    assert "clave = ANY(:claves)" in sess.sqls[-1]
+    assert sess.params[-1]["sector"] == "3020"
+
+
+def test_list_ficha_atributos_sin_nombres_devuelve_vacio():
+    sess = _FakeSession(rows=[])
+    assert EntidadRepository(sess).list_ficha_atributos_by_sector("3020", []) == {}
+    assert sess.sqls == []  # no consulta

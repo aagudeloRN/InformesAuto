@@ -91,6 +91,22 @@ def test_execute_inyecta_globales_anclados_en_el_prompt():
     assert "Danone" in bloque and "Fonterra" in bloque and "EXACTAMENTE" in bloque
 
 
+def test_execute_inyecta_fichas_conocidas_prefill():
+    chain = _FakeChain()
+    GenerateBenchmarking(
+        chain=chain,
+        store=_FakeStore(_chunks()),
+        web_connector=_FakeWeb(),
+        kb_competidores=["Danone"],
+        fichas_conocidas_ctx="Datos ya conocidos del KB:\n- Danone:\n    pais_origen: Francia",
+    ).execute(
+        nombre_empresa="Alpina",
+        descripcion_empresa="Empresa láctea.",
+        sector_gics="Alimentos, bebidas y tabaco",
+    )
+    assert "Francia" in chain.ultimo_input["fichas_conocidas"]
+
+
 def test_execute_sin_kb_deja_el_slot_vacio_invariante():
     chain = _FakeChain()
     GenerateBenchmarking(
