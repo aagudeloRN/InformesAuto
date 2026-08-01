@@ -49,6 +49,14 @@ commitear (en `.gitignore`).
 4. Después: **sembrar el KB** con competidores/datos de los 5 informes + armar el **set de evaluación**
    (regresión medible) y el **gap analysis** completo (calibra la rúbrica v1.0 contra criterio humano).
 
+## ESTADO — T1–T5 COMPLETO (2026-08-01, develop)
+
+Implementado y commiteado; gate ruff 0 + 575 fast tests. Cierre y hallazgos en
+`DT064_HALLAZGOS.md`. Commits: `0a8e294` T1 · `1464311` T2 · `8bab057` T3 · `17e910e` T4 · `b4a10a0` T5.
+Paso 1 (comparación ligera) → `DT064_FICHA_SPEC.md`. **Pendiente:** E2E de validación (ver más abajo) +
+siembra del KB desde los 5 informes manuales (siguiente sección; `parse_fichas_competidores` ya parsea
+sus tablas anchas). Las tareas de abajo quedan como registro histórico.
+
 ## Tareas propuestas (afinar en Plan Mode)
 
 - **T1 — Anclar los SUJETOS de las fichas (no solo enriquecer RAG).** Pasar al prompt de benchmarking
