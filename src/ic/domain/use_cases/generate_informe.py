@@ -248,16 +248,20 @@ class GenerateInforme:
         # descripción como candidato). Falla suave: es enriquecimiento, no debe romper la corrida.
         try:
             from ic.data.database import SessionLocal, engine
-            from ic.data.models.entidad import ensure_entidades_tables
+            from ic.data.models.entidad import ALCANCE_LOCAL, ensure_entidades_tables
             from ic.data.repositories.entidad_repo import EntidadRepository
             from ic.domain.use_cases.nurture_kb import NurtureKB
             from ic.shared.constants.gics_groups import extract_gics_code
             ensure_entidades_tables(engine)
             with SessionLocal() as db_kb:
+                # La empresa analizada es el jugador regional colombiano → alcance=local + su
+                # perfil de producto, para reusarla como competidor regional en informes futuros.
                 NurtureKB(EntidadRepository(db_kb)).execute(
                     nombre=ctx.params.empresa,
                     sector_gics=extract_gics_code(ctx.gics.grupo_gics),
                     descripcion=ctx.empresa.texto,
+                    alcance=ALCANCE_LOCAL,
+                    productos=ctx.empresa.productos_servicios,
                 )
         except Exception:
             logger.warning("No se pudo nutrir el KB con la empresa principal", exc_info=True)

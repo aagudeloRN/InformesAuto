@@ -287,13 +287,16 @@ class EntidadRepository:
         prefetch = max(limit * 10, 40)
         sql = text(
             f"SELECT e.nombre, e.ciudad, es.vertical, a_ing.valor, e.segmento, "
-            f"       (e.estado = :verificado) AS verificado, {tamano_num} AS tam, a_desc.valor "
+            f"       (e.estado = :verificado) AS verificado, {tamano_num} AS tam, a_desc.valor, "
+            f"       a_prod.valor "
             f"FROM {ent} e "
             f"JOIN {sec} es ON es.entidad_id = e.id "
             f"LEFT JOIN {atr} a_ing "
             f"  ON a_ing.entidad_id = e.id AND a_ing.clave = 'ingreso_operativo' "
             f"LEFT JOIN {atr} a_desc "
             f"  ON a_desc.entidad_id = e.id AND a_desc.clave = 'descripcion' "
+            f"LEFT JOIN {atr} a_prod "
+            f"  ON a_prod.entidad_id = e.id AND a_prod.clave = 'productos_perfil' "
             f"WHERE es.sector_gics = :sector AND e.alcance = :local "
             f"  AND e.estado <> :descartado AND e.tipo IN ('competidor', 'empresa'){cond_seg} "
             f"ORDER BY verificado DESC, tam DESC NULLS LAST "
@@ -309,7 +312,8 @@ class EntidadRepository:
         terms = productos_terms or set()
 
         def _clave(r):
-            descriptor = f"{r[2] or ''} {r[7] or ''}"
+            # Descriptor: perfil de producto (limpio) + vertical/CIIU + descripción.
+            descriptor = f"{r[8] or ''} {r[2] or ''} {r[7] or ''}"
             return (-producto_overlap(descriptor, terms), not r[5], -(int(r[6]) if r[6] else 0))
 
         rows = sorted(rows, key=_clave)[:limit]

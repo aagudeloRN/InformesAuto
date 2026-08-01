@@ -70,3 +70,26 @@ def test_sin_descripcion_no_agrega_atributo():
     repo = _RepoFake()
     NurtureKB(repo).execute(nombre="Colanta", sector_gics="3020", descripcion=None)
     assert repo.atributos == []
+
+
+def test_guarda_alcance_local_y_productos_perfil():
+    # Quick-win DT-063: la empresa analizada se marca alcance=local y guarda su perfil de producto,
+    # para reusarla como competidor regional rankeado por solape en informes futuros.
+    repo = _RepoFake()
+    NurtureKB(repo).execute(
+        nombre="Alpina", sector_gics="3020",
+        descripcion="Empresa láctea.", alcance="local",
+        productos="Produce lácteos: leche, yogurt, quesos, arequipe.",
+    )
+    (_, fila) = repo.entidades[0]
+    assert fila.alcance == "local"
+    claves = {a[1] for a in repo.atributos}
+    assert "productos_perfil" in claves
+    perfil = next(a for a in repo.atributos if a[1] == "productos_perfil")
+    assert "yogurt" in perfil[2] and perfil[4] == ESTADO_CANDIDATO
+
+
+def test_sin_productos_no_agrega_perfil():
+    repo = _RepoFake()
+    NurtureKB(repo).execute(nombre="Colanta", sector_gics="3020", descripcion="x")
+    assert all(a[1] != "productos_perfil" for a in repo.atributos)

@@ -45,11 +45,18 @@ class NurtureKB:
         sector_gics: str | None,
         descripcion: str | None = None,
         fuente_descripcion: str = FUENTE_WEB,
+        alcance: str | None = None,
+        productos: str | None = None,
     ) -> int | None:
         """Upsert de la empresa principal como entidad `verificado`; descripción como `candidato`.
 
         Idempotente (upsert por nombre+sector). Devuelve el id de la entidad, o None si el nombre
         está vacío (nunca fabrica una entidad sin nombre — RN-001).
+
+        DT-063/quick-win: se marca `alcance` (típicamente `local` para el analizado colombiano) y
+        se guarda su `productos_perfil` (sección "Productos y servicios" de Cap 1) → así la empresa
+        ya pagada como descripción se reusa como **competidor regional rankeado por solape de
+        producto** cuando mañana se analice otra empresa del mismo sector.
         """
         if not nombre or not nombre.strip():
             return None
@@ -58,6 +65,7 @@ class NurtureKB:
             nombre_normalizado=_normalizar(nombre),
             tipo=TIPO_EMPRESA,
             sector_gics=sector_gics or None,
+            alcance=alcance,
             estado=ESTADO_VERIFICADO,  # identidad pedida por el usuario (prioridad usuario)
             aliases=[nombre.strip()],
         ))
@@ -65,6 +73,12 @@ class NurtureKB:
             # Campo enriquecido: candidato con procedencia (web/LLM), no hecho verificado.
             self._repo.add_atributo(
                 entidad_id, "descripcion", descripcion.strip()[:2000],
+                fuente_descripcion, estado=ESTADO_CANDIDATO,
+            )
+        if productos and productos.strip():
+            # Perfil de producto (descriptor limpio para el re-rank por solape del anclaje).
+            self._repo.add_atributo(
+                entidad_id, "productos_perfil", productos.strip()[:2000],
                 fuente_descripcion, estado=ESTADO_CANDIDATO,
             )
         logger.info("KB nutrido con empresa principal '%s' (id=%s)", nombre, entidad_id)
