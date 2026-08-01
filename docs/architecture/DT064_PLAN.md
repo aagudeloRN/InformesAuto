@@ -53,7 +53,14 @@ reales cuando existan, **persistidos** para reuso, y con la **redacción estable
 - E2E Alpina (lácteos) con `anclaje_local_enabled + discover_globales_enabled + selfreview_enabled`:
   2.1.1 = Danone/Kellogg's/Fonterra/… (0 cerveza, 0 tabaco); 2.1.2 = Colanta/Alquería; fichas CON
   datos; atributos persistidos en el KB (verificable por consulta); re-corrida reusa (menos búsquedas).
-- Confirmar disjunción con una cervecera y una tabacalera (pendiente de DT-063).
+- **E2E en un SEGUNDO SECTOR distinto de alimentos/lácteos** (obligatorio, para no sesgar la
+  validación hacia food). Candidatos: banca (p. ej. `Bancolombia`, GICS 4010), automotor (`Sofasa`,
+  2510), software (`Sofka`, 4510) o energía (`Ecopetrol`, 1010). Confirmar que en ESE sector: los
+  globales anclados son del dominio correcto (no food), las fichas los usan (0 ajenos), y los
+  locales/startups del directorio salen re-rankeados por producto. El mecanismo es genérico (DT-063
+  no es food-specific) — este E2E lo demuestra y evita bias.
+- Confirmar además la disjunción por sub-actividad dentro de 3020: cervecera y tabacalera (pendiente
+  de DT-063).
 - Gate: ruff 0, `pytest -m "not slow"` verde.
 
 ## Estado del repo al cerrar hoy (2026-07-31)
@@ -102,4 +109,7 @@ EMIS↔NER + HITL, y migrar el path global al JOIN `entidad_sectores`).
 > generate_n1.py` (cableado), `data/repositories/entidad_repo.py` (persistir/leer atributos de ficha),
 > `shared/text_productos.py`, `domain/kb/relevance.py`. E2E: `scripts/run_pilot.py --empresa "Alpina
 > Productos Alimenticios S.A." --ciiu 1040` con los 3 flags. Confirmar disjunción con cervecera y
-> tabacalera. Sucesor vivo: **DT-050b** (reconciliación + HITL).
+> tabacalera. **IMPORTANTE (usuario 2026-07-31):** el E2E de validación NO puede ser solo Alpina —
+> correr también un **segundo sector no-alimentos** (p. ej. Bancolombia/4010, Sofasa/2510, Sofka/4510
+> o Ecopetrol/1010) para asegurar que el mecanismo es genérico y no hay sesgo hacia food/lácteos.
+> Sucesor vivo: **DT-050b** (reconciliación + HITL).
