@@ -46,6 +46,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.domain.use_cases.generate_mercado import GenerateMercado
     from ic.domain.use_cases.generate_tendencias import GenerateTendencias
     from ic.domain.use_cases.self_review_hooks import review_web_cap
+    from ic.infrastructure.llm.gateway import build_api_llm
     from ic.infrastructure.ner.entity_recognizer import normalize_entity
     from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
     from ic.infrastructure.sources.cached_connector import (
@@ -200,12 +201,25 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                     kb_locales = [r.nombre for r in (*regionales, *startups)]
         except Exception:  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
             logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)
+        # DT-064/T5: cadena de escalada = tier de API superior (synth = Nemotron Ultra). Se usa SOLO
+        # ante negativa del LLM tras retry (coste acotado). Sin API key o tier no configurado → None
+        # (invariante). El modelo vive en .env (ADR-002), no se hardcodea.
+        escalation_chain = None
+        if s.openrouter_api_key:
+            tier = getattr(s, "benchmarking_escalation_tier", "synth")
+            try:
+                escalation_chain = build_chain_03(
+                    build_api_llm(s, tier=tier, cost_tracker=ctx.tracker)
+                )
+            except Exception:  # noqa: BLE001 — sin tier de escalada la corrida sigue igual.
+                logger.warning("No se pudo construir la cadena de escalada (tier=%s)", tier)
         cap = GenerateBenchmarking(
             chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=web,
             entidades_chain=build_chain_entidades(ctx.api_llm or ctx.llm),
             kb_competidores=kb_competidores, kb_locales=kb_locales,
             jugadores_locales_ctx=jugadores_locales_ctx,
             fichas_conocidas_ctx=fichas_conocidas_ctx,
+            escalation_chain=escalation_chain,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,

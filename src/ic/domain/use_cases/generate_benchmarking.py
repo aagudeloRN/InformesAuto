@@ -12,7 +12,7 @@ from ic.domain.chains.chain_03_benchmarking import format_chunks_as_context
 from ic.domain.kb.relevance import format_referentes_globales
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
-from ic.shared.text_utils import has_cjk_characters
+from ic.shared.text_utils import has_cjk_characters, is_llm_refusal
 from ic.shared.types import CapBenchmarking
 
 logger = logging.getLogger(__name__)
@@ -91,6 +91,11 @@ def _extract_radar(texto: str) -> tuple[str, dict | None]:
     return texto, None
 
 
+def _requiere_reintento(texto: str) -> bool:
+    """El texto no es una redacción válida: negativa del LLM o idioma incorrecto (DT-064/T5)."""
+    return is_llm_refusal(texto) or has_cjk_characters(texto)
+
+
 class GenerateBenchmarking:
     def __init__(
         self,
@@ -102,6 +107,7 @@ class GenerateBenchmarking:
         kb_locales: list[str] | None = None,
         jugadores_locales_ctx: str = "",
         fichas_conocidas_ctx: str = "",
+        escalation_chain: Runnable | None = None,
     ) -> None:
         self._chain = chain
         self._store = store
@@ -121,6 +127,9 @@ class GenerateBenchmarking:
         self._jugadores_locales_ctx = jugadores_locales_ctx or ""
         # DT-064/T4: bloque de fichas ya conocidas del KB (pre-fill). "" → invariante.
         self._fichas_conocidas_ctx = fichas_conocidas_ctx or ""
+        # DT-064/T5: cadena de escalada (tier de API superior) ante negativa del LLM tras retry.
+        # None → sin escalada (invariante).
+        self._escalation_chain = escalation_chain
 
     def _identificar_entidades(self, chunks, sector_gics: str) -> list[str]:
         """Entidades competidoras a explotar: KB (canónico) + las ancladas en la evidencia.
@@ -165,6 +174,23 @@ class GenerateBenchmarking:
                     fuente_tipo="web",
                     urls=[r.url for r in results],
                 )
+
+    def _redactar_con_escalada(self, payload: dict) -> str:
+        """Redacta el Cap 2; ante negativa/idioma reintenta 1× y escala a un tier superior (T5).
+
+        El modelo gratuito es estocástico: un reintento con la misma cadena suele bastar. Si la
+        negativa persiste y hay `escalation_chain` (tier de API superior), se escala. La escalada
+        corre SOLO ante negativa confirmada tras retry → coste acotado (≤20 USD/mes, ADR-002).
+        """
+        texto = self._chain.invoke(payload)
+        if not _requiere_reintento(texto):
+            return texto
+        logger.info("Cap 2: respuesta no válida (negativa/idioma). Reintentando con el primario.")
+        texto = self._chain.invoke(payload)
+        if not _requiere_reintento(texto) or self._escalation_chain is None:
+            return texto
+        logger.info("Cap 2: negativa persistente tras retry. Escalando a tier de API superior.")
+        return self._escalation_chain.invoke(payload)
 
     def execute(
         self,
@@ -219,7 +245,7 @@ class GenerateBenchmarking:
             )
 
         context = format_chunks_as_context(chunks)
-        texto_raw = self._chain.invoke({
+        payload = {
             "descripcion_empresa": descripcion_empresa,
             "sector_gics": sector_gics,
             "retrieval_competidores": context,
@@ -229,13 +255,27 @@ class GenerateBenchmarking:
             "referentes_globales_anclados": format_referentes_globales(self._kb_competidores),
             # DT-064/T4: campos de ficha ya conocidos del KB (escribir desde hechos).
             "fichas_conocidas": self._fichas_conocidas_ctx,
-        })
+        }
+        texto_raw = self._redactar_con_escalada(payload)
 
         if has_cjk_characters(texto_raw):
             return CapBenchmarking(
                 texto=build_absent_paragraph(
                     "Cap 2 — Análisis Competitivo",
                     "El modelo generó texto en un idioma incorrecto (no español)",
+                ),
+                n_chunks_usados=len(chunks),
+                retrieval_suficiente=False,
+                chunks_usados=chunks,
+            )
+
+        # DT-064/T5: si el modelo rehusó redactar (incluso tras retry + escalada), no emitir la
+        # negativa como contenido: párrafo de ausencia (el self-review, si ON, aún puede rescatar).
+        if is_llm_refusal(texto_raw):
+            return CapBenchmarking(
+                texto=build_absent_paragraph(
+                    "Cap 2 — Análisis Competitivo",
+                    "El modelo no pudo redactar las fichas de competidores con las fuentes dadas",
                 ),
                 n_chunks_usados=len(chunks),
                 retrieval_suficiente=False,
