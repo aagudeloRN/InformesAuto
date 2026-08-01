@@ -7,11 +7,12 @@ ejecución del concern de presentación (CLI, Streamlit, tests).
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 from ic.domain.use_cases import checkpoint_hooks
+from ic.shared.text_productos import extract_productos_servicios
 
 logger = logging.getLogger(__name__)
 
@@ -208,12 +209,18 @@ class GenerateInforme:
                 )
                 ctx.empresa = uc_desc.execute(ctx.params.empresa)
             if ctx.params.ciiu:
-                ctx.empresa = ctx.empresa.__class__(
-                    nombre_empresa=ctx.empresa.nombre_empresa,
-                    actividad_ciiu=ctx.params.ciiu,
-                    texto=ctx.empresa.texto,
-                )
+                # `replace` preserva TODOS los campos (incl. productos_servicios de DT-063); antes
+                # se reconstruía a mano y se perdía la señal de producto → el descubrimiento caía a
+                # nivel grupo (contaminación tabaco en Alpina).
+                ctx.empresa = replace(ctx.empresa, actividad_ciiu=ctx.params.ciiu)
             checkpoint_hooks.save(ctx, "empresa", ctx.empresa)
+        # DT-063: red de seguridad — si productos_servicios llega vacío (checkpoint viejo sin el
+        # campo, o cualquier ruta que lo pierda) pero hay descripción, se re-deriva de la prosa.
+        if not getattr(ctx.empresa, "productos_servicios", "") and ctx.empresa.texto:
+            ctx.empresa = replace(
+                ctx.empresa,
+                productos_servicios=extract_productos_servicios(ctx.empresa.texto),
+            )
         ctx.step_fn(2, "GICS — Clasificación de sector")
         ctx.gics = checkpoint_hooks.restore(ctx, "gics")
         if ctx.gics is None:
