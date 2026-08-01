@@ -69,10 +69,14 @@ USER_PROMPT_03 = (
     "verificable para las subsecciones Regionales y Startups — no inventes nombres que no estén "
     "aquí ni en las fichas RAG):\n"
     "{jugadores_locales}\n\n"
+    "{referentes_globales_anclados}\n\n"
     "Desarrolla exactamente las siguientes secciones en este orden:\n\n"
     "## 2.1. Jugadores Clave - Líderes del Mercado\n\n"
     "Identifica y analiza 14 actores: 8 líderes globales, 3 referentes regionales (LatAm/Colombia) "  # noqa: E501
     "y 3 startups o disruptores del sector.\n"
+    "Si arriba se listan \"Referentes Globales OBLIGATORIOS\", las fichas de la subcategoría global "  # noqa: E501
+    "deben ser EXACTAMENTE esas empresas (usa el RAG solo para llenar sus campos, nunca para "
+    "elegir otras); si no se listan, identifícalos tú a partir de las fichas RAG del sector.\n"
     "Para cada actor, una ficha/tabla con los 8 puntos indicados en el system prompt.\n"
     "Agrupa por subcategoría: ### Referentes Globales / ### Referentes Regionales LatAm/Colombia / "  # noqa: E501
     "### Startups y Disruptores del sector.\n\n"

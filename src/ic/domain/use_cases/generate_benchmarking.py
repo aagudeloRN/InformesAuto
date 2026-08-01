@@ -9,6 +9,7 @@ from langchain_core.runnables import Runnable
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
 from ic.domain.chains.chain_02b_entidades import MAX_ENTIDADES, parse_entidades
 from ic.domain.chains.chain_03_benchmarking import format_chunks_as_context
+from ic.domain.kb.relevance import format_referentes_globales
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
 from ic.shared.text_utils import has_cjk_characters
@@ -220,6 +221,9 @@ class GenerateBenchmarking:
             "sector_gics": sector_gics,
             "retrieval_competidores": context,
             "jugadores_locales": self._jugadores_locales_ctx,
+            # DT-064/T1: sujetos globales anclados (kb_competidores) como actores obligatorios de
+            # 2.1.1. Vacío → invariante (el LLM identifica los globales del RAG del sector).
+            "referentes_globales_anclados": format_referentes_globales(self._kb_competidores),
         })
 
         if has_cjk_characters(texto_raw):

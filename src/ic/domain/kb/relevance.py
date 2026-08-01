@@ -150,6 +150,25 @@ def _linea_local(r: LocalRow) -> str:
     return "- " + " — ".join(partes)
 
 
+def format_referentes_globales(nombres: list[str] | None) -> str:
+    """Bloque con los globales anclados como sujetos obligatorios de 2.1.1 (DT-064). Puro.
+
+    Cierra la causa raíz del E2E de Alpina: la síntesis escribía las fichas de "Referentes
+    Globales" desde el RAG (contaminado por queries genéricas del grupo GICS), no desde la lista
+    anclada (DT-063). Devuelve "" si no hay nombres (invariante: prompt idéntico al actual → el LLM
+    identifica los globales del sector). RN-001: solo lista competidores ya anclados en el KB.
+    """
+    limpios = [n.strip() for n in (nombres or []) if n and n.strip()]
+    if not limpios:
+        return ""
+    vinetas = "\n".join(f"- {n}" for n in limpios)
+    return (
+        "Referentes Globales OBLIGATORIOS (sección 2.1.1): las fichas de \"Referentes Globales\" "
+        "son EXACTAMENTE estas empresas. No elijas otras del RAG ni sustituyas ninguna; usa el RAG "
+        "solo para llenar sus campos:\n" + vinetas
+    )
+
+
 def format_jugadores_locales(
     regionales: list[LocalRow], startups: list[LocalRow]
 ) -> str:
