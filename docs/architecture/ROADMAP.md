@@ -20,8 +20,26 @@ Rama `develop`. Últimos hitos (esta línea de trabajo, DT-050→):
   `LLM_API_SYNTH_MODEL=gemini-3.5-flash-lite` (500 RPD; 2.5-flash tenía 20). Ver
   `project_llm_robustez_modelos`.
 
+## Plan de mañana (2026-08-04) — foco: las TABLAS de competidores
+
+Objetivo (petición del usuario): **encontrar la mejor forma de trabajar las tablas 2.1** — o, si el
+esquema actual (3 tiers × 8 campos) resulta muy complejo, **evaluar otro esquema para identificar
+competencia**. Arrancar en Plan Mode explorando estas opciones:
+- **(a) Endurecer el esquema actual**: ya matchea los informes humanos; la complejidad estaba en
+  parsing/veneno/pre-fill (ya resuelto). ¿Solo falta datos + rendering sólido?
+- **(b) Tabla KB-driven determinista**: construir la tabla desde `entidad_atributos` (hechos del KB)
+  donde haya datos, y usar el LLM solo para los huecos → menos variabilidad/alucinación (aprovecha el
+  pre-fill T4 ya hecho).
+- **(c) Simplificar campos**: menos de 8 (p. ej. nombre/país/portafolio/diferenciador) → menos
+  "Dato no disponible".
+- **(d) Representación alternativa**: matriz comparativa única (top-N × dimensiones) o apoyarse más en
+  el **radar** (ya existe) como vista primaria de competencia, tablas secundarias.
+Insumo: los 5 informes humanos (`DT064_FICHA_SPEC.md`) + el eval set + el `.docx` de Alpina/Emtelco.
+Después de esto: cerrar la documentación completa (§ abajo) y el triaje de deuda.
+
 ## Pruebas pendientes (validaciones que faltan)
-1. **E2E Gemini síntesis** (tras el cambio de `.env`): Cap 6/Resumen por Gemini, sin crash (exit 0).
+1. ✅ **HECHO 2026-08-03** — E2E Gemini síntesis (`gemini-3.5-flash-lite`): Alpina EXIT=0, 0 crashes,
+   Cap 1 completo (9 subsecciones), 2.1.1 = 8 globales food (0 tabaco/cerveza). `output/alpina_gemini.docx`.
 2. **E2E Fase 1**: un capítulo degradado cae al cacheado bueno (fallback); re-corrida reusa.
 3. **E2E DT-064/065 con KB limpio**: Alpina 1040 + Emtelco full → fichas con datos reales, 0 veneno,
    0 cerveza/tabaco, tiers regional/startup pre-llenados por data local.
