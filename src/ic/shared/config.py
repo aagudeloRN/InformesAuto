@@ -23,8 +23,23 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     llm_api_free_model: str = ""      # tier free primario (Nemotron Super 120B)
     llm_api_free_alt_model: str = ""  # tier free alternativo (ej: meta-llama/llama-3.3-70b-instruct:free)  # noqa: E501
-    llm_api_synth_model: str = ""     # tier síntesis free (Nemotron Ultra)
-    llm_api_paid_model: str = ""      # respaldo pago (Gemma 3)
+    llm_api_synth_model: str = ""     # tier síntesis (Gemini 2.5 Flash — Google directo)
+    llm_api_paid_model: str = ""      # respaldo pago (Gemma 3/4)
+
+    # Proveedor por tier (2026-08-03): enruta un tier a otra API OpenAI-compat sin tocar código
+    # (ADR-002). "openrouter" (default) o "gemini". El resolver mapea provider→(base_url, key).
+    llm_api_free_provider: str = "openrouter"
+    llm_api_free_alt_provider: str = "openrouter"
+    llm_api_synth_provider: str = "openrouter"  # .env → "gemini" para Gemini 2.5 Flash
+    llm_api_paid_provider: str = "openrouter"
+    # Gemini (Google AI Studio) vía su endpoint OpenAI-compatible.
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    gemini_api_key: str = ""
+    # Fallback universal anexado al final de la cadena resiliente (auto-router free de OpenRouter).
+    llm_api_fallback_model: str = ""       # .env → "openrouter/free"
+    llm_api_fallback_provider: str = "openrouter"
+    # Red de seguridad de tokens de salida para la API (alta; no trunca síntesis legítimas).
+    llm_api_max_tokens_output: int = 32000
 
     # Compatibilidad legada — mantener para no romper .env existentes
     llm_api_provider: str = "openrouter"

@@ -28,7 +28,7 @@ _PRICING: dict[str, tuple[float, float]] = {
     "google/gemma-3-12b-it": (0.05 / 1_000_000, 0.10 / 1_000_000),
 }
 
-ModelTier = Literal["free", "free_alt", "synth", "paid"]
+ModelTier = Literal["free", "free_alt", "synth", "paid", "fallback"]
 
 
 @dataclass
@@ -181,6 +181,9 @@ class OpenRouterGatewayLLM(BaseChatModel):
     max_retries: int = 3
     timeout: int = 180
     cost_tracker: CostTracker | None = None
+    # Red de seguridad ALTA (no cap que trunque): acota la generación desbocada sin cortar síntesis
+    # largas legítimas (~30 páginas ingeridas → salidas de varios miles de tokens son normales).
+    max_tokens_output: int = 32000
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -208,6 +211,7 @@ class OpenRouterGatewayLLM(BaseChatModel):
         payload = {
             "model": self.model,
             "messages": self._to_openai_messages(messages),
+            "max_tokens": self.max_tokens_output,
         }
 
         @retry(
@@ -242,6 +246,21 @@ class OpenRouterGatewayLLM(BaseChatModel):
                     data,
                 )
                 raise RuntimeError(f"OpenRouter sin 'choices' (model={self.model}): {data}")
+            # Guard anti-crash (2026-08-03): el free tier (proveedor único) a veces devuelve
+            # content=None o finish_reason "length"/null (generación desbocada/truncada). Antes eso
+            # llegaba a AIMessage(content=None) → ValidationError → crash. Ahora es recuperable:
+            # reintenta aquí y, si agota, ResilientChatModel cae al fallback.
+            choice = data["choices"][0]
+            content = choice.get("message", {}).get("content")
+            finish = choice.get("finish_reason")
+            if content is None or (isinstance(content, str) and not content.strip()):
+                raise EmptyGenerationError(
+                    f"content vacío/None (model={self.model}, finish_reason={finish})"
+                )
+            if finish == "length":
+                raise EmptyGenerationError(
+                    f"generación truncada por longitud (model={self.model})"
+                )
             return data
 
         data = _call()
@@ -343,6 +362,19 @@ class RateLimitError(RuntimeError):
     """Excepción explícita de rate-limit para que ResilientChatModel la capture."""
 
 
+class EmptyGenerationError(RuntimeError):
+    """Generación vacía/None o truncada por longitud (free tier degradado, 2026-08-03).
+
+    ResilientChatModel la trata como recuperable → cae al siguiente tier (fallback). Evita el crash
+    por ``AIMessage(content=None)`` y convierte la fragilidad del modelo en degradación recuperable.
+    """
+
+
+def is_empty_generation_error(exc: Exception) -> bool:
+    """True si el fallo es una generación vacía/truncada → justifica fallback de tier."""
+    return isinstance(exc, EmptyGenerationError)
+
+
 class ResilientChatModel(BaseChatModel):
     """LLM con fallback automático de tier ante rate-limit de OpenRouter (DT-021, T15.3).
 
@@ -371,21 +403,28 @@ class ResilientChatModel(BaseChatModel):
             try:
                 return tier_llm._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
             except Exception as exc:
-                if is_rate_limit_error(exc):
+                # Recuperables → cae al siguiente tier: rate-limit, red transitoria, o generación
+                # vacía/truncada (free tier degradado, 2026-08-03).
+                if (
+                    is_rate_limit_error(exc)
+                    or is_transient_network_error(exc)
+                    or is_empty_generation_error(exc)
+                ):
                     logger.warning(
-                        "Rate-limit en tier %d (model=%s): %s. Intentando fallback.",
-                        i, tier_llm.model, exc,
-                    )
-                    last_exc = exc
-                    continue
-                if is_transient_network_error(exc):
-                    logger.warning(
-                        "Error de red transitorio en tier %d (model=%s): %s. Intentando fallback.",
+                        "Fallo recuperable en tier %d (model=%s): %s. Intentando fallback.",
                         i, tier_llm.model, exc,
                     )
                     last_exc = exc
                     continue
                 raise  # error no-recuperable → propagar inmediatamente
+        # Todos los tiers agotados. Si fue por generación vacía, DEGRADAR a content="" en vez de
+        # crashear: Fase 1 (commit_best) caerá al capítulo cacheado bueno. Otro caso → re-raise.
+        if is_empty_generation_error(last_exc):
+            logger.error(
+                "Todos los tiers devolvieron generación vacía → se degrada a content='' (%s)",
+                last_exc,
+            )
+            return ChatResult(generations=[ChatGeneration(message=AIMessage(content=""))])
         raise last_exc  # type: ignore[misc]
 
     def _stream(
@@ -440,7 +479,19 @@ _TIER_TIMEOUT_ATTR: dict[ModelTier, str] = {
     "free_alt": "llm_api_timeout_free_alt",
     "synth": "llm_api_timeout_synth",
     "paid": "llm_api_timeout_paid",
+    "fallback": "llm_api_timeout_free",
 }
+
+
+def _provider_base_and_key(settings: Settings, provider: str) -> tuple[str, str]:
+    """Resuelve (base_url, api_key) del proveedor de un tier. Puro (2026-08-03).
+
+    ``openrouter`` (default) o ``gemini`` (Google AI Studio, endpoint OpenAI-compatible). Cualquier
+    otro valor cae a openrouter para no romper .env existentes.
+    """
+    if provider == "gemini":
+        return settings.gemini_base_url, settings.gemini_api_key
+    return settings.openrouter_base_url, settings.openrouter_api_key
 
 
 def build_api_llm(
@@ -448,32 +499,41 @@ def build_api_llm(
     tier: ModelTier = "free",
     cost_tracker: CostTracker | None = None,
 ) -> OpenRouterGatewayLLM:
-    """Construye LLM de API (OpenRouter).
+    """Construye LLM de API para un tier. El modelo y el proveedor viven en .env (ADR-002).
 
-    tier='free'  → Nemotron Super (Caps 2, 3, 4 analíticos)
-    tier='synth' → Nemotron Ultra (Caps 5, 6, Resumen — síntesis)
-    tier='paid'  → Gemma 3 27B (respaldo si free tiene rate limit)
+    Provider por tier (``llm_api_<tier>_provider``): openrouter (default) o gemini. La síntesis
+    (Cap 5/6/Resumen) suele ir a Gemini 2.5 Flash; ``fallback`` = auto-router free de OpenRouter.
     """
     model_map: dict[ModelTier, str] = {
         "free": settings.llm_api_free_model,
         "free_alt": settings.llm_api_free_alt_model,
         "synth": settings.llm_api_synth_model,
         "paid": settings.llm_api_paid_model,
+        "fallback": settings.llm_api_fallback_model,
+    }
+    provider_map: dict[ModelTier, str] = {
+        "free": settings.llm_api_free_provider,
+        "free_alt": settings.llm_api_free_alt_provider,
+        "synth": settings.llm_api_synth_provider,
+        "paid": settings.llm_api_paid_provider,
+        "fallback": settings.llm_api_fallback_provider,
     }
     model = model_map[tier]
     if not model:
         raise ValueError(
             f"Modelo para tier='{tier}' no configurado en .env "
-            f"(LLM_API_FREE_MODEL / LLM_API_SYNTH_MODEL / LLM_API_PAID_MODEL)"
+            f"(LLM_API_FREE_MODEL / LLM_API_SYNTH_MODEL / LLM_API_FALLBACK_MODEL / …)"
         )
+    base_url, api_key = _provider_base_and_key(settings, provider_map[tier])
     timeout_attr = _TIER_TIMEOUT_ATTR.get(tier, "llm_api_timeout_free")
     timeout = getattr(settings, timeout_attr, 180)
     return OpenRouterGatewayLLM(
-        base_url=settings.openrouter_base_url,
+        base_url=base_url,
         model=model,
-        api_key=settings.openrouter_api_key,
+        api_key=api_key,
         max_retries=settings.llm_circuit_breaker_max_retries,
         timeout=timeout,
+        max_tokens_output=settings.llm_api_max_tokens_output,
         cost_tracker=cost_tracker,
     )
 
@@ -485,10 +545,13 @@ def build_resilient_api_llm(
 ) -> ResilientChatModel:
     """Construye un LLM resiliente con fallback automático entre tiers (T15.3, DT-021).
 
-    Orden default: free → free_alt → synth → paid.
-    Solo incluye tiers con modelo configurado en .env.
+    Orden default: free → free_alt → synth → paid. El tier ``fallback`` (auto-router free de
+    OpenRouter, si está configurado) se ANEXA siempre al final como último recurso universal.
+    Solo incluye tiers con modelo configurado en .env; deduplica y no repite el fallback.
     """
     tier_order: list[ModelTier] = tiers or ["free", "free_alt", "synth", "paid"]
+    if "fallback" not in tier_order:
+        tier_order = [*tier_order, "fallback"]
     built: list[OpenRouterGatewayLLM] = []
     for t in tier_order:
         try:

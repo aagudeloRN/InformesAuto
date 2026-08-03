@@ -135,10 +135,22 @@ class GenerateInforme:
 
         s = self._settings
         tracker = CostTracker(budget_limit=s.llm_budget_limit_usd)
-        # T16.0-A: un solo modelo resiliente (free→free_alt→synth→paid)
+        # T16.0-A: modelo resiliente analítico (free→free_alt→synth→paid→fallback) para Caps 2/3/4.
         resilient_llm = (
             build_resilient_api_llm(s, cost_tracker=tracker) if s.openrouter_api_key else None
         )
+        # 2026-08-03: cadena dedicada de SÍNTESIS (Cap 5/6/Resumen) = synth (Gemini 2.5 Flash) +
+        # fallback (openrouter/free). Reserva la cuota diaria de Gemini para los POCOS llamados de
+        # síntesis; los ~40 analíticos siguen en Nemotron. Sin synth/fallback → usa la general.
+        # Invariante: solo se separa si la síntesis va a Gemini (provider+key); si no, la general.
+        resilient_synth_llm = resilient_llm
+        if s.llm_api_synth_provider == "gemini" and s.gemini_api_key:
+            try:
+                resilient_synth_llm = build_resilient_api_llm(
+                    s, tiers=["synth"], cost_tracker=tracker
+                )
+            except ValueError:
+                resilient_synth_llm = resilient_llm
         llm = build_llm(s, cost_tracker=tracker)
         cap1_llms = [m for m in [resilient_llm, llm] if m is not None]
         slug = params.empresa.replace(" ", "_").replace(".", "").lower()
@@ -151,7 +163,7 @@ class GenerateInforme:
             llm=llm,
             api_llm=resilient_llm,
             api_llm_alt=None,
-            api_llm_synth=resilient_llm,  # mismo modelo; el fallback opera internamente
+            api_llm_synth=resilient_synth_llm,  # síntesis: Gemini + fallback openrouter/free
             cap1_llms=cap1_llms, embedder=Embedder(s), web=WebConnector(s),
             tracker=tracker,
             intro_chain=build_chain_intro(resilient_llm) if resilient_llm else None,
