@@ -38,7 +38,24 @@ FICHA_KEYS = (
     "mayor_fortaleza",
 )
 
-_AUSENTE = "dato no disponible"
+# Marcadores de ausencia (RN-001): frases con que el LLM señala "no hay dato" y que NUNCA deben
+# persistirse como valor (si no, el pre-fill T4 se las devuelve como hecho → bucle de veneno). Se
+# comparan sobre texto sin acentos/minúsculas y ANCLADAS AL INICIO (tras quitar paréntesis/guiones):
+# así "Datos no disponibles en las fuentes consultadas" o "(no especificado)" se descartan, pero un
+# valor útil con nota parcial ("B2B (Precios: No disponible)") se conserva.
+_AUSENTE_PREFIJOS = (
+    "no disponible",
+    "no especificad",
+    "dato no disponible",
+    "datos no disponible",
+    "informacion no disponible",
+    "sin informacion",
+    "sin datos",
+    "no aplica",
+    "no reportad",
+    "por confirmar",
+)
+_AUSENTE_EXACTO = {"n/a", "na", "n.a.", "nd", "s/d", "sd", "n/d", "-", "--", "---", "."}
 
 # Alias de claves de atributo de fuentes locales (StartIA/EmpresasColombia) → clave de ficha.
 # Deja que la data estructurada YA sembrada (descripción, actividad/vertical, tecnologías) alimente
@@ -103,8 +120,15 @@ def _clave_de_etiqueta(label: str) -> str | None:
 
 
 def _es_valor_util(valor: str) -> bool:
+    """True si el valor es un dato real, no una frase de ausencia (RN-001, anti-veneno del KB)."""
     v = valor.strip()
-    return bool(v) and _AUSENTE not in _sin_acentos(v)
+    if not v:
+        return False
+    # Sin acentos/minúsculas; quita paréntesis/guiones/asteriscos y puntuación de borde para anclar.
+    norm = _sin_acentos(v).lstrip("(-–—* ").strip().rstrip(").")
+    if norm in _AUSENTE_EXACTO:
+        return False
+    return not any(norm.startswith(p) for p in _AUSENTE_PREFIJOS)
 
 
 def _split_nombre_pais(valor: str) -> tuple[str, str | None]:

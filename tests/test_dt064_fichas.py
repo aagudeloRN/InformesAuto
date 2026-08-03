@@ -69,6 +69,31 @@ def test_parse_ignora_dato_no_disponible_y_hereda_tier():
     assert "presencia_geografica" not in colombina.campos
 
 
+def test_parse_ignora_variantes_de_ausencia_pero_conserva_parciales():
+    # Regresión del bucle de veneno: el LLM emite el PLURAL "Datos no disponibles…" y variantes que
+    # el detector antiguo (solo "dato no disponible") dejaba pasar → T3 las persistía como hecho.
+    texto = """
+### Referentes Globales
+
+| Campo | Valor |
+|-------|-------|
+| Nombre + País | Acme — EE. UU. |
+| Resumen estratégico | Datos no disponibles en las fuentes consultadas. |
+| Portafolio clave | (no especificado) |
+| Canales y precios | B2B (Precios: No disponible) |
+| Presencia geográfica | N/A |
+| Mayor fortaleza | Sin información. |
+"""
+    fichas = parse_fichas_competidores(texto)
+    assert len(fichas) == 1
+    campos = fichas[0].campos
+    # Ninguna frase de ausencia se persiste…
+    for k in ("resumen_estrategico", "portafolio", "presencia_geografica", "mayor_fortaleza"):
+        assert k not in campos, f"{k} no debería persistirse (frase de ausencia)"
+    # …pero un valor útil con nota parcial SÍ se conserva.
+    assert campos["canales_precios"].startswith("B2B")
+
+
 _ANCHA = """
 ### Startups / FoodTech
 
