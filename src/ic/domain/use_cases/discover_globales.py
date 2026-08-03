@@ -36,11 +36,14 @@ class DiscoverGlobales:
         web_connector: WebConnector,
         store: PGVectorStore,
         min_corrob: int = 2,
+        force_ddg: bool = False,
     ) -> None:
         self._chain = chain
         self._web_connector = web_connector
         self._store = store
         self._min_corrob = min_corrob
+        # DT-065: forzar DuckDuckGo (gratis) para el pre-warm por lotes, sin gastar Tavily.
+        self._force_ddg = force_ddg
 
     def discover(
         self,
@@ -65,7 +68,9 @@ class DiscoverGlobales:
         corroborados = 0
         for nombre in candidatos:
             query = f"{nombre} {sector_gics} global company profile revenue market share"
-            results = self._web_connector.search(query, search_depth="advanced")
+            results = self._web_connector.search(
+                query, search_depth="advanced", force_ddg=self._force_ddg
+            )
             hits = contar_corroboracion(nombre, [r.content for r in results])
             corroborado = es_corroborado(hits, self._min_corrob)
             if corroborado:

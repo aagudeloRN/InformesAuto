@@ -26,7 +26,6 @@ from ic.data.database import SessionLocal  # noqa: E402
 from ic.data.models.entidad import (  # noqa: E402
     ALCANCE_GLOBAL,
     ESTADO_CANDIDATO,
-    ESTADO_VERIFICADO,
     FUENTE_LLM,
     TIPO_COMPETIDOR,
     ensure_entidades_tables,
@@ -62,8 +61,11 @@ def _nombre_sector(sector_code: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Descubrimiento LLM de globales (DT-062)")
-    parser.add_argument("--sector", required=True, help="Código de grupo GICS (ej. 3020)")
+    parser.add_argument("--sector", nargs="+", required=True,
+                        help="Uno o más códigos de grupo GICS (ej. --sector 3020 2020)")
     parser.add_argument("--sub", default=None, help="Sub-código GICS 6 díg (ej. 302020)")
+    parser.add_argument("--ddg-only", action="store_true",
+                        help="Forzar DuckDuckGo (no gasta Tavily) — pre-warm por lotes (DT-065)")
     parser.add_argument("--dry-run", action="store_true",
                         help="No siembra ni ingiere; solo reporta recomendados/corroborados")
     args = parser.parse_args()
@@ -77,42 +79,48 @@ def main() -> int:
     llm = build_llm(settings, cost_tracker=tracker)
     embedder = Embedder(settings)
     web = WebConnector(settings)
-    sector_nombre = _nombre_sector(args.sector)
+    chain = build_chain_pares_globales(api_llm or llm)
 
     with SessionLocal() as db:
         ensure_entidades_tables(db.get_bind())
         repo = EntidadRepository(db)
         store = PGVectorStore(embedder, EmbeddingRepository(db), settings)
-
-        def _seed(nombre: str, corroborado: bool, hits: int) -> None:
-            estado = ESTADO_VERIFICADO if corroborado else ESTADO_CANDIDATO
-            marca = "✓ verificado/global" if corroborado else "· candidato/llm"
-            logger.info("  %-22s hits=%d → %s", nombre, hits, marca)
-            if args.dry_run:
-                return
-            eid = repo.upsert_entidad(EntidadRow(
-                nombre=nombre, nombre_normalizado=normalize_entity(nombre),
-                tipo=TIPO_COMPETIDOR, sector_gics=args.sector, sub_gics=args.sub,
-                alcance=ALCANCE_GLOBAL if corroborado else None, estado=estado,
-            ))
-            repo.add_atributo(
-                eid, "origen", "llm-corroborado" if corroborado else "llm",
-                FUENTE_LLM, estado=estado,
-            )
-
         # En dry-run no queremos ingerir evidencia web: un store no-op evita escribir vectores.
         store_efectivo = store if not args.dry_run else _NoopStore()
-        conteos = DiscoverGlobales(
-            chain=build_chain_pares_globales(api_llm or llm),
-            web_connector=web, store=store_efectivo,
-            min_corrob=settings.discover_globales_min_corrob,
-        ).discover(sector_gics=sector_nombre, sub_gics=args.sub, seed_repo_fn=_seed)
 
-    logger.info(
-        "Sector %s (%s)%s: recomendados=%d corroborados=%d no_corroborados=%d",
-        args.sector, sector_nombre, " [DRY-RUN]" if args.dry_run else "",
-        conteos["recomendados"], conteos["corroborados"], conteos["no_corroborados"],
-    )
+        for sector_code in args.sector:
+            sector_nombre = _nombre_sector(sector_code)
+
+            def _seed(nombre: str, corroborado: bool, hits: int, _sector=sector_code) -> None:
+                # DT-065: LLM/web = SIEMPRE candidato (verificado se reserva a informes humanos).
+                # La corroboración (≥min_corrob) gatea alcance=global (para 2.1.1) + ingesta.
+                marca = "✓ candidato/global" if corroborado else "· candidato/llm"
+                logger.info("  %-22s hits=%d → %s", nombre, hits, marca)
+                if args.dry_run:
+                    return
+                eid = repo.upsert_entidad(EntidadRow(
+                    nombre=nombre, nombre_normalizado=normalize_entity(nombre),
+                    tipo=TIPO_COMPETIDOR, sector_gics=_sector, sub_gics=args.sub,
+                    alcance=ALCANCE_GLOBAL if corroborado else None,
+                    estado=ESTADO_CANDIDATO,
+                ))
+                repo.add_atributo(
+                    eid, "origen", "llm-corroborado" if corroborado else "llm",
+                    FUENTE_LLM, estado=ESTADO_CANDIDATO,
+                )
+
+            conteos = DiscoverGlobales(
+                chain=chain, web_connector=web, store=store_efectivo,
+                min_corrob=settings.discover_globales_min_corrob,
+                force_ddg=args.ddg_only,
+            ).discover(sector_gics=sector_nombre, productos="", seed_repo_fn=_seed)
+
+            logger.info(
+                "Sector %s (%s)%s%s: recomendados=%d corroborados=%d no_corroborados=%d",
+                sector_code, sector_nombre, " [DRY-RUN]" if args.dry_run else "",
+                " [DDG]" if args.ddg_only else "",
+                conteos["recomendados"], conteos["corroborados"], conteos["no_corroborados"],
+            )
     return 0
 
 

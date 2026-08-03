@@ -93,6 +93,27 @@ class TestDiscoverGlobales:
         nombre, corroborado, hits = seed.call_args.args
         assert nombre == "Marca Inventada" and corroborado is False and hits == 1
 
+    def test_force_ddg_se_propaga_a_search(self):
+        # DT-065: el pre-warm por lotes fuerza DuckDuckGo para no gastar Tavily.
+        chain = MagicMock()
+        chain.invoke.return_value = '["Nestlé"]'
+        web = MagicMock()
+        web.search.return_value = [_web("Perfil de Nestlé"), _web("Nestlé revenue")]
+        DiscoverGlobales(
+            chain=chain, web_connector=web, store=MagicMock(), min_corrob=2, force_ddg=True,
+        ).discover(sector_gics="Alimentos", productos="", seed_repo_fn=MagicMock())
+        assert web.search.call_args.kwargs.get("force_ddg") is True
+
+    def test_force_ddg_default_false(self):
+        chain = MagicMock()
+        chain.invoke.return_value = '["Nestlé"]'
+        web = MagicMock()
+        web.search.return_value = [_web("Perfil de Nestlé")]
+        DiscoverGlobales(chain=chain, web_connector=web, store=MagicMock()).discover(
+            sector_gics="Alimentos", productos="", seed_repo_fn=MagicMock()
+        )
+        assert web.search.call_args.kwargs.get("force_ddg") is False
+
     def test_sin_candidatos_no_busca_ni_siembra(self):
         conteos, store, seed = self._run(
             llm_json="[]", web_content_por_query=lambda q: [],
