@@ -1,4 +1,9 @@
-# 🗺️ ROADMAP — Fase 9 en adelante
+# 🗺️ ROADMAP — Fase 9 en adelante (tracker detallado, CONGELADO)
+
+> ⚠️ **CONGELADO ~F22/DT-064 (2026-08-03).** El roadmap vivo canónico es ahora
+> [`ROADMAP.md`](ROADMAP.md). Este documento se conserva como **tracker detallado histórico** de la
+> deuda técnica (tabla DT-004..DT-064+, §5) y del tablero de fases (§4). Su estado NO se actualiza
+> aquí; ver `ROADMAP.md` y `docs/decisions/FASEN_HALLAZGOS.md`.
 
 > **Propósito:** Plan de trabajo vivo y pormenorizado para llevar el sistema de Informes
 > de Inteligencia Competitiva desde su estado actual (pipeline E2E funcional) hasta un
