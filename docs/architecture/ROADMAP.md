@@ -47,6 +47,31 @@ Abierta desde F19, **agravada esta línea de trabajo**:
 
 **Triaje sugerido:** DT-037/039/040 (agravados aquí) antes de más features; DT-038 antes de HITL.
 
+## Documentación — cómo continuar (plan explícito)
+
+La consolidación 2026-08-03 dejó **1 roadmap canónico** (este) + memoria slim (54→14). Falta cerrar la
+"documentación completa"; hacerlo en este orden:
+
+1. **Actualizar la auditoría** (`auditoria_arquitectura.md`): es un snapshot de Fase 30/DT-063. Añadir un
+   **addendum** con esta línea de trabajo (DT-064, DT-065, modularidad F1 caché, robustez gateway/Gemini)
+   y **re-medir cobertura** `domain/` (`uv run pytest --cov=src/ic/domain --cov-report=term-missing -m
+   "not slow" -q`) → fijar la nueva línea base (era 69% en F19).
+2. **Actualizar docs obsoletos** (auditoría §P2): `docs/architecture/REGLAS_NEGOCIO.md` (RN-007/RN-013 ya
+   implementadas), tabla de estado de `ADR-014` (cableado ya hecho), nota puerto 5434 en `PRIME
+   DIRECTIVE.md`.
+3. **Formalizar decisiones nuevas**: decidir si merecen ADR (inmutable) o solo entrada aquí — candidatos:
+   **provider-por-tier + Gemini síntesis** (¿ADR-016?), **caché de contenido por capítulo / keep-best**
+   (¿ADR-017?). Si no ameritan ADR, basta `ROADMAP.md` + un `HALLAZGOS`.
+
+### Convención hacia adelante (para NO volver a regar la doc)
+Al cerrar cada DT/hito:
+- **(a)** Documentar hallazgos en `docs/decisions/FASEN_HALLAZGOS.md` (o `DTNNN_HALLAZGOS.md` para DTs
+  grandes, patrón `DT064_HALLAZGOS.md`).
+- **(b)** Actualizar **este** `ROADMAP.md` (estado + pruebas pendientes + deuda). **NO** tocar
+  `ROADMAP_FASE9+.md` (congelado).
+- **(c)** Añadir **1 línea** al digest `project_historial_fases` (memoria) y actualizar
+  `project_roadmap_ago2026`. **NO crear una memoria de estado por fase** (fue la causa del bloat 54→14).
+
 ## Convenciones
 Ver `CLAUDE.md` (TIER 1–4) y `PRIME DIRECTIVE.md`. Gate de cierre: `uv run ruff check src/ tests/` +
 `uv run pytest -m "not slow" -q` en verde. Modelos solo en `.env` (ADR-002). Commits Conventional.
