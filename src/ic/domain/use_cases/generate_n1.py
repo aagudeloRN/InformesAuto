@@ -180,12 +180,6 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 kb_competidores = repo_kb.list_competidores_by_sector(
                     g_code or "", productos_terms=productos_terms, alcance=ALCANCE_GLOBAL
                 )
-                # DT-064/T4: pre-fill del prompt con los campos de ficha ya persistidos (T3) de los
-                # globales anclados → el LLM escribe desde hechos. Vacío → invariante.
-                if g_code and kb_competidores:
-                    fichas_conocidas_ctx = format_fichas_conocidas(
-                        repo_kb.list_ficha_atributos_by_sector(g_code, kb_competidores)
-                    )
                 # DT-050/DT-063: anclaje del tier LOCAL (2.1.2 regionales + 2.1.3 startups) desde el
                 # directorio, re-rankeado por solape de producto. Flag OFF → nada (invariante). No
                 # diluye el global: el path global usa alcance=global con su propio método.
@@ -199,6 +193,15 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                     )
                     jugadores_locales_ctx = format_jugadores_locales(regionales, startups)
                     kb_locales = [r.nombre for r in (*regionales, *startups)]
+                # DT-064/T4 + DT-065: pre-fill del prompt con los campos de ficha ya conocidos, de
+                # los globales anclados (persistidos por T3) Y de los locales (data estructurada de
+                # StartIA/EmpresasColombia mapeada a los campos de ficha) → el LLM escribe desde
+                # hechos, no fabrica. Vacío → invariante.
+                nombres_ficha = [*kb_competidores, *kb_locales]
+                if g_code and nombres_ficha:
+                    fichas_conocidas_ctx = format_fichas_conocidas(
+                        repo_kb.list_ficha_atributos_by_sector(g_code, nombres_ficha)
+                    )
         except Exception:  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
             logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)
         # DT-064/T5: cadena de escalada = tier de API superior (synth = Nemotron Ultra). Se usa SOLO
