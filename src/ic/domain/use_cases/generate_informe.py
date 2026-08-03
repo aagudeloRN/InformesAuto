@@ -29,6 +29,11 @@ class InformeParams:
     ciiu: str | None = None
     output_path: str | None = None
     resume: bool = False  # T22.3 (DT-030): reanuda desde el último capítulo persistido
+    # Fase 1 (caché durable keep-best): el caché por (empresa, ciiu) sobrevive a la corrida y sirve
+    # de fallback si un capítulo sale degradado. `use_cache=False` → clásico (sin caché);
+    # `refresh=True` → invalida el caché al arrancar y regenera todo desde cero.
+    use_cache: bool = True
+    refresh: bool = False
 
 
 @dataclass
@@ -104,6 +109,9 @@ class GenerateInforme:
                 on_step(n, self.TOTAL_PASOS, label)
 
         ctx = self._setup_infra(params, _step, time.time())
+        # Fase 1: --refresh invalida el caché durable al arrancar → regenera todo desde cero.
+        if params.refresh:
+            checkpoint_hooks.clear(ctx)
         checkpoint_hooks.load(ctx)
         self._sweep_stale_web(ctx)
         self._run_n0(ctx)
@@ -213,7 +221,7 @@ class GenerateInforme:
                 # se reconstruía a mano y se perdía la señal de producto → el descubrimiento caía a
                 # nivel grupo (contaminación tabaco en Alpina).
                 ctx.empresa = replace(ctx.empresa, actividad_ciiu=ctx.params.ciiu)
-            checkpoint_hooks.save(ctx, "empresa", ctx.empresa)
+            ctx.empresa = checkpoint_hooks.commit_best(ctx, "empresa", ctx.empresa)
         # DT-063: red de seguridad — si productos_servicios llega vacío (checkpoint viejo sin el
         # campo, o cualquier ruta que lo pierda) pero hay descripción, se re-deriva de la prosa.
         if not getattr(ctx.empresa, "productos_servicios", "") and ctx.empresa.texto:
@@ -228,7 +236,7 @@ class GenerateInforme:
                 nombre_empresa=ctx.params.empresa, descripcion_empresa=ctx.empresa.texto,
                 ciiu=ctx.params.ciiu,
             )
-            checkpoint_hooks.save(ctx, "gics", ctx.gics)
+            ctx.gics = checkpoint_hooks.commit_best(ctx, "gics", ctx.gics)
         # Resolver empresa_id al inicio del pipeline para pasarlo a todos los use cases (T18.3).
         # Esto permite que el retrieval priorice docs asociados a esta empresa.
         try:
@@ -364,11 +372,11 @@ class GenerateInforme:
                     if intro:
                         cap_obj.texto = intro + "\n\n" + cap_obj.texto
 
-        # Persistir los caps recién computados (con intro) para poder reanudar (T22.3).
+        # Persistir los caps recién computados (con intro) con keep-best + fallback (Fase 1).
         if not conv_restaurado:
-            checkpoint_hooks.save(ctx, "cap5", ctx.cap_conv)
+            ctx.cap_conv = checkpoint_hooks.commit_best(ctx, "cap5", ctx.cap_conv)
         if not acc_restaurado:
-            checkpoint_hooks.save(ctx, "cap6", ctx.cap_acc)
+            ctx.cap_acc = checkpoint_hooks.commit_best(ctx, "cap6", ctx.cap_acc)
 
     def _run_n3(self, ctx: _PipelineContext) -> InformeResult:
         from ic.data.database import SessionLocal, engine
@@ -553,8 +561,10 @@ class GenerateInforme:
         )
         logger.info("Cache openalex: %d HITs / %d MISSes", oc.hits, oc.misses)
 
-        # T22.3 (DT-030): corrida completa → el checkpoint ya no hace falta.
-        checkpoint_hooks.clear(ctx)
+        # Fase 1: el caché por (empresa, ciiu) es DURABLE (sirve de fallback/reuso entre corridas).
+        # Solo se limpia si la corrida no usa caché (clásico T22.3: no dejar checkpoint colgando).
+        if not ctx.params.use_cache:
+            checkpoint_hooks.clear(ctx)
 
         return InformeResult(
             ruta_docx=ctx.output_path, n_referencias=len(refs),

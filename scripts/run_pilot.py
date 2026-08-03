@@ -90,6 +90,16 @@ def main() -> None:
         action="store_true",
         help="Reanuda una corrida interrumpida desde el último capítulo persistido (T22.3)",
     )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Invalida el caché durable de la empresa y regenera todo desde cero (Fase 1)",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="No usa el caché durable (sin keep-best/fallback; comportamiento clásico)",
+    )
     args = parser.parse_args()
 
     from ic.shared.config import get_settings
@@ -122,7 +132,8 @@ def main() -> None:
 
     uc = GenerateInforme(settings)
     params = InformeParams(
-        empresa=args.empresa, ciiu=args.ciiu, output_path=output_path, resume=args.resume
+        empresa=args.empresa, ciiu=args.ciiu, output_path=output_path, resume=args.resume,
+        refresh=args.refresh, use_cache=not args.no_cache,
     )
 
     global _step_times, _step_start, _last_step_label

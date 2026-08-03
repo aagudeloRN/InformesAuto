@@ -35,6 +35,14 @@ class CheckpointRepository:
         rows = self._db.execute(stmt).scalars().all()
         return {row.cap_nombre: row.payload for row in rows}
 
+    def get_capitulo(self, run_key: str, cap_nombre: str) -> dict | None:
+        """Payload de un capítulo cacheado (keep-best/fallback, Fase 1), o None si no existe."""
+        stmt = select(CheckpointCapitulo.payload).where(
+            CheckpointCapitulo.run_key == run_key,
+            CheckpointCapitulo.cap_nombre == cap_nombre,
+        )
+        return self._db.execute(stmt).scalar_one_or_none()
+
     def clear(self, run_key: str) -> None:
         """Borra el checkpoint de una corrida (p. ej. tras completarla con éxito)."""
         self._db.execute(delete(CheckpointCapitulo).where(CheckpointCapitulo.run_key == run_key))

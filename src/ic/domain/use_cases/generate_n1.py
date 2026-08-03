@@ -326,10 +326,11 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 if intro:
                     cap_obj.texto = intro + "\n\n" + cap_obj.texto
 
-    # Persistir los caps recién computados (con intro aplicado) para poder reanudar.
+    # Persistir los caps recién computados (con intro) con keep-best + fallback (Fase 1).
+    _slots = {"cap2": "cap", "mercado": "cap_mercado", "cap3": "cap_tend", "cap4": "cap_eco"}
     for name, obj in [
         ("cap2", ctx.cap), ("mercado", ctx.cap_mercado),
         ("cap3", ctx.cap_tend), ("cap4", ctx.cap_eco),
     ]:
         if _restored[name] is None:
-            checkpoint_hooks.save(ctx, name, obj)
+            setattr(ctx, _slots[name], checkpoint_hooks.commit_best(ctx, name, obj))

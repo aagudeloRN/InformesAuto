@@ -71,6 +71,54 @@ def save(ctx: _PipelineContext, nombre: str, obj) -> None:
         logger.warning("No se pudo persistir checkpoint de '%s'", nombre, exc_info=True)
 
 
+def commit_best(ctx: _PipelineContext, nombre: str, fresh):
+    """Persiste el MEJOR capítulo (keep-best) y devuelve el que debe usar el informe (fallback).
+
+    - Caché durable por `(empresa, ciiu)`: no lo borra la corrida; guarda el de mayor completitud
+      (`score_capitulo`) → un capítulo degradado no pisa uno bueno.
+    - Fallback anti-regresión: si el fresco está **claramente degradado** frente al cacheado
+      (score < `_FALLBACK_RATIO`× el cacheado), devuelve el cacheado para el informe actual; si no,
+      el fresco. Best-effort: cualquier fallo de BD → devuelve el fresco y no rompe la corrida.
+
+    Con `ctx.params.use_cache=False` se comporta como el `save` clásico (a ciegas, devuelve el
+    fresco) → invariante para quien pida corrida sin caché.
+    """
+    if fresh is None:
+        return fresh
+    if not getattr(ctx.params, "use_cache", True):
+        save(ctx, nombre, fresh)
+        return fresh
+
+    from ic.data.database import SessionLocal, engine
+    from ic.data.models.checkpoint import ensure_checkpoint_table
+    from ic.data.repositories.checkpoint_repo import CheckpointRepository
+    from ic.domain.checkpoint_serde import deserialize_cap, serialize_cap
+    from ic.domain.kb.completitud import elegir_mejor
+
+    try:
+        ensure_checkpoint_table(engine)
+        with SessionLocal() as db:
+            repo = CheckpointRepository(db)
+            payload = repo.get_capitulo(ctx.run_key, nombre)
+            cached = None
+            if payload is not None:
+                try:
+                    cached = deserialize_cap(payload)
+                except Exception:
+                    cached = None  # cacheado corrupto → se ignora
+            para_informe, para_cache = elegir_mejor(fresh, cached)
+            if para_informe is cached:
+                logger.warning(
+                    "Fallback de caché: '%s' fresco degradado → se usa el cacheado en el informe",
+                    nombre,
+                )
+            repo.save_capitulo(ctx.run_key, nombre, serialize_cap(para_cache))
+    except Exception:
+        logger.warning("commit_best: fallo de caché para '%s' — se usa el fresco", nombre)
+        return fresh
+    return para_informe
+
+
 def clear(ctx: _PipelineContext) -> None:
     """Borra el checkpoint tras completar la corrida con éxito."""
     if not ctx.run_key:
