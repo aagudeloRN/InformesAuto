@@ -25,7 +25,7 @@ from ic.data.models.entidad import (
     EntidadAtributo,
     EntidadSector,
 )
-from ic.domain.kb.ficha_parser import FICHA_KEYS
+from ic.domain.kb.ficha_parser import FICHA_KEYS, SOURCE_ATTR_TO_FICHA
 from ic.domain.kb.relevance import (
     LocalRow,
     ProductoRankRow,
@@ -194,34 +194,51 @@ class EntidadRepository:
     ) -> dict[str, dict[str, str]]:
         """Campos de ficha ya conocidos del KB para los competidores dados (DT-064/T4).
 
-        Devuelve ``{nombre: {clave: valor}}`` restringido a las claves de ficha
-        (``FICHA_KEYS``) y al sector. Alimenta el pre-fill del prompt (escribir desde hechos).
-        `verificado` gana sobre `candidato` si hay ambos para una clave. Vacío → ``{}``.
+        Devuelve ``{nombre: {clave_ficha: valor}}`` restringido al sector. Alimenta el pre-fill del
+        prompt (escribir desde hechos). Fuentes de cada campo canónico, por prioridad:
+        1) atributo NATIVO de la clave de ficha (``FICHA_KEYS``); 2) alias de una fuente local
+        (``SOURCE_ATTR_TO_FICHA``: descripción/actividad/tecnologías de StartIA/EmpresasColombia,
+        para no dejar vacíos los tiers regional/startup); 3) la columna ``ciudad`` de la entidad
+        → ``presencia_geografica``. Native > alias > columna; ``verificado`` > ``candidato``.
+        (La columna ``pais`` NO alimenta ``pais_origen``: en las fuentes locales guarda la región,
+        no el país; el país fiable llega como atributo nativo.) RN-001: solo re-etiqueta lo dado.
+        Vacío → {}.
         """
         if not sector_gics or not nombres:
             return {}
         ent = Entidad.__table__.fullname
         atr = EntidadAtributo.__table__.fullname
+        claves = list(FICHA_KEYS) + list(SOURCE_ATTR_TO_FICHA.keys())
         sql = text(
-            f"SELECT e.nombre, a.clave, a.valor "
+            f"SELECT e.nombre, e.ciudad, a.clave, a.valor "
             f"FROM {ent} e JOIN {atr} a ON a.entidad_id = e.id "
             "WHERE e.sector_gics = :sector AND a.clave = ANY(:claves) "
             "  AND e.nombre = ANY(:nombres) AND a.valor IS NOT NULL "
-            "ORDER BY (a.estado = :verificado) DESC"
+            # Native antes que alias (setdefault da prioridad al nativo), y verificado antes.
+            "ORDER BY (a.clave = ANY(:ficha)) DESC, (a.estado = :verificado) DESC"
         )
         rows = self._db.execute(
             sql,
             {
                 "sector": sector_gics,
-                "claves": list(FICHA_KEYS),
+                "claves": claves,
+                "ficha": list(FICHA_KEYS),
                 "nombres": list(nombres),
                 "verificado": ESTADO_VERIFICADO,
             },
         ).fetchall()
         fichas: dict[str, dict[str, str]] = {}
-        for nombre, clave, valor in rows:
+        ciudades: dict[str, str | None] = {}
+        for nombre, ciudad, clave, valor in rows:
             campos = fichas.setdefault(nombre, {})
-            campos.setdefault(clave, valor)  # el primero (verificado) gana
+            ciudades.setdefault(nombre, ciudad)
+            canon = clave if clave in FICHA_KEYS else SOURCE_ATTR_TO_FICHA.get(clave)
+            if canon:
+                campos.setdefault(canon, valor)  # native (por ORDER BY) y verificado ganan
+        # Columna ciudad → presencia_geografica, solo si sigue vacío (menor prioridad).
+        for nombre, ciudad in ciudades.items():
+            if ciudad:
+                fichas[nombre].setdefault("presencia_geografica", ciudad)
         return fichas
 
     def upsert_sector_membership(

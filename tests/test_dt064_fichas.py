@@ -170,18 +170,50 @@ def test_format_fichas_conocidas_lista_hechos():
 
 
 def test_list_ficha_atributos_mapea_filas_a_dict():
+    # Filas (nombre, ciudad, clave, valor) — la forma que devuelve la query DT-065.
     rows = [
-        ("Nestlé", "pais_origen", "Suiza"),
-        ("Nestlé", "portafolio", "Galletas."),
-        ("Danone", "pais_origen", "Francia"),
+        ("Nestlé", None, "pais_origen", "Suiza"),
+        ("Nestlé", None, "portafolio", "Galletas."),
+        ("Danone", None, "pais_origen", "Francia"),
     ]
     sess = _FakeSession(rows=rows)
     fichas = EntidadRepository(sess).list_ficha_atributos_by_sector("3020", ["Nestlé", "Danone"])
     assert fichas["Nestlé"] == {"pais_origen": "Suiza", "portafolio": "Galletas."}
     assert fichas["Danone"] == {"pais_origen": "Francia"}
-    # restringe a claves de ficha y por sector/nombres
+    # restringe por sector/nombres y consulta claves de ficha + alias de fuentes locales
     assert "clave = ANY(:claves)" in sess.sqls[-1]
     assert sess.params[-1]["sector"] == "3020"
+    assert "descripcion" in sess.params[-1]["claves"]  # incluye alias (DT-065)
+
+
+def test_list_ficha_atributos_alias_local_y_ciudad():
+    # Entidad local (StartIA/EmpresasColombia): data bajo claves de fuente + columna ciudad.
+    rows = [
+        ("StartCo", "Medellín", "descripcion", "Plataforma SaaS de logística."),
+        ("StartCo", "Medellín", "verticales", "LOGTECH"),
+        ("StartCo", "Medellín", "tecnologias", "IA, cloud"),
+    ]
+    f = EntidadRepository(_FakeSession(rows=rows)).list_ficha_atributos_by_sector(
+        "4510", ["StartCo"]
+    )["StartCo"]
+    assert f["resumen_estrategico"] == "Plataforma SaaS de logística."  # descripcion → resumen
+    assert f["portafolio"] == "LOGTECH"  # verticales → portafolio
+    assert f["factor_diferencial"] == "IA, cloud"  # tecnologias → factor_diferencial
+    assert f["presencia_geografica"] == "Medellín"  # columna ciudad → presencia_geografica
+    assert "pais_origen" not in f  # la columna región NO alimenta pais_origen
+
+
+def test_list_ficha_atributos_native_gana_sobre_alias():
+    # El ORDER BY del SQL entrega el nativo primero; el fake respeta ese orden → nativo gana.
+    rows = [
+        ("X", "Bogotá", "resumen_estrategico", "NATIVO"),  # native (clave de ficha)
+        ("X", "Bogotá", "descripcion", "ALIAS"),  # alias → resumen_estrategico
+        ("X", "Bogotá", "presencia_geografica", "Global"),  # native
+    ]
+    repo = EntidadRepository(_FakeSession(rows=rows))
+    f = repo.list_ficha_atributos_by_sector("3020", ["X"])["X"]
+    assert f["resumen_estrategico"] == "NATIVO"  # no lo pisa el alias
+    assert f["presencia_geografica"] == "Global"  # native gana sobre columna ciudad
 
 
 def test_list_ficha_atributos_sin_nombres_devuelve_vacio():

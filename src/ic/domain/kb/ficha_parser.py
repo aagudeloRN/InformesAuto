@@ -40,6 +40,17 @@ FICHA_KEYS = (
 
 _AUSENTE = "dato no disponible"
 
+# Alias de claves de atributo de fuentes locales (StartIA/EmpresasColombia) → clave de ficha.
+# Deja que la data estructurada YA sembrada (descripción, actividad/vertical, tecnologías) alimente
+# los campos de ficha del pre-fill (T4) sin re-sembrar. Conservador (RN-001): solo re-etiqueta lo
+# presente, 1:1, sin componer ni fabricar. El atributo nativo de la clave gana sobre su alias.
+SOURCE_ATTR_TO_FICHA: dict[str, str] = {
+    "descripcion": "resumen_estrategico",  # StartIA DESCRIPCION / EmpresasColombia "Descripción…"
+    "actividad": "portafolio",  # EmpresasColombia "Sector (Local)"
+    "verticales": "portafolio",  # StartIA VERTICALES
+    "tecnologias": "factor_diferencial",  # StartIA TECNOLOGIAS (diferenciador tech)
+}
+
 
 @dataclass
 class FichaCompetidor:

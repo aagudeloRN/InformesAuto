@@ -65,6 +65,10 @@ def parse_startia(
         ("empleados", "NUMERO_EMPLEADOS"),
         ("descripcion", "DESCRIPCION"),
         ("verticales", COL_VERTICALES),
+        # DT-065: columnas ricas que faltaban. `tecnologias` alimenta la ficha (factor_diferencial,
+        # vía SOURCE_ATTR_TO_FICHA); `ventas_2025_cop` = ingresos (metadata). Requiere re-seed.
+        ("tecnologias", "TECNOLOGIAS"),
+        ("ventas_2025_cop", "VENTAS_2025_(COP)"),
     ):
         valor = _limpio(row.get(col))
         if valor:
