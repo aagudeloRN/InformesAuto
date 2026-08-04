@@ -60,8 +60,13 @@ Después de esto: cerrar la documentación completa (§ abajo) y el triaje de de
 5. **Fix bug** empresa focal en su propia tabla de competidores (excluir por nombre normalizado).
 
 ## Frentes abiertos (prioridad)
-- **Frente Evidencia (DT-049 / DT-034):** el lote EMIS diverso (250 PDFs) está en disco pero **sin
-  ingestar** → la calidad cae fuera del sector 3020. Es la palanca directa de diversidad de fuentes.
+- **Frente Evidencia (DT-049 / DT-034):** el lote EMIS **YA está ingestado** (238/250 PDFs + 25 Pulso =
+  264 docs, 23.816 embeddings; 10 pendientes) y el RAG lo consulta. El cuello NO es volumen sino
+  **retrieval/citación** (~10 docs/sector → solo ~9 refs únicas afloran en el `.docx`) + evidencia de
+  **globales** (fuera del corpus colombiano). Ver `project_rag_ingesta_paralelizacion`.
+- **Paralelizar la ingesta ENTRE PDFs** (`scripts/ingest_batch.py`, hoy secuencial): el embedding
+  intra-PDF ya es paralelo (F23, `embedder_max_workers`); falta paralelizar el lote de PDFs (sesión DB
+  por hilo + embedders concurrentes; aplazado en FASE23 §3.2). Tarea elegida por el usuario.
 - **HITL (F24/F25):** captura/aprobación humana; depende de **DT-050b** (reconciliación EMIS↔NER por NIT).
 - **Estilo/documento (F26):** coherencia, Cap 5/6, numeración, estilo.
 
