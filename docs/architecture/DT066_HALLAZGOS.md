@@ -110,3 +110,24 @@ Re-corrida Alpina 1040 (4 flags), con el **free saturado TODA la corrida** (`Res
   (DT-049)**. El flag permite A/B (OFF vs ON) en la misma corrida.
 - **Deuda:** `generate_benchmarking`/`generate_n1` crecieron algo (lógica nueva ubicada en módulos
   `domain/kb/` para no engordar el orquestador; DT-039 sigue vigente).
+
+## AVANCES (esta sesión, 2026-08-04)
+- **DT-066 CERRADO** (código `95d97de` + fix/cierre `e363870`): 2.1 determinista validada de punta a
+  punta, con el hole-filler y el radar ya **medidos** (no solo "no-crash").
+- Cambio quirúrgico (1 línea en `generate_n1.py`): hole-filler → tier synth (Gemini), decisión
+  sancionada por el usuario. Sin nueva deuda, sin nuevos flags, invariante preservado.
+- Gate verde (ruff 0, 618 tests) y E2E dirigido reproducible (`output/alpina_dt066_v2.docx`,
+  `logs/e2e_dt066_v2.log`).
+
+## RECOMENDACIONES (próximos pasos, en orden)
+1. **Frente Evidencia (DT-049 / DT-034) — palanca directa del M>0.** El hole-filler funciona pero la
+   evidencia RAG es delgada para los globales recién anclados (por eso M=0 en KB frío). Ingestar el
+   lote **EMIS de 250 PDFs** (en disco, sin ingestar) sube la diversidad de fuentes ⇒ más huecos
+   rellenables ⇒ fichas 2.1 más ricas **y** refs del `.docx` menos escuálidas (hoy 9 únicas).
+2. **Detalles de la 2.1 (tarea acotada, opción 2 del usuario):** (a) cablear `citas_por_tier` en el
+   assembler (ya lo acepta, no se pasa); (b) bug empresa-focal en su propia tabla (excluir por nombre
+   normalizado); (c) ¿colapsar vacíos también en 2.3 Mercado / 5.4 (las 7+ "no disponible" residuales
+   viven ahí, tablas que aún redacta el LLM)?
+3. **Robustez del edge refusal/CJK:** cuando la PROSA se rehúsa, emitir la 2.1 determinista + ausencia
+   solo para la prosa (hoy se pierde la 2.1 ensamblada). Bajo impacto (self-review OFF por defecto).
+4. **Deuda estructural** (DT-037/039/040) antes de más features; DT-038 antes de HITL.
