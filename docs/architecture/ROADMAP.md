@@ -10,7 +10,7 @@
 ## Estado actual (2026-08-04)
 
 Rama `develop`. Últimos hitos (esta línea de trabajo, DT-050→):
-- **DT-066 — Sección 2.1 KB-driven determinista (B2)** (código cerrado, **E2E pendiente**): la tabla
+- **DT-066 — Sección 2.1 KB-driven determinista (B2)** (**CERRADO**, E2E + re-verificación OK): la tabla
   de Jugadores Clave se **ensambla desde los hechos del KB** (`seccion21_assembler`), el LLM solo
   rellena huecos desde evidencia (`chain_03b_ficha_fields` + `seccion21_holes`) y redacta la prosa
   2.2/2.4/2.5 + radar. Elimina el round-trip con pérdida y el spam de "Dato no disponible" (regla de
@@ -44,12 +44,13 @@ Insumo: los 5 informes humanos (`DT064_FICHA_SPEC.md`) + el eval set + el `.docx
 Después de esto: cerrar la documentación completa (§ abajo) y el triaje de deuda.
 
 ## Pruebas pendientes (validaciones que faltan)
-0. ✅ **HECHO 2026-08-04 — E2E DT-066 (B2):** Alpina 1040 con los 4 flags, EXIT=0. **"Dato no
-   disponible" 25%→3%** doc-wide (**0 en la sección 2.1**); fichas 2.1 deterministas con datos reales
-   del KB (globales food Abbott/Arla/Bel/Coca-Cola/Danone); 0 competidores tabaco/cerveza; radar
-   renderizado. `output/alpina_dt066.docx`. **Caveat:** el modelo free estuvo rate-limited (32/32) →
-   hole-filling=0 nuevos y `radar_data` de Cap 2 ausente en log; **re-verificar sin rate-limit** para
-   medir el aporte del hole-filler. Detalle: `DT066_HALLAZGOS.md`.
+0. ✅ **CERRADO 2026-08-04 — E2E DT-066 (B2) + re-verificación:** Alpina 1040 con los 4 flags, EXIT=0.
+   **"Dato no disponible" 25%→3%** doc-wide (**0 en la sección 2.1**); fichas 2.1 deterministas con
+   datos reales del KB; 0 competidores tabaco/cerveza; radar renderizado. El caveat de rate-limit se
+   resolvió enrutando el **hole-filler al tier synth (Gemini)**: re-corrida (`alpina_dt066_v2.docx`)
+   con el free saturado toda la corrida → **radar Cap 2 PRESENTE** + **hole-filler medido limpio**
+   (`8 procesados, 0 nuevos` vía Gemini, sin rate-limit). El M=0 es honesto (evidencia delgada, no
+   fallo de B2) → apunta al Frente Evidencia (DT-049). Detalle: `DT066_HALLAZGOS.md`.
 1. ✅ **HECHO 2026-08-03** — E2E Gemini síntesis (`gemini-3.5-flash-lite`): Alpina EXIT=0, 0 crashes,
    Cap 1 completo (9 subsecciones), 2.1.1 = 8 globales food (0 tabaco/cerveza). `output/alpina_gemini.docx`.
 2. **E2E Fase 1**: un capítulo degradado cae al cacheado bueno (fallback); re-corrida reusa.

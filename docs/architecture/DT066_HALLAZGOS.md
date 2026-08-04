@@ -71,13 +71,35 @@ competidores procesados`).
   pre-existente de los caps de prosa, ajeno a DT-066).
 - ✅ Radar renderizado (1 figura en el doc).
 
-## PROBLEMAS detectados (esta corrida)
+## RE-VERIFICACIÓN sin dependencia del free tier (2026-08-04, `output/alpina_dt066_v2.docx`) — CIERRE
+El caveat de la 1ª corrida (rate-limit del free) se resolvió con un cambio mínimo: **el hole-filler se
+enruta al tier de síntesis (Gemini)** en vez del resiliente free-first (`generate_n1.py`,
+`build_chain_ficha_fields(ctx.api_llm_synth or …)`). El hole-filler es extracción de precisión y
+acotada (≤`holefill_max`) → cabe de sobra en la cuota de Gemini (500 RPD) y su calidad deja de
+depender del free. Invariante: sin Gemini synth en `.env`, `api_llm_synth == api_llm` (idéntico a hoy).
+
+Re-corrida Alpina 1040 (4 flags), con el **free saturado TODA la corrida** (`ResourceExhausted 32/32`):
+- **EXIT=0**; path B2 activo (`entidades competidoras: 8 (KB=8, LLM=3)`, 8 globales food, 0 tabaco/cerveza).
+- ✅ **Radar de Cap 2: `PRESENTE (6 competidores)`** (antes AUSENTE) + 1 figura en el `.docx`.
+- ✅ **Hole-filler medido limpio:** `hole-filling: 8 competidores procesados, 0 con datos nuevos`,
+  **sin una sola excepción de rate-limit** (las llamadas fueron por Gemini — visibles en los cost
+  records: `gemini-3.5-flash-lite … out=76/86/23`). El M=0 de esta corrida es el resultado **honesto**:
+  la evidencia RAG recuperada para esos 8 globales **no soporta** los campos faltantes → Gemini
+  devuelve `null` (RN-001, no fabrica). NO es artefacto de rate-limit. **Conclusión:** B2 desacopla la
+  calidad de la tabla de la disponibilidad del modelo; la riqueza de los huecos queda atada al **Frente
+  Evidencia (DT-049)** (evidencia más diversa ⇒ más huecos rellenables).
+- ✅ Regresiones intactas: **0 "no disponible" en la sección 2.1**; 11 doc-wide (~3%, 7 en 2.3 Mercado,
+  tabla que aún redacta el LLM); **0 fichas de competidor tabaco/cerveza en 2.1** (las 4 menciones en
+  tablas 2.1.2/2.1.3 son etiquetas de actividad CIIU de las empresas regionales/startup —
+  "Elaboración de Alimentos, Bebidas y Tabaco (C2825)" —, no competidores); 3 tiers poblados.
+
+## PROBLEMAS detectados (1ª corrida — RESUELTOS arriba)
 - **Modelo free severamente rate-limited** (`nvidia/nemotron … ResourceExhausted: 32/32` durante toda
   la corrida). Consecuencias directas: (a) **hole-filling = 0 datos nuevos** (las llamadas del
   hole-filler cayeron por rate-limit → no se exploró su capacidad de rellenar huecos, solo su no-crash
   path); (b) **`radar_data: AUSENTE` en el log de Cap 2** (la generación prosa+radar se degradó).
-  **Re-verificar en una corrida sin rate-limit** para medir el aporte real del hole-filler y confirmar
-  el radar de Cap 2. La tabla 2.1 salió bien igual porque el ensamblaje es DETERMINISTA (no depende
+  **RESUELTO** por la re-verificación de arriba (hole-filler a Gemini): radar confirmado y hole-filler
+  medido limpio. La tabla 2.1 salió bien igual porque el ensamblaje es DETERMINISTA (no depende
   del LLM); solo los huecos lo hacen — evidencia de que B2 desacopla la calidad de la tabla de la
   disponibilidad del modelo.
 - **Degradación en refusal/CJK:** si la PROSA del LLM se rehúsa/idioma-incorrecto, `execute` devuelve

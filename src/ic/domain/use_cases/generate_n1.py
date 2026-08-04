@@ -226,7 +226,11 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         # En ese caso las cadenas (primaria + escalada) se construyen con omitir_21=True (el LLM no
         # redacta 2.1) y se pasa la cadena de hole-filling. OFF o sin anclas → invariante.
         b2_on = s.seccion21_determinista_enabled and bool(fichas_kb)
-        holes_chain = build_chain_ficha_fields(ctx.api_llm or ctx.llm) if b2_on else None
+        # DT-066: el hole-filler es una tarea de EXTRACCIÓN de precisión y acotada (≤holefill_max
+        # llamadas) → va al tier de síntesis (Gemini) para desacoplar su calidad de la saturación
+        # del free tier. Invariante: sin Gemini synth en .env, api_llm_synth == api_llm.
+        holes_llm = ctx.api_llm_synth or ctx.api_llm or ctx.llm
+        holes_chain = build_chain_ficha_fields(holes_llm) if b2_on else None
         # DT-064/T5: cadena de escalada = tier de API superior (synth = Nemotron Ultra). Se usa SOLO
         # ante negativa del LLM tras retry (coste acotado). Sin API key o tier no configurado → None
         # (invariante). El modelo vive en .env (ADR-002), no se hardcodea.
