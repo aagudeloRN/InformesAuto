@@ -10,6 +10,8 @@ from ic.domain.absent_data import build_absent_paragraph, check_retrieval_suffic
 from ic.domain.chains.chain_02b_entidades import MAX_ENTIDADES, parse_entidades
 from ic.domain.chains.chain_03_benchmarking import format_chunks_as_context
 from ic.domain.kb.relevance import format_referentes_globales
+from ic.domain.kb.seccion21_assembler import assemble_seccion_21
+from ic.domain.kb.seccion21_holes import fill_holes
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
 from ic.shared.text_utils import has_cjk_characters, is_llm_refusal
@@ -108,6 +110,11 @@ class GenerateBenchmarking:
         jugadores_locales_ctx: str = "",
         fichas_conocidas_ctx: str = "",
         escalation_chain: Runnable | None = None,
+        seccion21_enabled: bool = False,
+        tiers: dict[str, list[str]] | None = None,
+        fichas_kb: dict[str, dict[str, str]] | None = None,
+        holes_chain: Runnable | None = None,
+        holefill_max: int = 0,
     ) -> None:
         self._chain = chain
         self._store = store
@@ -130,6 +137,14 @@ class GenerateBenchmarking:
         # DT-064/T5: cadena de escalada (tier de API superior) ante negativa del LLM tras retry.
         # None → sin escalada (invariante).
         self._escalation_chain = escalation_chain
+        # DT-066/B2: ensamblaje determinista de la sección 2.1 desde el KB. `seccion21_enabled` lo
+        # decide el llamador (flag ON Y hay sujetos anclados en `tiers`); `self._chain`/escalada se
+        # construyen con `omitir_21=True`. OFF (o sin tiers) → el LLM autora 2.1 hoy (invariante).
+        self._seccion21_enabled = seccion21_enabled and bool(tiers)
+        self._tiers = tiers or {}
+        self._fichas_kb = fichas_kb or {}
+        self._holes_chain = holes_chain
+        self._holefill_max = holefill_max
 
     def _identificar_entidades(self, chunks, sector_gics: str) -> list[str]:
         """Entidades competidoras a explotar: KB (canónico) + las ancladas en la evidencia.
@@ -256,6 +271,24 @@ class GenerateBenchmarking:
             # DT-064/T4: campos de ficha ya conocidos del KB (escribir desde hechos).
             "fichas_conocidas": self._fichas_conocidas_ctx,
         }
+
+        # DT-066/B2: ensamblar la sección 2.1 desde el KB (hechos deterministas) + hole-filling de
+        # los campos faltantes con la evidencia RAG ya recuperada. El LLM redacta solo la prosa
+        # (2.2/2.4/2.5 + radar) recibiendo la 2.1 hecha como contexto. Si no está habilitado, la
+        # 2.1 la escribe el LLM como hasta ahora (invariante).
+        seccion_21_md = ""
+        if self._seccion21_enabled:
+            fichas_enr, _ = fill_holes(
+                self._tiers, self._fichas_kb, self._holes_chain, sector_gics, context,
+                self._holefill_max,
+            )
+            seccion_21_md = assemble_seccion_21(self._tiers, fichas_enr)
+        if seccion_21_md:
+            # La 2.1 ya no la genera el LLM: se le pasa como contexto (self._chain se construyó con
+            # omitir_21=True). `fichas_conocidas` deja de usarse (redundante con la 2.1 ensamblada).
+            payload["seccion_21_context"] = seccion_21_md
+            payload["fichas_conocidas"] = ""
+
         texto_raw = self._redactar_con_escalada(payload)
 
         if has_cjk_characters(texto_raw):
@@ -284,6 +317,12 @@ class GenerateBenchmarking:
 
         # T16.1: extraer bloque radar_json; si parseable, adjuntar en radar_data
         texto, radar_data = _extract_radar(texto_raw)
+
+        # DT-066/B2: anteponer la sección 2.1 ensamblada (la prosa del LLM arranca en 2.2). El
+        # markdown emitido es el mismo formato que parsea `parse_fichas_competidores` → la
+        # persistencia T3 y el render docx siguen sin cambios.
+        if seccion_21_md:
+            texto = f"{seccion_21_md}\n\n{texto}"
         # T22.2 (DT-027): log determinista para medir el hit-rate del radar (N corridas).
         logger.info(
             "radar_data: %s (%d competidores)",

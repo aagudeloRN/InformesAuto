@@ -34,11 +34,17 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.domain.chains.chain_02b_entidades import build_chain_entidades
     from ic.domain.chains.chain_02c_pares_globales import build_chain_pares_globales
     from ic.domain.chains.chain_03_benchmarking import build_chain_03
+    from ic.domain.chains.chain_03b_ficha_fields import build_chain_ficha_fields
     from ic.domain.chains.chain_03b_mercado import build_chain_03b
     from ic.domain.chains.chain_04_tendencias import build_chain_04
     from ic.domain.chains.chain_05_ecosistema import build_chain_05
     from ic.domain.chains.chain_judge import CRITERIOS_CAPITULO
-    from ic.domain.kb.ficha_parser import parse_fichas_competidores
+    from ic.domain.kb.ficha_parser import (
+        TIER_GLOBAL,
+        TIER_REGIONAL,
+        TIER_STARTUP,
+        parse_fichas_competidores,
+    )
     from ic.domain.kb.relevance import format_fichas_conocidas, format_jugadores_locales
     from ic.domain.use_cases.discover_globales import DiscoverGlobales
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
@@ -173,6 +179,10 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         kb_locales: list[str] = []
         jugadores_locales_ctx = ""
         fichas_conocidas_ctx = ""
+        # DT-066/B2: tiers anclados (global/regional/startup) + fichas del KB para el ensamblaje
+        # determinista de 2.1. Se pueblan aquí y se pasan a GenerateBenchmarking.
+        tiers_ancla: dict[str, list[str]] = {}
+        fichas_kb: dict[str, dict[str, str]] = {}
         try:
             with SessionLocal() as db_kb:
                 ensure_entidades_tables(db_kb.get_bind())
@@ -180,6 +190,8 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 kb_competidores = repo_kb.list_competidores_by_sector(
                     g_code or "", productos_terms=productos_terms, alcance=ALCANCE_GLOBAL
                 )
+                regionales: list = []
+                startups: list = []
                 # DT-050/DT-063: anclaje del tier LOCAL (2.1.2 regionales + 2.1.3 startups) desde el
                 # directorio, re-rankeado por solape de producto. Flag OFF → nada (invariante). No
                 # diluye el global: el path global usa alcance=global con su propio método.
@@ -199,11 +211,22 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 # hechos, no fabrica. Vacío → invariante.
                 nombres_ficha = [*kb_competidores, *kb_locales]
                 if g_code and nombres_ficha:
-                    fichas_conocidas_ctx = format_fichas_conocidas(
-                        repo_kb.list_ficha_atributos_by_sector(g_code, nombres_ficha)
-                    )
+                    fichas_kb = repo_kb.list_ficha_atributos_by_sector(g_code, nombres_ficha)
+                    fichas_conocidas_ctx = format_fichas_conocidas(fichas_kb)
+                # DT-066/B2: tiers por subcategoría (global = clase mundial; regional/startup = del
+                # directorio). Alimentan el ensamblaje determinista de la tabla 2.1.
+                tiers_ancla = {
+                    TIER_GLOBAL: list(kb_competidores),
+                    TIER_REGIONAL: [r.nombre for r in regionales],
+                    TIER_STARTUP: [r.nombre for r in startups],
+                }
         except Exception:  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
             logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)
+        # DT-066/B2: la 2.1 se ensambla desde el KB SOLO si el flag está ON y hay sujetos anclados.
+        # En ese caso las cadenas (primaria + escalada) se construyen con omitir_21=True (el LLM no
+        # redacta 2.1) y se pasa la cadena de hole-filling. OFF o sin anclas → invariante.
+        b2_on = s.seccion21_determinista_enabled and bool(fichas_kb)
+        holes_chain = build_chain_ficha_fields(ctx.api_llm or ctx.llm) if b2_on else None
         # DT-064/T5: cadena de escalada = tier de API superior (synth = Nemotron Ultra). Se usa SOLO
         # ante negativa del LLM tras retry (coste acotado). Sin API key o tier no configurado → None
         # (invariante). El modelo vive en .env (ADR-002), no se hardcodea.
@@ -212,17 +235,20 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             tier = getattr(s, "benchmarking_escalation_tier", "synth")
             try:
                 escalation_chain = build_chain_03(
-                    build_api_llm(s, tier=tier, cost_tracker=ctx.tracker)
+                    build_api_llm(s, tier=tier, cost_tracker=ctx.tracker), omitir_21=b2_on
                 )
             except Exception:  # noqa: BLE001 — sin tier de escalada la corrida sigue igual.
                 logger.warning("No se pudo construir la cadena de escalada (tier=%s)", tier)
         cap = GenerateBenchmarking(
-            chain=build_chain_03(ctx.api_llm or ctx.llm), store=store, web_connector=web,
+            chain=build_chain_03(ctx.api_llm or ctx.llm, omitir_21=b2_on),
+            store=store, web_connector=web,
             entidades_chain=build_chain_entidades(ctx.api_llm or ctx.llm),
             kb_competidores=kb_competidores, kb_locales=kb_locales,
             jugadores_locales_ctx=jugadores_locales_ctx,
             fichas_conocidas_ctx=fichas_conocidas_ctx,
             escalation_chain=escalation_chain,
+            seccion21_enabled=b2_on, tiers=tiers_ancla, fichas_kb=fichas_kb,
+            holes_chain=holes_chain, holefill_max=s.seccion21_holefill_max,
         ).execute(
             nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
             sector_gics_code=g_code, empresa_id=ctx.empresa_id,

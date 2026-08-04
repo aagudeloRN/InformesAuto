@@ -126,9 +126,37 @@ def format_chunks_as_context(chunks: list[ChunkResult]) -> str:
     return format_chunks_with_meta(chunks)
 
 
-def build_chain_03(llm: OllamaGatewayLLM) -> Runnable:
+# DT-066/B2: variante del USER prompt cuando la sección 2.1 se ensambla determinísticamente (el LLM
+# ya no redacta las fichas). Se DERIVA del prompt canónico (no se duplica el spec de 2.2/2.4/2.5 +
+# radar → sin riesgo de drift): se conserva el encabezado (hasta antes de "Desarrolla…") y todo
+# desde "## 2.2" en adelante; se sustituye el bloque de instrucciones de 2.1 por la 2.1 ya
+# redactada, que el LLM usa como contexto (referenciar los actores en 2.2 y el radar) sin repetirla.
+_MARCADOR_DESARROLLA = "Desarrolla exactamente las siguientes secciones en este orden:"
+_MARCADOR_22 = "## 2.2. División de Competidores"
+
+
+def _user_prompt_sin_21() -> str:
+    encabezado = USER_PROMPT_03[: USER_PROMPT_03.index(_MARCADOR_DESARROLLA)]
+    resto = USER_PROMPT_03[USER_PROMPT_03.index(_MARCADOR_22) :]
+    return (
+        encabezado
+        + "SECCIÓN 2.1 YA REDACTADA (fichas de los Jugadores Clave, ensambladas desde datos "
+        "verificados del KB; NO la reescribas ni la repitas; refiérete a estos actores en la "
+        "síntesis 2.2 y en el radar):\n{seccion_21_context}\n\n"
+        "Desarrolla las siguientes secciones en este orden (la 2.1 ya está redactada arriba; "
+        "empieza directamente en 2.2):\n\n" + resto
+    )
+
+
+USER_PROMPT_03_SIN_21 = _user_prompt_sin_21()
+
+
+def build_chain_03(llm: OllamaGatewayLLM, *, omitir_21: bool = False) -> Runnable:
+    """Cadena del Cap 2. ``omitir_21=True`` (DT-066/B2): el LLM no redacta 2.1 (se ensambla aparte)
+    y recibe la 2.1 ya hecha como contexto. ``False`` = prompt canónico idéntico (invariante)."""
+    user = USER_PROMPT_03_SIN_21 if omitir_21 else USER_PROMPT_03
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM_PROMPT_03),
-        ("human", USER_PROMPT_03),
+        ("human", user),
     ])
     return prompt | llm | StrOutputParser()

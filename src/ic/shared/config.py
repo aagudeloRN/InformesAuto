@@ -143,6 +143,15 @@ class Settings(BaseSettings):
     anclaje_local_enabled: bool = False
     anclaje_local_top_n: int = 6  # tope de jugadores locales por subsección (regionales/startups)
 
+    # Sección 2.1 determinista (DT-066/B2) — la tabla de Jugadores Clave se ENSAMBLA desde los
+    # hechos del KB (entidad_atributos) en vez de que el LLM redacte cada celda; el LLM solo rellena
+    # los huecos (campos sin dato) desde la evidencia y escribe la prosa 2.2/2.4/2.5 + radar. Menos
+    # variabilidad y sin spam de "Dato no disponible". Flag maestro default-OFF: apagado = el LLM
+    # autora las tablas 2.1 como hoy, prompt idéntico (invariante). Si no hay sujetos anclados, el
+    # flag cae al comportamiento previo aunque esté ON.
+    seccion21_determinista_enabled: bool = False
+    seccion21_holefill_max: int = 8  # tope de competidores a los que se les rellenan huecos por LLM
+
     # NER de entidades (DT-057/T3) — motor y modelos por config, nunca hardcodeados en app-code.
     # Motor pluggable: "spacy" (librería, CPU, sin VRAM) hoy; otros motores se añaden en el wrapper.
     # Corpus EMIS bilingüe (~79% inglés / ~24% español): se elige el modelo por idioma del chunk.
