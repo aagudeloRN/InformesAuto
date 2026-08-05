@@ -250,12 +250,12 @@ def test_chain_05_estructura_movimientos_4_1_a_4_5():
 # ---------------------------------------------------------------------------
 
 
-def test_chain_03b_mercado_pide_seccion_y_tabla_region():
+def test_chain_03b_mercado_pide_seccion_y_prosa_region():
     from ic.domain.chains.chain_03b_mercado import SYSTEM_PROMPT_03B, USER_PROMPT_03B
 
     assert "## 2.3. Mercado" in USER_PROMPT_03B
-    assert "Tabla de mercado por región" in USER_PROMPT_03B
-    assert "| Región |" in USER_PROMPT_03B
+    assert "Mercado por región" in USER_PROMPT_03B
+    assert "| Región |" not in USER_PROMPT_03B  # DT-UI03: prosa, sin tabla
     assert "{sector_gics}" in SYSTEM_PROMPT_03B
 
 

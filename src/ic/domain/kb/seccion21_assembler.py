@@ -25,7 +25,6 @@ from ic.domain.kb.ficha_parser import (
     TIER_REGIONAL,
     TIER_STARTUP,
 )
-from ic.domain.kb.informe_seccion import _tabla_markdown
 
 # Etiquetas humanas de cada tier (verdad de terreno DT064_FICHA_SPEC). El texto debe resolver por
 # ``_tier_de_heading`` al tier correcto (round-trip con ``parse_fichas_competidores``).
@@ -53,18 +52,22 @@ CAMPO_LABEL: dict[str, str] = {
 _TITULO_21 = "## 2.1. Jugadores Clave - Líderes del Mercado"
 
 
-def _ficha_markdown(nombre: str, campos: dict[str, str]) -> str:
-    """Tabla vertical ``| Campo | Valor |`` de un competidor. Solo filas con dato (colapso)."""
+def _ficha_prosa(nombre: str, campos: dict[str, str]) -> str:
+    """Mini-párrafo en prosa de un competidor. Solo incluye campos con dato (colapso)."""
     pais = (campos.get("pais_origen") or "").strip()
-    nombre_pais = f"{nombre} — {pais}" if pais else nombre
-    rows: list[list[str]] = [["Campo", "Valor"], ["Nombre + País", nombre_pais]]
+    encabezado = f"**{nombre}**"
+    if pais:
+        encabezado += f" *({pais})*"
+    fragmentos: list[str] = []
     for clave in FICHA_KEYS:
         if clave == "pais_origen":
             continue
         valor = (campos.get(clave) or "").strip()
         if valor:
-            rows.append([CAMPO_LABEL[clave], valor])
-    return _tabla_markdown(rows)
+            fragmentos.append(valor.rstrip("."))
+    if not fragmentos:
+        return encabezado
+    return encabezado + " — " + ". ".join(fragmentos) + "."
 
 
 def assemble_seccion_21(
@@ -88,7 +91,7 @@ def assemble_seccion_21(
         nombres = [n for n in tiers.get(tier, []) if n and n.strip()]
         if not nombres:
             continue
-        fichas_tier = [(n, _ficha_markdown(n, fichas.get(n, {}))) for n in nombres]
+        fichas_tier = [(n, _ficha_prosa(n, fichas.get(n, {}))) for n in nombres]
         fichas_tier = [(n, md) for n, md in fichas_tier if md]
         if not fichas_tier:
             continue

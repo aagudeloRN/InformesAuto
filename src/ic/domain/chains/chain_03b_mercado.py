@@ -28,7 +28,6 @@ SYSTEM_PROMPT_03B = (
     "- Tono ejecutivo y directo. Prohibido: \"podría\", \"quizás\", \"en resumen\", "
     "\"por lo tanto\", \"cabe destacar\", \"es importante mencionar\".\n"
     "- Los párrafos narrativos van en texto corrido (storytelling), sin viñetas.\n"
-    "- La tabla de mercado por región debe ser una tabla markdown con pipes.\n"
     "- Sin mini-checklists ni meta-comentarios al final. Sin citaciones inline en la narrativa.\n"
 )
 
@@ -44,14 +43,10 @@ USER_PROMPT_03B = (
     "2. **Segmentos de mercado**: describe los principales segmentos y su peso relativo. "
     "Texto corrido.\n\n"
     "3. **Drivers y barreras**: factores que impulsan o frenan el mercado. Texto corrido.\n\n"
-    "4. **Tabla de mercado por región**: emite una tabla markdown con el tamaño y crecimiento "
-    "del mercado por región geográfica. Usa exactamente este formato de columnas:\n"
-    "| Región | Tamaño de mercado | Crecimiento (%) | Año |\n"
-    "|--------|-------------------|-----------------|-----|\n"
-    "| Norteamérica | ... | ... | ... |\n"
-    "Incluye las regiones con evidencia en las fuentes (p. ej. Norteamérica, Europa, "
-    "América Latina, Asia-Pacífico). Si una celda no tiene dato, escribe "
-    "\"Dato no disponible en fuentes consultadas.\"."
+    "4. **Mercado por región**: si las fuentes contienen datos geográficos, describe en texto "
+    "corrido los mercados con datos disponibles (p. ej. Norteamérica, Europa, América Latina, "
+    "Asia-Pacífico). Menciona solo las regiones con evidencia concreta; omite las que no "
+    "aparezcan en las fuentes (no escribas 'Dato no disponible')."
 )
 
 

@@ -207,6 +207,71 @@ class GenerateBenchmarking:
         logger.info("Cap 2: negativa persistente tras retry. Escalando a tier de API superior.")
         return self._escalation_chain.invoke(payload)
 
+    def _enriquecer_globales_web(
+        self,
+        globales: list[str],
+        sector_gics: str,
+        sector_gics_code: str | None,
+        top_n: int = 3,
+    ) -> dict[str, dict[str, str]]:
+        """Busca web por los top_n globales con campos vacíos, extrae y persiste al KB.
+
+        Best-effort: nunca rompe la corrida. Devuelve {nombre: {clave: valor}} de los campos
+        nuevos encontrados. La segunda corrida del mismo sector reutiliza lo del KB (0 llamadas).
+        """
+        from ic.data.database import SessionLocal
+        from ic.data.models.entidad import (
+            ESTADO_CANDIDATO,
+            FUENTE_WEB,
+            ensure_entidades_tables,
+        )
+        from ic.data.repositories.entidad_repo import EntidadRepository
+        from ic.domain.chains.chain_03b_ficha_fields import parse_ficha_fields
+        from ic.domain.kb.seccion21_holes import _format_campos_faltantes, compute_holes
+        from ic.infrastructure.ner.entity_recognizer import normalize_entity
+
+        resultado: dict[str, dict[str, str]] = {}
+        if self._holes_chain is None or not sector_gics_code:
+            return resultado
+        for nombre in globales[:top_n]:
+            faltantes = compute_holes(self._fichas_kb.get(nombre, {}))
+            if not faltantes:
+                continue
+            try:
+                query = f"{nombre} empresa estrategia portafolio {sector_gics} 2024 2025"
+                results = self._web_connector.search(query, search_depth="advanced")
+                if not results:
+                    continue
+                evidencia = "\n\n".join(r.content[:1500] for r in results[:3])
+                raw = self._holes_chain.invoke({
+                    "nombre": nombre,
+                    "sector_gics": sector_gics,
+                    "evidencia_rag": evidencia,
+                    "campos_faltantes": _format_campos_faltantes(faltantes),
+                })
+                nuevos = parse_ficha_fields(raw, set(faltantes))
+                if not nuevos:
+                    continue
+                resultado[nombre] = nuevos
+                with SessionLocal() as db:
+                    ensure_entidades_tables(db.get_bind())
+                    repo = EntidadRepository(db)
+                    eid = repo.get_id_by_nombre_sector(
+                        normalize_entity(nombre), sector_gics_code
+                    )
+                    if eid:
+                        for clave, valor in nuevos.items():
+                            repo.add_atributo(
+                                eid, clave, valor, FUENTE_WEB, estado=ESTADO_CANDIDATO
+                            )
+            except Exception:  # noqa: BLE001
+                logger.warning("web enrichment falló para global %r", nombre, exc_info=True)
+        logger.info(
+            "web enrichment globales: %d/%d con datos nuevos",
+            len(resultado), min(top_n, len(globales)),
+        )
+        return resultado
+
     def execute(
         self,
         nombre_empresa: str,
@@ -274,12 +339,21 @@ class GenerateBenchmarking:
 
         # DT-066/B2: ensamblar la sección 2.1 desde el KB (hechos deterministas) + hole-filling de
         # los campos faltantes con la evidencia RAG ya recuperada. El LLM redacta solo la prosa
-        # (2.2/2.4/2.5 + radar) recibiendo la 2.1 hecha como contexto. Si no está habilitado, la
+        # (2.2/2.4/2.5) recibiendo la 2.1 hecha como contexto. Si no está habilitado, la
         # 2.1 la escribe el LLM como hasta ahora (invariante).
         seccion_21_md = ""
         if self._seccion21_enabled:
+            # DT-UI03: busca web por los top-3 globales anclados, extrae campos y persiste al KB.
+            # La siguiente corrida del mismo sector reutiliza los datos sin llamadas adicionales.
+            globales = self._tiers.get("global", [])
+            nuevos_web = self._enriquecer_globales_web(
+                globales, sector_gics, sector_gics_code
+            )
+            fichas_para_fill = {n: dict(c) for n, c in self._fichas_kb.items()}
+            for nombre, campos in nuevos_web.items():
+                fichas_para_fill.setdefault(nombre, {}).update(campos)
             fichas_enr, _ = fill_holes(
-                self._tiers, self._fichas_kb, self._holes_chain, sector_gics, context,
+                self._tiers, fichas_para_fill, self._holes_chain, sector_gics, context,
                 self._holefill_max,
             )
             seccion_21_md = assemble_seccion_21(self._tiers, fichas_enr)

@@ -77,10 +77,12 @@ def _execute(chain, **kw):
 def test_prompt_sin_21_derivado_del_canonico():
     # Conserva el spec de 2.2+ (sin drift) pero quita la autoría de 2.1 y añade el contexto.
     assert "## 2.2. División de Competidores" in USER_PROMPT_03_SIN_21
-    assert "RADAR DE POSICIONAMIENTO" in USER_PROMPT_03_SIN_21
     assert "{seccion_21_context}" in USER_PROMPT_03_SIN_21
     assert "Identifica y analiza 14 actores" not in USER_PROMPT_03_SIN_21  # ya no redacta 2.1
     assert "Identifica y analiza 14 actores" in USER_PROMPT_03  # el canónico sí
+    # DT-UI03: radar eliminado del pipeline
+    assert "RADAR DE POSICIONAMIENTO" not in USER_PROMPT_03_SIN_21
+    assert "RADAR DE POSICIONAMIENTO" not in USER_PROMPT_03
 
 
 def test_prompt_sin_21_formatea_sin_variables_faltantes():
@@ -103,8 +105,9 @@ def test_prompt_sin_21_formatea_sin_variables_faltantes():
     msgs = prompt.format_messages(**payload)
     texto = "\n".join(m.content for m in msgs)
     assert "## 2.1. Jugadores Clave" in texto  # el contexto ensamblado se inyectó
-    assert "radar_json" in texto  # el bloque radar (llaves {{}}) sobrevive el formateo
     assert "{seccion_21_context}" not in texto  # el placeholder se resolvió
+    # DT-UI03: radar eliminado — el prompt ya no debe contener radar_json
+    assert "radar_json" not in texto
 
 
 def test_b2_antepone_21_ensamblada_y_pasa_contexto():
@@ -115,7 +118,9 @@ def test_b2_antepone_21_ensamblada_y_pasa_contexto():
     assert isinstance(cap, CapBenchmarking)
     # La 2.1 ensamblada (determinista, desde el KB) abre el capítulo…
     assert cap.texto.startswith("## 2.1. Jugadores Clave")
-    assert "Nestlé — Suiza" in cap.texto
+    # DT-UI03: formato prosa — **Nestlé** *(Suiza)* en lugar de tabla | Nombre + País |
+    assert "**Nestlé**" in cap.texto
+    assert "*(Suiza)*" in cap.texto
     assert "Galletas y café." in cap.texto
     # …seguida de la prosa del LLM (2.2).
     assert "## 2.2. División de Competidores" in cap.texto

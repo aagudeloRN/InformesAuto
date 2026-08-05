@@ -1,8 +1,7 @@
 """DT-066/B2 — Ensamblador determinista de la sección 2.1 (puro).
 
-Fast: sin BD ni LLM. Verifica el colapso de vacíos (nada de "Dato no disponible"), el orden de tiers
-y el round-trip crítico: lo ensamblado debe re-parsearse a los mismos hechos (garantiza que la
-persistencia T3 y el render docx siguen funcionando sin tocarse).
+Fast: sin BD ni LLM. Verifica el colapso de vacíos (nada de "Dato no disponible"), el orden de
+tiers y que el formato prosa emita los campos disponibles sin etiquetas de tabla.
 """
 
 from __future__ import annotations
@@ -11,7 +10,6 @@ from ic.domain.kb.ficha_parser import (
     TIER_GLOBAL,
     TIER_REGIONAL,
     TIER_STARTUP,
-    parse_fichas_competidores,
 )
 from ic.domain.kb.seccion21_assembler import assemble_seccion_21
 
@@ -61,22 +59,25 @@ def test_assemble_competidor_solo_con_diferenciador_se_lista():
     assert "IA para formular recetas" in md
 
 
-def test_round_trip_assemble_parse_recupera_hechos():
-    # Lo ensamblado se re-parsea a los MISMOS hechos → T3 y el render docx no se rompen.
+def test_prosa_contiene_campos_con_dato_en_formato_bold():
+    # DT-UI03: formato prosa — cada competidor es un mini-párrafo **Nombre** *(País)* — campos.
     md = assemble_seccion_21(_TIERS, _FICHAS)
-    fichas = {f.nombre: f for f in parse_fichas_competidores(md)}
-    assert set(fichas) == {"Nestlé", "Colombina", "NotCo"}
-    assert fichas["Nestlé"].tier == TIER_GLOBAL
-    assert fichas["Nestlé"].campos["pais_origen"] == "Suiza"
-    assert fichas["Nestlé"].campos["resumen_estrategico"].startswith("Líder mundial")
-    assert fichas["Nestlé"].campos["portafolio"].startswith("Galletas")
-    assert fichas["Nestlé"].campos["presencia_geografica"] == "189 países."
-    assert fichas["Nestlé"].campos["factor_diferencial"].startswith("Nutrición")
-    assert fichas["Colombina"].tier == TIER_REGIONAL
-    assert fichas["Colombina"].campos["pais_origen"] == "Colombia"
-    assert "presencia_geografica" not in fichas["Colombina"].campos
-    assert fichas["NotCo"].tier == TIER_STARTUP
-    assert fichas["NotCo"].campos["factor_diferencial"].startswith("IA")
+    assert "**Nestlé**" in md
+    assert "*(Suiza)*" in md
+    assert "Líder mundial en alimentos y bebidas" in md
+    assert "Galletas, snacks y confitería" in md
+    assert "189 países" in md
+    assert "Nutrición personalizada" in md
+    # Colombina: solo país y portafolio disponibles
+    assert "**Colombina**" in md
+    assert "*(Colombia)*" in md
+    assert "Confitería y galletas" in md
+    # NotCo: sin país, solo diferenciador
+    assert "**NotCo**" in md
+    assert "IA para formular recetas" in md
+    # El formato es prosa, no tablas de pipes
+    assert "| Campo |" not in md
+    assert "| Valor |" not in md
 
 
 def test_assemble_incluye_citas_por_tier():
