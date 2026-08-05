@@ -10,6 +10,14 @@
 ## Estado actual (2026-08-04)
 
 Rama `develop`. Últimos hitos (esta línea de trabajo, DT-050→):
+- **DT-049 — Frente Evidencia: retrieval/citación** (**CERRADO**, E2E OK): el `.docx` citaba ~9 refs.
+  Diagnóstico con números: la palanca **no** era el umbral (0.70 inerte — las reservas ya inyectan
+  diversidad a 0.5) sino **`top_k` + `min_distinct_docs`**. Cambio config-only: `rag_top_k` 10→16,
+  `rag_min_distinct_docs` 5→8, `rag_similarity_threshold` 0.70→0.60. E2E Alpina 1040:
+  **9 → 14 refs (+56%)**, anti-mezcla `ajeno=0`, radar presente. El "bug" `pdf_manual` no era bug
+  (documento único legítimo). **Citación:** autor corporativo del Informe de Convergencia + 25
+  sectoriales corregido a **"Ruta N Medellín"** (2625 chunks + ambos scripts de ingesta). Globales
+  siguen M=0 (evidencia web-por-competidor, frente aparte). Detalle: `DT049_HALLAZGOS.md`.
 - **DT-066 — Sección 2.1 KB-driven determinista (B2)** (**CERRADO**, E2E + re-verificación OK): la tabla
   de Jugadores Clave se **ensambla desde los hechos del KB** (`seccion21_assembler`), el LLM solo
   rellena huecos desde evidencia (`chain_03b_ficha_fields` + `seccion21_holes`) y redacta la prosa

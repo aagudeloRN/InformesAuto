@@ -5,7 +5,7 @@ sectores con cupo propio (reserva global, ADR-012 addendum).
 
 Uso:
     uv run python scripts/ingest_global.py
-    uv run python scripts/ingest_global.py --pdf ruta/al/archivo.pdf --titulo "Título" --autor "Autor" --año 2026
+    uv run python scripts/ingest_global.py --pdf ruta.pdf --titulo "T" --autor "A" --año 2026
 
 El PDF InformeConvergenciaLocal2026V3RvADAA.pdf está en la raíz del repo por defecto.
 Idempotente: salta documentos ya indexados por título.
@@ -31,7 +31,7 @@ logger = logging.getLogger("ingest_global")
 
 _DEFAULT_PDF = _ROOT / "InformeConvergenciaLocal2026V3RvADAA.pdf"
 _DEFAULT_TITULO = "Informe de Convergencia Local 2026"
-_DEFAULT_AUTOR = "Ruta N"
+_DEFAULT_AUTOR = "Ruta N Medellín"  # autor corporativo (no la persona) — DT-049
 _DEFAULT_AÑO = 2026
 
 

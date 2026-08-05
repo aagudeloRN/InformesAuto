@@ -54,8 +54,18 @@ class Settings(BaseSettings):
     llm_local_timeout: int = 300  # segundos; qwen3:8b con contexto amplio puede tardar >120s
 
     # Retrieval (ADR-001)
-    rag_similarity_threshold: float = 0.7
-    rag_top_k: int = 10
+    # Umbral general del pool principal. Recalibrado 0.7→0.6 (DT-049, Frente Evidencia):
+    # medición directa sobre el índice EMIS (nomic-embed-text, español) mostró que a 0.70 la
+    # capa sectorial colapsa a 1–3 documentos aunque el sector tenga 8–14 en el índice (la
+    # "rodilla" de diversidad de documento está en 0.55–0.60). Causa raíz de las ~9 referencias
+    # únicas del .docx. No afecta las reservas (usan t_reserve = min(t, 0.5), sin cambio) ni la
+    # precisión sectorial (el filtro GICS ya garantiza on-sector; contaminación=0 en eval).
+    rag_similarity_threshold: float = 0.6
+    # top_k 10→16 (DT-049): la palanca real de la diversidad de referencias. Medición del path
+    # search() real: subir top_k+min_distinct_docs casi duplica los docs distintos por query
+    # (3020 5→8, 2020 6→9) donde el corpus los tiene. +60% de contexto de retrieval (coste
+    # moderado). El umbral por sí solo era inerte (las reservas ya inyectan diversidad a 0.5).
+    rag_top_k: int = 16
     # Cap por documento: evita que un informe sectorial grande monopolice el contexto
     # (diversidad de fuentes — hallazgo RepositorioRN MMR, ADR-012).
     # Fase 22 (DT-049): bajado 4→2 con el corpus EMIS multi-documento por sector, para que
@@ -78,7 +88,9 @@ class Settings(BaseSettings):
     # Piso de diversidad (Fase 22, DT-049): mínimo de documentos DISTINTOS que search() intenta
     # devolver cuando el corpus los tiene. Garantía determinista sobre MMR + cap por doc, para
     # que las Referencias del informe reflejen la amplitud real del corpus (≥8 fuentes citables).
-    rag_min_distinct_docs: int = 5
+    # 5→8 (DT-049): con top_k=16 y max_chunks_per_doc=2 (16 slots), la garantía sube a 8 docs
+    # distintos por query donde el corpus los tiene (medido: 3020→8, 2020→9, 5010→7).
+    rag_min_distinct_docs: int = 8
     # Cupos reservados para chunks globales cross-sector (Fase 18, DT-031): documentos con
     # es_global=true participan en todos los sectores con cupo propio, antepuestos tras los
     # sectoriales. Mismo umbral relajado que rag_sector_reserve_threshold (ADR-012 addendum).

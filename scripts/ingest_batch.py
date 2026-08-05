@@ -82,7 +82,7 @@ def main() -> int:
             titulo_csv = (fila.get("titulo") or "").strip()
             titulo = titulo_csv or f"Informe sectorial: {nombre_sector}"
             tipo = _tipo_from_csv(fila.get("tipo") or "")
-            autor = (fila.get("autor") or "Ruta N").strip() or "Ruta N"
+            autor = (fila.get("autor") or "Ruta N Medellín").strip() or "Ruta N Medellín"
             año_raw = (fila.get("año") or "").strip()
             año = int(año_raw) if año_raw.isdigit() else None
             # Sectores adicionales para docs multi-sector (Fase 18, T18.4)
