@@ -392,15 +392,37 @@ with tab_gen:
             )
 
         with col_m2:
-            st.markdown("**Caps 3–6** *(selección — próxima iteración)*")
-            st.caption(
-                "Estos módulos siempre se generan hoy. "
-                "La selección individual se habilitará en el siguiente DT."
+            st.markdown("**Caps 3–6**")
+            mod_tend = st.checkbox(
+                "Cap 3 — Tendencias sectoriales", value=True,
+                help="Análisis de tendencias tecnológicas y regulatorias del sector.",
             )
-            mod_tend = st.checkbox("Cap 3 — Tendencias sectoriales", value=True, disabled=True)
-            mod_eco = st.checkbox("Cap 4 — Ecosistema empresarial", value=True, disabled=True)
-            mod_conv = st.checkbox("Cap 5 — Convergencia empresarial", value=True, disabled=True)
-            mod_acc = st.checkbox("Cap 6 — Accionables estratégicos", value=True, disabled=True)
+            mod_eco = st.checkbox(
+                "Cap 4 — Ecosistema empresarial", value=True,
+                help="Panorama de inversiones, fusiones, alianzas y actores del ecosistema.",
+            )
+            mod_conv = st.checkbox(
+                "Cap 5 — Convergencia empresarial", value=True,
+                help="Síntesis cruzada de Caps 2–4. Requiere Cap 3 y Cap 4.",
+            )
+            mod_acc = st.checkbox(
+                "Cap 6 — Accionables estratégicos", value=True,
+                help="Recomendaciones accionables derivadas del análisis. Requiere Cap 5.",
+            )
+
+        # Dependencias del DAG (Cap 6 ← Cap 5 ← Cap 3 + Cap 4)
+        _auto_activados: list[str] = []
+        if mod_acc and not mod_conv:
+            mod_conv = True
+            _auto_activados.append("Cap 5 — Convergencia (requerida por Cap 6)")
+        if mod_conv and not mod_tend:
+            mod_tend = True
+            _auto_activados.append("Cap 3 — Tendencias (requerida por Cap 5)")
+        if mod_conv and not mod_eco:
+            mod_eco = True
+            _auto_activados.append("Cap 4 — Ecosistema (requerido por Cap 5)")
+        if _auto_activados:
+            st.info("Auto-activados por dependencias del DAG: " + ", ".join(_auto_activados))
 
         st.markdown("**Calidad**")
         mod_selfreview = st.checkbox(
@@ -475,6 +497,13 @@ with tab_gen:
             from ic.domain.use_cases.generate_informe import GenerateInforme, InformeParams
 
             uc = GenerateInforme(settings)
+            _todos_caps = mod_tend and mod_eco and mod_conv and mod_acc
+            caps_set: set[str] | None = None if _todos_caps else {
+                c for flag, c in [
+                    (mod_tend, "cap3"), (mod_eco, "cap4"),
+                    (mod_conv, "cap5"), (mod_acc, "cap6"),
+                ] if flag
+            }
             params = InformeParams(
                 empresa=empresa.strip(),
                 ciiu=ciiu.strip() or None,
@@ -485,6 +514,7 @@ with tab_gen:
                 discover_globales=mod_globales,
                 anclaje_local=mod_local,
                 seccion21_determinista=mod_det,
+                caps_incluidos=caps_set,
             )
             result = uc.run(params, on_step=on_step)
 

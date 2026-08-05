@@ -324,6 +324,9 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.domain.use_cases import checkpoint_hooks
 
     _fns = {"cap2": _fn_cap2, "mercado": _fn_mercado, "cap3": _fn_cap3, "cap4": _fn_cap4}
+    _caps = ctx.params.caps_incluidos
+    if _caps is not None:
+        _fns = {k: v for k, v in _fns.items() if k in ("cap2", "mercado") or k in _caps}
     _restored = {name: checkpoint_hooks.restore(ctx, name) for name in _fns}
     _results: dict = {}
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -336,8 +339,8 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         _results[name] = (
             _restored[name] if _restored[name] is not None else _futures[name].result()
         )
-    ctx.cap, ctx.cap_mercado = _results["cap2"], _results["mercado"]
-    ctx.cap_tend, ctx.cap_eco = _results["cap3"], _results["cap4"]
+    ctx.cap, ctx.cap_mercado = _results.get("cap2"), _results.get("mercado")
+    ctx.cap_tend, ctx.cap_eco = _results.get("cap3"), _results.get("cap4")
 
     ctx.step_fn(4, "Párrafos introductorios N1")
     if ctx.intro_chain is not None:

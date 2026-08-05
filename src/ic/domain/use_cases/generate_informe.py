@@ -40,6 +40,7 @@ class InformeParams:
     discover_globales: bool | None = None
     anclaje_local: bool | None = None
     seccion21_determinista: bool | None = None
+    caps_incluidos: set[str] | None = None  # None = todos; subconjunto de {"cap3".."cap6"}
 
 
 @dataclass
@@ -170,6 +171,8 @@ class GenerateInforme:
         cap1_llms = [m for m in [resilient_llm, llm] if m is not None]
         slug = params.empresa.replace(" ", "_").replace(".", "").lower()
         output_path = params.output_path or f"./output/{slug}_informe.docx"
+        if not output_path.lower().endswith(".docx"):
+            output_path += ".docx"
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         import uuid
         return _PipelineContext(
@@ -321,11 +324,14 @@ class GenerateInforme:
 
         e, g = ctx.params.empresa, ctx.gics.grupo_gics
         g_code = extract_gics_code(g)
+        _caps = ctx.params.caps_incluidos
+        run_cap5 = _caps is None or "cap5" in _caps
+        run_cap6 = _caps is None or "cap6" in _caps
         # T22.3 (DT-030): --resume salta Cap 5/6 ya persistidos. Cap 6 es barrera de
         # sincronización (consume Cap 5); si Cap 5 se restaura y Cap 6 no, se recomputa
         # Cap 6 sobre el Cap 5 restaurado — el DAG se respeta.
-        ctx.cap_conv = checkpoint_hooks.restore(ctx, "cap5")
-        ctx.cap_acc = checkpoint_hooks.restore(ctx, "cap6")
+        ctx.cap_conv = checkpoint_hooks.restore(ctx, "cap5") if run_cap5 else None
+        ctx.cap_acc = checkpoint_hooks.restore(ctx, "cap6") if run_cap6 else None
         conv_restaurado = ctx.cap_conv is not None
         acc_restaurado = ctx.cap_acc is not None
         with SessionLocal() as db_n2:
@@ -336,7 +342,7 @@ class GenerateInforme:
             )
 
             ctx.step_fn(6, "Cap 5 — Convergencia Empresarial")
-            if not conv_restaurado and ctx.api_llm_synth is not None:
+            if not conv_restaurado and ctx.api_llm_synth is not None and run_cap5:
                 ctx.cap_conv = GenerateConvergencia(
                     chain=build_chain_06_synth(ctx.api_llm_synth),
                     chain_eje=build_chain_06a(ctx.api_llm) if ctx.api_llm else None,
@@ -354,7 +360,7 @@ class GenerateInforme:
                 )
 
             ctx.step_fn(7, "Cap 6 — Accionables Estratégicos")
-            if not acc_restaurado and ctx.api_llm is not None:
+            if not acc_restaurado and ctx.api_llm is not None and run_cap6:
                 # Coherencia (T22.1, Q1): pasar un resumen de los hallazgos de los caps ya
                 # generados (2/3/4/5) para que los accionables los referencien explícitamente,
                 # no solo el retrieval. Todos están disponibles en este punto del DAG.
@@ -400,9 +406,9 @@ class GenerateInforme:
                         cap_obj.texto = intro + "\n\n" + cap_obj.texto
 
         # Persistir los caps recién computados (con intro) con keep-best + fallback (Fase 1).
-        if not conv_restaurado:
+        if not conv_restaurado and run_cap5:
             ctx.cap_conv = checkpoint_hooks.commit_best(ctx, "cap5", ctx.cap_conv)
-        if not acc_restaurado:
+        if not acc_restaurado and run_cap6:
             ctx.cap_acc = checkpoint_hooks.commit_best(ctx, "cap6", ctx.cap_acc)
 
     def _run_n3(self, ctx: _PipelineContext) -> InformeResult:
@@ -525,34 +531,13 @@ class GenerateInforme:
             resumen_ejecutivo=ctx.resumen, referencias=refs,
         )
 
-        from ic.infrastructure.charts.radar_chart import (
-            generate_placeholder_radar,
-            generate_radar_chart,
-        )
         from ic.infrastructure.render.docx_renderer import DocxRenderer
         from ic.infrastructure.render.pdf_renderer import convert_docx_to_pdf
 
-        chart_path = ctx.output_path.replace(".docx", "_radar.png")
-        try:
-            # T16.1-D: usar datos reales del LLM si están disponibles; fallback a placeholder
-            rd = ctx.cap.radar_data if ctx.cap else None
-            if rd and rd.get("competidores") and rd.get("dimensions"):
-                # T17.2 (DT-027): instrumentar hit del bloque radar_json emitido por el LLM.
-                logger.info(
-                    "Radar: datos reales del LLM — %d competidores, %d dimensiones",
-                    len(rd["competidores"]), len(rd["dimensions"]),
-                )
-                generate_radar_chart(rd["competidores"], rd["dimensions"], chart_path,
-                                     title=f"Posicionamiento Competitivo — {ctx.params.empresa}")
-            else:
-                logger.info("Radar: placeholder (radar_json ausente o no parseable) — DT-027 miss")
-                generate_placeholder_radar(chart_path, ctx.params.empresa)
-        except Exception:
-            logger.warning("No se pudo generar radar chart", exc_info=True)
-            chart_path = None
-
+        # Radar desconectado: el placeholder no aportaba valor y el LLM raramente emite
+        # radar_json confiable. El código de generación se conserva en radar_chart.py.
         assembler = PilotAssembler(disclaimer=ctx.settings.informe_disclaimer)
-        report_doc = assembler.build(informe, figura_benchmarking=chart_path)
+        report_doc = assembler.build(informe, figura_benchmarking=None)
         DocxRenderer(ctx.settings.docx_template_path or None).render(report_doc, ctx.output_path)
 
         ruta_pdf: str | None = None
