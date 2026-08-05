@@ -10,6 +10,17 @@
 ## Estado actual (2026-08-05)
 
 Rama `develop`. Últimos hitos (esta línea de trabajo, DT-050→):
+- **DT-UI02 — Selección genuina Caps 3–6 (CERRADO, commit ad140a3):** `caps_incluidos: set[str] | None`
+  en `InformeParams`; DAG de dependencias (Cap 6→5→3+4) con auto-activación en UI + info al usuario.
+  `_fns` en `generate_n1.py` filtradas; `_run_n2` condicional con guardas `run_cap5`/`run_cap6`.
+- **DT-UI03 — Cap 2: prosa + web enrichment globales + mercado sin tabla (CERRADO, commit 7499053 +
+  fix chain_judge 2026-08-05):** fichas 2.1 en mini-párrafo `**Nombre** *(País)* — desc` (antes tablas
+  10 columnas con 70% "No disponible"); radar desconectado del pipeline (código preservado en
+  `radar_chart.py`); sección 2.3 en texto corrido sin tabla regional; `_enriquecer_globales_web()`
+  busca top-3 globales con campos vacíos y persiste hallazgos al KB. **Bug encontrado post-deploy:**
+  el juez de calidad (`chain_judge.py`) tenía criterio F que exigía tablas+radar → forzaba al revisor
+  a revertir al formato viejo. Corregido hoy: criterio F actualizado a "prosa NO tablas, sin radar,
+  2.3 en texto corrido".
 - **DT-049 — Frente Evidencia: retrieval/citación** (**CERRADO**, E2E OK): el `.docx` citaba ~9 refs.
   Diagnóstico con números: la palanca **no** era el umbral (0.70 inerte — las reservas ya inyectan
   diversidad a 0.5) sino **`top_k` + `min_distinct_docs`**. Cambio config-only: `rag_top_k` 10→16,
@@ -49,18 +60,57 @@ tolerante a None.**
 ## Pruebas pendientes (validaciones que faltan)
 0. ✅ **CERRADO 2026-08-04 — E2E DT-066 (B2) + re-verificación:** Alpina 1040 con los 4 flags, EXIT=0.
    **"Dato no disponible" 25%→3%** doc-wide (**0 en la sección 2.1**); fichas 2.1 deterministas con
-   datos reales del KB; 0 competidores tabaco/cerveza; radar renderizado. El caveat de rate-limit se
-   resolvió enrutando el **hole-filler al tier synth (Gemini)**: re-corrida (`alpina_dt066_v2.docx`)
-   con el free saturado toda la corrida → **radar Cap 2 PRESENTE** + **hole-filler medido limpio**
-   (`8 procesados, 0 nuevos` vía Gemini, sin rate-limit). El M=0 es honesto (evidencia delgada, no
-   fallo de B2) → apunta al Frente Evidencia (DT-049). Detalle: `DT066_HALLAZGOS.md`.
+   datos reales del KB; 0 competidores tabaco/cerveza; radar renderizado. Detalle: `DT066_HALLAZGOS.md`.
 1. ✅ **HECHO 2026-08-03** — E2E Gemini síntesis (`gemini-3.5-flash-lite`): Alpina EXIT=0, 0 crashes,
    Cap 1 completo (9 subsecciones), 2.1.1 = 8 globales food (0 tabaco/cerveza). `output/alpina_gemini.docx`.
-2. **E2E Fase 1**: un capítulo degradado cae al cacheado bueno (fallback); re-corrida reusa.
-3. **E2E DT-064/065 con KB limpio**: Alpina 1040 + Emtelco full → fichas con datos reales, 0 veneno,
+2. ✅ **HECHO 2026-08-05 — E2E DT-UI03 con ERCO ENERGÍA SAS (EnergyTech, GICS 5510):** Cap 1 excelente
+   (LinkedIn + fuentes web; StartIA citada como "Ruta N Medellín, 2026"); 2.1 ya en prosa (fix chain_judge
+   mediante); Cap 3 tendencias relevantes con buenos casos de éxito. **Bugs abiertos:** ver DT-UI04 abajo.
+3. **E2E Fase 1**: un capítulo degradado cae al cacheado bueno (fallback); re-corrida reusa.
+4. **E2E DT-064/065 con KB limpio**: Alpina 1040 + Emtelco full → fichas con datos reales, 0 veneno,
    0 cerveza/tabaco, tiers regional/startup pre-llenados por data local.
-4. **Re-medir cobertura `domain/`** (base F19 = 69%).
-5. **Fix bug** empresa focal en su propia tabla de competidores (excluir por nombre normalizado).
+5. **Re-medir cobertura `domain/`** (base F19 = 69%).
+6. ✅ **RESUELTO** — empresa focal en su propia tabla: el SYSTEM_PROMPT_03 ya tiene la regla; el LLM
+   la incumple esporádicamente (DT-UI04a). Fix real: filtrado en repo/N1, no solo instrucción al LLM.
+
+## DT-UI04 — Bugs y mejoras detectados en E2E ERCO (2026-08-05)
+
+Bugs encontrados en la corrida de validación con ERCO ENERGÍA SAS (EnergyTech / GICS 5510):
+
+### DT-UI04a — Empresa focal aparece como su propia competencia (BUG)
+El LLM incluye a ERCO ENERGÍA dentro de sus propios competidores pese a la instrucción en
+`SYSTEM_PROMPT_03`. La instrucción al LLM es frágil; el fix real es **filtrar por nombre normalizado
+en `repo_kb.list_competidores_by_sector()`** (excluir la entidad analizada antes de pasarla al prompt)
+y también en el bloque `jugadores_locales_ctx` en `generate_n1.py`. No depender solo del LLM.
+
+### DT-UI04b — StartIA/EmpresasColombia no se inyectan en sectores no mapeados (BUG)
+Para ERCO en sector 5510 (EnergyTech), `list_locales_by_sector(g_code=5510)` devuelve vacío: las
+empresas de StartIA con vertical "ENERGYTECH" están indexadas en la BD por su GICS numérico, pero
+puede haber un gap en el mapeo `CatalogoVerticalesStartIAGICS.csv` o en la ingesta. Diagnóstico:
+verificar que `ENERGYTECH → 5510` (o código real) esté en el catálogo y que las entidades existan
+en `ic.entidades` con ese `sector_gics`. También verificar `sector_gics_code` que llega a N1.
+
+### DT-UI04c — Cap 3 inicia con texto tipo código/gibberish (BUG)
+La primera línea del Cap 3 en el `.docx` ERCO era texto sin estructura / similar a código. El juez
+de calidad no lo detectó como E=0 (o el score total superó el umbral y no disparó revisión). Dos
+acciones: (1) añadir regla explícita al `SYSTEM_PROMPT_04` que prohíba bloques de código, JSON o
+markdown de código; (2) añadir post-procesamiento que elimine líneas de preamble no-Markdown al
+inicio del texto de cualquier capítulo (función utilitaria en `shared/`).
+
+### DT-UI04d — Web enrichment globales: validar que dispare y mida impacto (MEJORA)
+`_enriquecer_globales_web()` está implementado pero no fue posible validar si corrió para ERCO
+(sector 5510 sin tiers anclados en KB → B2 cae a modo LLM, la función puede no disparar). Añadir
+log visible en la UI (contador "X competidores globales enriquecidos desde web") para trazabilidad.
+Además, cuando B2 cae a modo LLM por KB vacío, los globales igualmente podrían buscarse en web
+antes de invocar el LLM para enriquecer el prompt.
+
+### DT-UI04e — Contenido globales 2.1 pobre en sectores sin corpus EMIS suficiente (MEJORA)
+Para EnergyTech (sector 5510), el corpus EMIS tiene documentos pero la evidencia sobre competidores
+globales (Enel, Iberdrola, Nextracker, SolarEdge) es escasa. La búsqueda web por los top-3 es la
+palanca correcta; una vez funcione DT-UI04d, este problema debería mejorar. Complementar con queries
+web más específicas por empresa+sector en el paso de retrieval de benchmarking.
+
+---
 
 ## Frentes abiertos (prioridad)
 - **Frente Evidencia (DT-049 / DT-034):** el lote EMIS **YA está ingestado** (238/250 PDFs + 25 Pulso =

@@ -22,10 +22,12 @@ CRITERIOS_CAPITULO: dict[str, str] = {
     "Cap 2 — Análisis Competitivo": (
         "E: subcapítulos 2.1 Jugadores Clave (Globales/Regionales LatAm/Startups), 2.2 División "
         "de competidores (matriz 2x2 + síntesis), 2.3 Mercado, 2.4 Innovación/Inversión/RRHH, "
-        "2.5 Brechas. P: ~14 actores con fichas de 8 puntos, cifras de cuota/ingresos reales. "
-        "V: cada ficha citada (Autor, año), nunca nombre de archivo, empresa analizada excluida. "
-        "F: fichas en tabla + matriz 2x2 + radar + tabla de mercado por región. "
-        "T: 2.1 fichas; 2.2/2.4/2.5 storytelling ejecutivo sin viñetas."
+        "2.5 Brechas. P: ~14 actores descritos con datos reales (portafolio, presencia, estrategia), "  # noqa: E501
+        "cifras de cuota/ingresos cuando las fuentes las proveen. "
+        "V: cada actor citado (Autor, año), nunca nombre de archivo, empresa analizada excluida. "
+        "F: 2.1 en PROSA (NO tablas) — un mini-párrafo por actor con formato **Nombre** *(País)* — "
+        "descripción; sin radar, sin tabla de mercado por región (sección 2.3 en texto corrido). "
+        "T: 2.1 mini-párrafos; 2.2/2.4/2.5 storytelling ejecutivo sin viñetas."
     ),
     "Cap 3 — Análisis Sectorial Tendencial": (
         "E: intro fija + 3.1 seis tendencias (2 T/2 E/2 S) + 3.2 cuatro MECE + 3.3 casos globales "
@@ -66,7 +68,8 @@ SYSTEM_PROMPT_JUDGE = (
     "- E (Estructura): ¿están los subcapítulos esperados, en orden y numeración correctos?\n"
     "- P (Profundidad): datos concretos, cifras y nombres propios vs generalidades de relleno.\n"
     "- V (Evidencia/Citación): afirmaciones sustentadas y trazables (APA), ausencias declaradas.\n"
-    "- F (Formato/Visuales): tablas, fichas y figuras que el patrón exige.\n"
+    "- F (Formato/Visuales): formato correcto según los criterios del capítulo "
+    "(prosa, tablas o figuras según se especifique).\n"
     "- T (Tono): ejecutivo, storytelling sin viñetas, sin muletillas de IA, español neutro.\n\n"
     "Escala: 0=ausente/no cumple; 1=presente pero deficiente; 2=cumple con carencias menores; "
     "3=equivalente al patrón de referencia.\n\n"
