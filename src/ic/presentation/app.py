@@ -86,7 +86,7 @@ def _render_repositorio() -> None:
             ]
             tipo_doc = col_a.selectbox("Tipo", options=_tipo_opts)
             año_doc = col_b.number_input("Año", min_value=1990, max_value=2100, value=2026)
-            autor_doc = st.text_input("Autor", value="Ruta N")
+            autor_doc = st.text_input("Autor", value="Ruta N Medellín")
             titulo_doc = st.text_input(
                 "Título", placeholder="Ej: Informe sectorial: Servicios al consumidor"
             )
@@ -361,6 +361,63 @@ with tab_gen:
             placeholder="./output/noel_informe.docx",
             help="Ruta donde se guardará el .docx. Se crea el directorio si no existe.",
         )
+
+        st.divider()
+        st.markdown("**Módulos del análisis**")
+        st.caption(
+            "Cap 1 (Descripción) y GICS siempre se generan — son la base de todo el pipeline."
+        )
+
+        col_m1, col_m2 = st.columns(2)
+
+        with col_m1:
+            st.markdown("**Cap 2 — Competidores**")
+            mod_globales = st.checkbox(
+                "Descubrir globales (LLM + web)",
+                value=True,
+                help="Identifica líderes mundiales del sector y los corrobora en web (≥2 fuentes). "
+                     "Más lento; consume cuota API.",
+            )
+            mod_local = st.checkbox(
+                "Jugadores colombianos (reg. + startups)",
+                value=True,
+                help="Inyecta empresas locales del directorio (EmpresasColombia + StartIA) "
+                     "como regionales y startups en la tabla 2.1.",
+            )
+            mod_det = st.checkbox(
+                "Tabla 2.1 determinista desde KB",
+                value=True,
+                help="Ensambla la tabla de jugadores clave desde hechos verificados del KB "
+                     "en lugar de dejar que el LLM la redacte. Reduce 'Dato no disponible'.",
+            )
+
+        with col_m2:
+            st.markdown("**Caps 3–6** *(selección — próxima iteración)*")
+            st.caption(
+                "Estos módulos siempre se generan hoy. "
+                "La selección individual se habilitará en el siguiente DT."
+            )
+            mod_tend = st.checkbox("Cap 3 — Tendencias sectoriales", value=True, disabled=True)
+            mod_eco = st.checkbox("Cap 4 — Ecosistema empresarial", value=True, disabled=True)
+            mod_conv = st.checkbox("Cap 5 — Convergencia empresarial", value=True, disabled=True)
+            mod_acc = st.checkbox("Cap 6 — Accionables estratégicos", value=True, disabled=True)
+
+        st.markdown("**Calidad**")
+        mod_selfreview = st.checkbox(
+            "Revisión automática por capítulo",
+            value=False,
+            help="Loop generar→juez→revisar sobre cada capítulo. Más lento y consume más cuota. "
+                 "Desactivado por defecto.",
+        )
+
+        st.divider()
+        st.markdown("**Opciones de caché**")
+        col_c1, col_c2 = st.columns(2)
+        use_cache = col_c1.checkbox("Usar caché de capítulos", value=True,
+                                    help="Reutiliza capítulos ya generados para esta empresa.")
+        refresh_cache = col_c2.checkbox("Forzar regeneración completa", value=False,
+                                        help="Invalida el caché y regenera todo desde cero.")
+
         submitted = st.form_submit_button("🚀 Generar informe", use_container_width=True)
 
     # ── Ejecución ──────────────────────────────────────────────────────────
@@ -422,6 +479,12 @@ with tab_gen:
                 empresa=empresa.strip(),
                 ciiu=ciiu.strip() or None,
                 output_path=output_path.strip() or None,
+                use_cache=use_cache,
+                refresh=refresh_cache,
+                selfreview=mod_selfreview,
+                discover_globales=mod_globales,
+                anclaje_local=mod_local,
+                seccion21_determinista=mod_det,
             )
             result = uc.run(params, on_step=on_step)
 
@@ -477,6 +540,20 @@ with tab_gen:
                 st.caption(
                     f"Tokens: {result.tokens_in:,} entrada / {result.tokens_out:,} salida"
                 )
+
+            _modulos_on = [
+                lbl for lbl, activo in [
+                    ("Globales", mod_globales),
+                    ("Jugadores CO", mod_local),
+                    ("Tabla KB", mod_det),
+                    ("Tendencias", mod_tend),
+                    ("Ecosistema", mod_eco),
+                    ("Convergencia", mod_conv),
+                    ("Accionables", mod_acc),
+                    ("Self-review", mod_selfreview),
+                ] if activo
+            ]
+            st.caption(f"Módulos activos: {', '.join(_modulos_on) if _modulos_on else '—'}")
 
             if result.cost_records:
                 st.markdown("**Desglose por llamada:**")

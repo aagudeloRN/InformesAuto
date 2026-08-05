@@ -34,6 +34,12 @@ class InformeParams:
     # `refresh=True` → invalida el caché al arrancar y regenera todo desde cero.
     use_cache: bool = True
     refresh: bool = False
+    # Módulos opcionales: None = usa el default de Settings/.env; True/False = override por corrida.
+    # Permite que la UI active/desactive módulos sin tocar el .env global.
+    selfreview: bool | None = None
+    discover_globales: bool | None = None
+    anclaje_local: bool | None = None
+    seccion21_determinista: bool | None = None
 
 
 @dataclass
@@ -133,7 +139,16 @@ class GenerateInforme:
         from ic.infrastructure.sources.cached_connector import CacheCounter
         from ic.infrastructure.sources.web_connector import WebConnector
 
-        s = self._settings
+        # Aplicar overrides de módulos desde InformeParams (None = respetar el .env/Settings).
+        _overrides = {
+            k: v for k, v in {
+                "selfreview_enabled": params.selfreview,
+                "discover_globales_enabled": params.discover_globales,
+                "anclaje_local_enabled": params.anclaje_local,
+                "seccion21_determinista_enabled": params.seccion21_determinista,
+            }.items() if v is not None
+        }
+        s = self._settings.model_copy(update=_overrides) if _overrides else self._settings
         tracker = CostTracker(budget_limit=s.llm_budget_limit_usd)
         # T16.0-A: modelo resiliente analítico (free→free_alt→synth→paid→fallback) para Caps 2/3/4.
         resilient_llm = (

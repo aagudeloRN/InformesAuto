@@ -1,7 +1,12 @@
 # NOTA: En el entorno compartido el contenedor 'repositorio_postgres' ya ocupa el puerto
 # 5434 y es la instancia que este proyecto usa (DATABASE_URL en .env apunta a él).
-# Solo ejecutar 'docker compose up -d' si esa instancia NO está corriendo.
+# Solo ejecutar 'docker compose up -d postgres' si esa instancia NO está corriendo.
 # Verificar con: docker ps | grep 5434
+#
+# Para levantar solo la UI (asumiendo que la BD ya está corriendo):
+#   docker compose up -d streamlit
+# Para todo:
+#   docker compose up -d
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -19,3 +24,30 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    image: informesauto-streamlit
+    ports:
+      - "${STREAMLIT_PORT:-8503}:${STREAMLIT_PORT:-8503}"
+    env_file:
+      - .env
+    environment:
+      # En Docker, Ollama corre en el host — acceder por la gateway Docker (172.17.0.1)
+      # o por host.docker.internal (Docker Desktop). En producción ajustar a IP del servidor.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://172.17.0.1:11434}
+      STREAMLIT_PORT: ${STREAMLIT_PORT:-8503}
+    volumes:
+      # output/ en bind mount para que los .docx generados persistan fuera del contenedor
+      - ./output:/app/output
+      # .env se monta como read-only por si el build no lo incluyó
+      - ./.env:/app/.env:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # La UI necesita acceso a Ollama en el host; en Linux requiere extra_hosts
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
