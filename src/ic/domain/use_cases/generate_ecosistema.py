@@ -9,7 +9,7 @@ from ic.domain.chains.chain_05_ecosistema import (
 )
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
-from ic.shared.text_utils import has_cjk_characters
+from ic.shared.text_utils import has_cjk_characters, strip_preamble
 from ic.shared.types import CapEcosistema
 
 _MIN_CHUNKS = 3
@@ -89,6 +89,7 @@ class GenerateEcosistema:
             "fuentes_web": web_context,
             "secciones_solicitadas": build_secciones_solicitadas(activas),
         })
+        texto = strip_preamble(texto)
 
         if has_cjk_characters(texto):
             return CapEcosistema(

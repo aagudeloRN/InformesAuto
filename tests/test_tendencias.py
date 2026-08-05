@@ -6,6 +6,7 @@ Todos los tests usan mocks — sin llamadas reales a OpenRouter, OpenAlex ni Tav
 from unittest.mock import MagicMock
 
 from ic.domain.chains.chain_04_tendencias import (
+    SYSTEM_PROMPT_04,
     build_chain_04,
     format_academic_sources,
     format_chunks_as_context,
@@ -74,6 +75,12 @@ class TestChain04:
         assert "[A1]" in texto
         assert "García, J." in texto
 
+    def test_system_prompt_04_prohibe_bloques_codigo(self):
+        # DT-UI04c: el prompt prohíbe explícitamente emitir bloques de código/cercas ``` (prevención
+        # del preámbulo espurio que contaminaba el Cap 3).
+        assert "No emitas bloques de código" in SYSTEM_PROMPT_04
+        assert "```" in SYSTEM_PROMPT_04
+
 
 class TestGenerateTendencias:
     def _make_uc(self, texto_llm: str = "Cap 3 generado.", chunks: list | None = None):
@@ -131,6 +138,16 @@ class TestGenerateTendencias:
         assert "sector_gics" in call_kwargs
         assert "retrieval_sector" in call_kwargs
         assert "fuentes_academicas" in call_kwargs
+
+    def test_execute_strip_preamble_antes_de_heading(self):
+        # DT-UI04c: si el LLM antepone un bloque de código/JSON, el post-procesamiento lo poda y el
+        # texto queda empezando en el encabezado real.
+        crudo = '```json\n{"seccion": "3.1"}\n```\n\n## 3.1. Tendencias\n\nTexto del capítulo.'
+        uc = self._make_uc(crudo)
+        result = uc.execute("ERCO", "Empresa de energía.", "Servicios de Energía")
+        primera = next(ln for ln in result.texto.splitlines() if ln.strip())
+        assert primera.startswith("## 3.")
+        assert "```" not in result.texto
 
     def test_execute_parrafo_ausencia_si_retrieval_insuficiente(self):
         uc = self._make_uc(chunks=[_make_chunk("Solo un chunk")])

@@ -1,7 +1,7 @@
 from langchain_core.runnables import Runnable
 
 from ic.domain.absent_data import build_absent_paragraph
-from ic.shared.text_utils import has_cjk_characters
+from ic.shared.text_utils import has_cjk_characters, strip_preamble
 from ic.shared.types import ResumenEjecutivo
 
 
@@ -28,6 +28,7 @@ class GenerateResumenEjecutivo:
             "sector_gics": sector_gics,
             "textos_capitulos": contexto,
         })
+        texto = strip_preamble(texto)
 
         if has_cjk_characters(texto):
             return ResumenEjecutivo(

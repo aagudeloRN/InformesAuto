@@ -27,6 +27,8 @@ SYSTEM_PROMPT_04 = (
     "- Varía el ritmo: alterna frases cortas (≤12 palabras) con frases más largas.\n"
     "- Sin mini-checklists ni meta-comentarios al final.\n"
     "- Sin citaciones inline en las secciones narrativas.\n"
+    "- No emitas bloques de código ni cercas ``` ni JSON: responde en prosa Markdown plana. "
+    "La respuesta debe empezar directamente con el párrafo introductorio, sin preámbulo.\n"
 )
 
 USER_PROMPT_04 = (

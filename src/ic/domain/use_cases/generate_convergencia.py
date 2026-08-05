@@ -15,7 +15,7 @@ from ic.domain.chains.chain_06a_convergencia_eje import EJE_MERCADO, EJE_SOCIAL,
 from ic.domain.coherence import enforce_cap5_areas
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
-from ic.shared.text_utils import has_cjk_characters
+from ic.shared.text_utils import has_cjk_characters, strip_preamble
 from ic.shared.types import CapConvergencia, ChunkResult
 
 logger = logging.getLogger(__name__)
@@ -101,6 +101,7 @@ class GenerateConvergencia:
                 "retrieval_caps_anteriores": context_caps,
                 "retrieval_convergencia_territorial": context_territorial,
             })
+            texto = strip_preamble(texto)
             if has_cjk_characters(texto):
                 return CapConvergencia(
                     texto=build_absent_paragraph(
@@ -128,6 +129,7 @@ class GenerateConvergencia:
         texto_final = self._chain_synth.invoke({
             "partes": "\n\n---\n\n".join([texto_tec, texto_soc, texto_mer])
         })
+        texto_final = strip_preamble(texto_final)
 
         if has_cjk_characters(texto_final):
             return CapConvergencia(

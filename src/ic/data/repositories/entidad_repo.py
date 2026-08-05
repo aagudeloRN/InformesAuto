@@ -10,6 +10,7 @@ la verificación es curada/HITL.
 from __future__ import annotations
 
 import json
+import unicodedata
 from dataclasses import dataclass, field
 
 from sqlalchemy import text
@@ -32,7 +33,18 @@ from ic.domain.kb.relevance import (
     es_ruido_competidor,
     rank_by_product_overlap,
 )
+from ic.infrastructure.ner.entity_recognizer import normalize_entity
 from ic.shared.text_productos import producto_overlap
+
+
+def _clave_exclusion(nombre: str) -> str:
+    """Clave de comparación para excluir la empresa analizada (DT-UI04a): dedup por
+    ``normalize_entity`` (minúsculas, sin sufijos societarios ni puntuación) **más** sin acentos,
+    para que "ERCO ENERGÍA S.A.S." empate con "ERCO ENERGIA". Puro y determinista."""
+    base = normalize_entity(nombre)
+    return "".join(
+        c for c in unicodedata.normalize("NFD", base) if unicodedata.category(c) != "Mn"
+    )
 
 
 @dataclass
@@ -288,6 +300,7 @@ class EntidadRepository:
         productos_terms: set[str] | None = None,
         alcance: str | None = None,
         limit: int = 8,
+        exclude_nombre: str | None = None,
     ) -> list[str]:
         """Nombres canónicos de competidores del grupo para anclar (DT-056/DT-063).
 
@@ -313,6 +326,8 @@ class EntidadRepository:
         rows = self._db.execute(
             sql, {"sector": sector_gics, "descartado": ESTADO_DESCARTADO}
         ).fetchall()
+        # DT-UI04a: excluir la empresa analizada de su propia lista de competidores.
+        norm_excl = _clave_exclusion(exclude_nombre) if exclude_nombre else None
         candidatos = [
             ProductoRankRow(
                 nombre=r[0],
@@ -323,6 +338,7 @@ class EntidadRepository:
                 tiebreak=int(r[4] or 0),
             )
             for r in rows
+            if not (norm_excl and _clave_exclusion(r[0]) == norm_excl)
         ]
         # Tier de clase mundial: exigir solape (no traer globales de otra actividad; vacío → el
         # guard dispara el descubrimiento por producto). Sin productos → orden por evidencia.
@@ -339,6 +355,7 @@ class EntidadRepository:
         solo_establecidas: bool = False,
         productos_terms: set[str] | None = None,
         limit: int = 6,
+        exclude_nombre: str | None = None,
     ) -> list[LocalRow]:
         """Jugadores LOCALES del directorio para anclar 2.1.2/2.1.3 (DT-050/DT-063). JOIN sectores.
 
@@ -390,6 +407,11 @@ class EntidadRepository:
                 "verificado": ESTADO_VERIFICADO, "segmento": segmento, "prefetch": prefetch,
             },
         ).fetchall()
+        # DT-UI04a: la empresa analizada no debe aparecer como jugador local propio. Se poda antes
+        # del re-rank por solape (normalización robusta a sufijos societarios y acentos).
+        norm_excl = _clave_exclusion(exclude_nombre) if exclude_nombre else None
+        if norm_excl:
+            rows = [r for r in rows if _clave_exclusion(r[0]) != norm_excl]
         terms = productos_terms or set()
 
         def _clave(r):

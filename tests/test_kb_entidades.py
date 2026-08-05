@@ -188,6 +188,12 @@ def _row(nombre, nombre_norm, estado, n_chunks, alcance=None, descriptor=""):
     return (nombre, nombre_norm, alcance, estado, n_chunks, descriptor)
 
 
+def _local_row(nombre, desc="", tam=0, ciudad=None, vertical=None, segmento=None, verificado=True):
+    """Tupla en el orden del SELECT de list_locales_by_sector:
+    (nombre, ciudad, vertical, ingreso, segmento, verificado, tam, descripcion, prod_perfil)."""
+    return (nombre, ciudad, vertical, None, segmento, verificado, tam, None, desc)
+
+
 def test_list_competidores_sin_productos_ordena_por_evidencia():
     # DT-063: sin productos → comportamiento de grupo (solo ruido excluido), orden por evidencia.
     sess = _FakeSession(select_rows=[
@@ -228,6 +234,36 @@ def test_list_competidores_alcance_global_excluye_locales():
         "3020", productos_terms={"lacteos"}, alcance="global"
     )
     assert nombres == ["Nestlé"]  # Colanta (local) no entra al componente global
+
+
+def test_list_competidores_excluye_empresa_analizada():
+    # DT-UI04a: la empresa analizada no aparece en su propia lista de competidores. El match es
+    # robusto a sufijos societarios y acentos ("ERCO ENERGÍA S.A.S." ≡ "ERCO ENERGIA").
+    sess = _FakeSession(select_rows=[
+        _row("ERCO ENERGIA", "erco energia", ESTADO_VERIFICADO, 5, alcance="global",
+             descriptor="energía solar fotovoltaica"),
+        _row("Celsia", "celsia", ESTADO_VERIFICADO, 8, alcance="global",
+             descriptor="energía solar"),
+    ])
+    nombres = EntidadRepository(sess).list_competidores_by_sector(
+        "3510", productos_terms={"energia", "solar"}, exclude_nombre="ERCO ENERGÍA S.A.S."
+    )
+    assert "ERCO ENERGIA" not in nombres
+    assert nombres == ["Celsia"]
+
+
+def test_list_locales_excluye_empresa_analizada():
+    # DT-UI04a: mismo para el tier local (2.1.2/2.1.3). Fila local = orden del SELECT del repo.
+    sess = _FakeSession(select_rows=[
+        _local_row("ERCO ENERGIA", desc="energía solar", tam=900),
+        _local_row("Ecoflux", desc="energía solar", tam=300),
+    ])
+    locales = EntidadRepository(sess).list_locales_by_sector(
+        "3510", productos_terms={"energia", "solar"}, exclude_nombre="ERCO ENERGÍA S.A.S."
+    )
+    nombres = [r.nombre for r in locales]
+    assert "ERCO ENERGIA" not in nombres
+    assert nombres == ["Ecoflux"]
 
 
 def test_list_competidores_sector_vacio_no_consulta():

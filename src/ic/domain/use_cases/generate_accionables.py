@@ -3,7 +3,7 @@ from langchain_core.runnables import Runnable
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
 from ic.domain.chains.chain_07_accionables import format_chunks_as_context
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
-from ic.shared.text_utils import has_cjk_characters
+from ic.shared.text_utils import has_cjk_characters, strip_preamble
 from ic.shared.types import CapAccionables
 
 _MIN_CHUNKS = 6
@@ -50,6 +50,7 @@ class GenerateAccionables:
             "hallazgos_caps_previos": hallazgos_caps_previos
             or "No se proporcionaron resúmenes de capítulos previos.",
         })
+        texto = strip_preamble(texto)
 
         if has_cjk_characters(texto):
             return CapAccionables(

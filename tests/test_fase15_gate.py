@@ -11,7 +11,8 @@ import pytest
 
 _ROOT = Path(__file__).resolve().parent.parent
 _GATE_SCRIPT = _ROOT / "scripts" / "eval_gate.py"
-_BUDGET = _ROOT / "docs" / "decisions" / "fase15_budget.json"
+# Artefactos efímeros de Fase 14/15 reubicados a archive/ en la consolidación de doc (785f79b).
+_BUDGET = _ROOT / "docs" / "decisions" / "archive" / "fase15_budget.json"
 
 
 def _run_gate(snapshot_data: dict, budget_data: dict, tmp_path: Path) -> int:
@@ -142,7 +143,7 @@ def test_fase15_budget_file_exists_and_valid():
 
 def test_gate_passes_against_fase14_snapshot(tmp_path):
     """El snapshot real de Fase 14 pasa el budget de Fase 15."""
-    fase14_snap = _ROOT / "docs" / "decisions" / "fase14_final_filtered.json"
+    fase14_snap = _ROOT / "docs" / "decisions" / "archive" / "fase14_final_filtered.json"
     if not fase14_snap.exists():
         pytest.skip("snapshot Fase 14 no disponible")
     rc = _run_gate(

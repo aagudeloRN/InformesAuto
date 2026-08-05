@@ -10,6 +10,25 @@
 ## Estado actual (2026-08-05)
 
 Rama `develop`. Últimos hitos (esta línea de trabajo, DT-050→):
+- **Higiene de suite (2026-08-05):** suite `not slow` al **100% verde** (630 passed, 2 skipped, 14
+  deselected=slow). Se corrigió el único test que fallaba desde días atrás (`test_fase15_gate.py`):
+  no era bug de código sino rutas obsoletas — `fase15_budget.json` y `fase14_final_filtered.json` se
+  movieron a `docs/decisions/archive/` en la consolidación de doc (commit `785f79b`) y el test seguía
+  apuntando a la ruta vieja. Fix = re-apuntar a `archive/` (reactiva además un test que se saltaba en
+  silencio). Los 14 `slow` (Ollama/red real) se corren antes de release, no en cada cambio.
+- **DT-UI04c — Cap 3 (y todos los caps narrativos) inician con gibberish/código (CERRADO 2026-08-05):**
+  saneo determinista `strip_preamble()` en `shared/text_utils.py` (poda cercas ``` /JSON antes del
+  primer encabezado; conserva prosa legítima; desenvuelve documentos envueltos en cerca), aplicado en
+  `generate_tendencias/ecosistema/convergencia/accionables/resumen_ejecutivo` tras el `invoke` y antes
+  del guard CJK. Prevención: `SYSTEM_PROMPT_04` prohíbe explícitamente bloques de código. Tests:
+  `tests/test_text_utils.py` (6) + `test_tendencias.py` (strip en execute + prompt). No se tocó el juez
+  (el saneo evita que el gibberish llegue al `.docx`).
+- **DT-UI04a — Empresa focal aparece como su propia competencia (CERRADO 2026-08-05):** filtro real en
+  el repo (no en el prompt): `exclude_nombre` en `list_competidores_by_sector` y `list_locales_by_sector`
+  (`entidad_repo.py`), match robusto a sufijos societarios y acentos (`_clave_exclusion`:
+  `normalize_entity` + sin acentos → "ERCO ENERGÍA S.A.S." ≡ "ERCO ENERGIA"). `generate_n1.py` pasa
+  `exclude_nombre=e` en los anclajes global/regional/startup + el guard de descubrimiento. Tests:
+  `test_kb_entidades.py` (competidores + locales).
 - **DT-UI02 — Selección genuina Caps 3–6 (CERRADO, commit ad140a3):** `caps_incluidos: set[str] | None`
   en `InformeParams`; DAG de dependencias (Cap 6→5→3+4) con auto-activación en UI + info al usuario.
   `_fns` en `generate_n1.py` filtradas; `_run_n2` condicional con guardas `run_cap5`/`run_cap6`.
@@ -77,11 +96,11 @@ tolerante a None.**
 
 Bugs encontrados en la corrida de validación con ERCO ENERGÍA SAS (EnergyTech / GICS 5510):
 
-### DT-UI04a — Empresa focal aparece como su propia competencia (BUG)
-El LLM incluye a ERCO ENERGÍA dentro de sus propios competidores pese a la instrucción en
-`SYSTEM_PROMPT_03`. La instrucción al LLM es frágil; el fix real es **filtrar por nombre normalizado
-en `repo_kb.list_competidores_by_sector()`** (excluir la entidad analizada antes de pasarla al prompt)
-y también en el bloque `jugadores_locales_ctx` en `generate_n1.py`. No depender solo del LLM.
+### DT-UI04a — Empresa focal aparece como su propia competencia (✅ CERRADO 2026-08-05)
+~~El LLM incluye a ERCO ENERGÍA dentro de sus propios competidores.~~ **Resuelto:** filtrado en el
+repo (`exclude_nombre` en `list_competidores_by_sector`/`list_locales_by_sector`, match sin acentos ni
+sufijos societarios vía `_clave_exclusion`); `generate_n1.py` pasa `exclude_nombre=e` en los tres
+anclajes + guard de descubrimiento. Tests en `test_kb_entidades.py`. Pendiente: verificar en E2E ERCO.
 
 ### DT-UI04b — StartIA/EmpresasColombia no se inyectan en sectores no mapeados (BUG)
 Para ERCO en sector 5510 (EnergyTech), `list_locales_by_sector(g_code=5510)` devuelve vacío: las
@@ -90,12 +109,24 @@ puede haber un gap en el mapeo `CatalogoVerticalesStartIAGICS.csv` o en la inges
 verificar que `ENERGYTECH → 5510` (o código real) esté en el catálogo y que las entidades existan
 en `ic.entidades` con ese `sector_gics`. También verificar `sector_gics_code` que llega a N1.
 
-### DT-UI04c — Cap 3 inicia con texto tipo código/gibberish (BUG)
-La primera línea del Cap 3 en el `.docx` ERCO era texto sin estructura / similar a código. El juez
-de calidad no lo detectó como E=0 (o el score total superó el umbral y no disparó revisión). Dos
-acciones: (1) añadir regla explícita al `SYSTEM_PROMPT_04` que prohíba bloques de código, JSON o
-markdown de código; (2) añadir post-procesamiento que elimine líneas de preamble no-Markdown al
-inicio del texto de cualquier capítulo (función utilitaria en `shared/`).
+**Diagnóstico CORREGIDO con datos (verificación KB en vivo, 2026-08-05):** el KB tiene 115.369 filas
+(97.970 locales con NIT, 102 globales verificados, 390.095 atributos). **La hipótesis inicial "5510/3510
+sin datos" es FALSA:** ambos sectores están poblados — **5510: 525 locales + 19 startups**; **3510: 2288
+locales + 28 startups** (total 403 startups en el KB). Por tanto el bug NO es ausencia de datos ni gap
+del catálogo StartIA→GICS; es que **`list_locales_by_sector` no los devuelve en la corrida**. Sospechas
+por probar mañana, en orden: (1) `g_code` que llega a N1 — si `extract_gics_code(g)` devuelve nombre sin
+código o vacío, el guard `if s.anclaje_local_enabled and g_code:` corta el anclaje local entero (ver
+[[feedback_extract_gics_code]]); (2) el flag `anclaje_local_enabled` en esa corrida; (3) que el
+`sector_gics` de N1 sea de 4 dígitos y las entidades locales estén en `entidad_sectores` con CIIU largo
+(el JOIN usa `es.sector_gics`). **Globales sí persisten bien:** hoy quedaron ERCO/5510 → Engie, EVBox,
+First Solar, Fluence y HolaDr/3510 → Teladoc, Amwell, Ping An, Doctor On Demand (verificados).
+
+### DT-UI04c — Cap 3 inicia con texto tipo código/gibberish (✅ CERRADO 2026-08-05)
+~~La primera línea del Cap 3 en el `.docx` ERCO era texto similar a código.~~ **Resuelto:** (1) regla
+en `SYSTEM_PROMPT_04` que prohíbe bloques de código; (2) `strip_preamble()` en `shared/text_utils.py`
+(saneo conservador: poda cercas ``` /JSON antes del primer encabezado, conserva prosa legítima),
+aplicado en los 5 use cases narrativos (tendencias/ecosistema/convergencia/accionables/resumen).
+Tests: `test_text_utils.py` + `test_tendencias.py`. Pendiente: verificar en E2E ERCO/HolaDr.
 
 ### DT-UI04d — Web enrichment globales: validar que dispare y mida impacto (MEJORA)
 `_enriquecer_globales_web()` está implementado pero no fue posible validar si corrió para ERCO

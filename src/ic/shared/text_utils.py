@@ -74,6 +74,40 @@ def is_llm_refusal(text: str, ausencia_ratio: float = 0.5) -> bool:
     return False
 
 
+_HEADING_RE = re.compile(r"^\s*#{1,6}\s")
+_FENCE_RE = re.compile(r"^\s*```")
+_JSON_START_RE = re.compile(r"^\s*[{\[]", re.MULTILINE)
+
+
+def strip_preamble(texto: str) -> str:
+    """Elimina preámbulo espurio antes del contenido real del capítulo (DT-UI04c).
+
+    Algunos modelos anteponen razonamiento, cercas de código (```` ``` ````) o JSON antes de
+    la prosa/encabezado real, contaminando el .docx. Este saneo es **conservador**: solo poda
+    lo que hay antes del primer encabezado markdown si ese preámbulo contiene cercas de código o
+    JSON (ruido inequívoco); nunca descarta prosa legítima como un párrafo introductorio. Además
+    desenvuelve una cerca de código que envuelva todo el documento. Puro y determinista.
+    """
+    if not texto:
+        return texto
+    lines = texto.split("\n")
+    heading_idx = next((i for i, ln in enumerate(lines) if _HEADING_RE.match(ln)), None)
+    dangling_fence = False
+    if heading_idx:  # >0: hay encabezado y algo lo precede
+        preamble = "\n".join(lines[:heading_idx])
+        if "```" in preamble or _JSON_START_RE.search(preamble):
+            dangling_fence = "```" in preamble  # el bloque envolvía el documento → limpiar cierre
+            lines = lines[heading_idx:]
+    # Desenvolver cerca de código que envuelve el documento completo (```markdown … ```).
+    while lines and (not lines[0].strip() or _FENCE_RE.match(lines[0])):
+        dangling_fence = dangling_fence or bool(_FENCE_RE.match(lines[0]))
+        lines.pop(0)
+    if dangling_fence:
+        while lines and (not lines[-1].strip() or _FENCE_RE.match(lines[-1])):
+            lines.pop()
+    return "\n".join(lines).strip("\n")
+
+
 def format_web_results_as_context(
     results: list[WebResult], max_chars_per_result: int = 1500
 ) -> str:

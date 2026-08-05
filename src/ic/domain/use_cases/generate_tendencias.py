@@ -8,7 +8,7 @@ from ic.domain.chains.chain_04_tendencias import (
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.openalex_connector import OpenAlexConnector
 from ic.infrastructure.sources.web_connector import WebConnector
-from ic.shared.text_utils import has_cjk_characters
+from ic.shared.text_utils import has_cjk_characters, strip_preamble
 from ic.shared.types import CapTendencias
 
 _MIN_CHUNKS = 3
@@ -88,6 +88,7 @@ class GenerateTendencias:
             "retrieval_sector": context,
             "fuentes_academicas": academic_context,
         })
+        texto = strip_preamble(texto)
 
         if has_cjk_characters(texto):
             return CapTendencias(

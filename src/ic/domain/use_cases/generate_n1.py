@@ -91,7 +91,8 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 # El ranker global exige solape (require_overlap): `ya` ya son globales de ESTOS
                 # productos. KB caliente para estos productos ⇒ no re-descubrir.
                 ya = repo.list_competidores_by_sector(
-                    g_code, productos_terms=productos_terms, alcance=ALCANCE_GLOBAL, limit=100
+                    g_code, productos_terms=productos_terms, alcance=ALCANCE_GLOBAL, limit=100,
+                    exclude_nombre=e,
                 )
                 if len(ya) >= 8:
                     return
@@ -188,7 +189,8 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 ensure_entidades_tables(db_kb.get_bind())
                 repo_kb = EntidadRepository(db_kb)
                 kb_competidores = repo_kb.list_competidores_by_sector(
-                    g_code or "", productos_terms=productos_terms, alcance=ALCANCE_GLOBAL
+                    g_code or "", productos_terms=productos_terms, alcance=ALCANCE_GLOBAL,
+                    exclude_nombre=e,
                 )
                 regionales: list = []
                 startups: list = []
@@ -198,10 +200,12 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 if s.anclaje_local_enabled and g_code:
                     n = s.anclaje_local_top_n
                     regionales = repo_kb.list_locales_by_sector(
-                        g_code, solo_establecidas=True, productos_terms=productos_terms, limit=n
+                        g_code, solo_establecidas=True, productos_terms=productos_terms, limit=n,
+                        exclude_nombre=e,
                     )
                     startups = repo_kb.list_locales_by_sector(
-                        g_code, segmento=SEGMENTO_STARTUP, productos_terms=productos_terms, limit=n
+                        g_code, segmento=SEGMENTO_STARTUP, productos_terms=productos_terms, limit=n,
+                        exclude_nombre=e,
                     )
                     jugadores_locales_ctx = format_jugadores_locales(regionales, startups)
                     kb_locales = [r.nombre for r in (*regionales, *startups)]
