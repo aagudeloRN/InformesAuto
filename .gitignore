@@ -17,6 +17,7 @@ htmlcov/
 .DS_Store
 data/postgres/
 output/
+logs/
 *.docx
 *.pdf
 # Corpus sectorial: permanente pero local; solo indice.csv se versiona (Fase 13, ADR-012)

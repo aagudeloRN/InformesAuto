@@ -3,6 +3,7 @@
 from ic.shared.constants.ciiu_gics import (
     ciiu_to_gics_candidates,
     ciiu_to_seccion,
+    sectores_ancla_local,
 )
 
 # --- ciiu_to_seccion ---
@@ -89,3 +90,30 @@ def test_candidates_seccion_U_sin_correspondencia():
 def test_candidates_sin_duplicados():
     cands = ciiu_to_gics_candidates("2011")
     assert len(cands) == len(set(cands))
+
+
+# --- sectores_ancla_local (DT-UI04b: grupo del LLM + grupo canónico del CIIU) ---
+
+
+def test_sectores_ancla_energia_une_grupo_llm_con_utilities_del_ciiu():
+    # ERCO: el LLM la llama "Energía" (1010) pero su CIIU de generación eléctrica (D3511) es
+    # canónicamente Utilities (5510), donde vive la data de pares. Se unen, grupo del LLM primero.
+    assert sectores_ancla_local("1010", "3511") == ["1010", "5510"]
+
+
+def test_sectores_ancla_sin_regresion_cuando_coinciden():
+    # HolaDr: grupo del LLM (3510) y grupo del CIIU (8610 → división 86 → 3510) coinciden → un solo
+    # sector, sin arrastrar ruido (invariante para los casos ya limpios).
+    assert sectores_ancla_local("3510", "8610") == ["3510"]
+
+
+def test_sectores_ancla_sin_ciiu_solo_grupo_llm():
+    # CIIU ausente/no resoluble → solo el grupo clasificado (invariante).
+    assert sectores_ancla_local("3020", None) == ["3020"]
+    assert sectores_ancla_local("3020", "No disponible") == ["3020"]
+
+
+def test_sectores_ancla_sin_grupo_llm_usa_solo_ciiu():
+    # Sin g_code (clasificación vacía) pero con CIIU → el grupo canónico del CIIU.
+    assert sectores_ancla_local(None, "3511") == ["5510"]
+    assert sectores_ancla_local("", "") == []

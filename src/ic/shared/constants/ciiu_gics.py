@@ -247,3 +247,24 @@ def ciiu_division_to_gics(ciiu: str | int | None) -> str | None:
         return _CIIU_DIVISION_GICS[division]
     candidatos = ciiu_to_gics_candidates(digitos)
     return candidatos[0] if candidatos else None
+
+
+def sectores_ancla_local(g_code: str | None, ciiu: str | int | None) -> list[str]:
+    """Sectores GICS a consultar para el anclaje LOCAL (2.1.2/2.1.3). Puro (DT-UI04b).
+
+    El grupo clasificado por el LLM y el grupo canónico del CIIU pueden diferir sin que ninguno
+    esté "mal": una generadora de energía solar (CIIU D3511) se clasifica coloquialmente como
+    "Energía" (GICS 1010, que en GICS es petróleo/gas/minería) cuando su grupo GICS canónico es
+    "Servicios públicos" (5510, Utilities), donde vive la data curada de pares (EPM, Celsia,
+    Isagen). Anclar solo por el grupo del LLM deja el tier local con pares irrelevantes (minería)
+    o vacío. Se une el grupo clasificado con el grupo **preciso** del CIIU por división
+    (``ciiu_division_to_gics``, single y sin ruido — 8610→3510 no arrastra 2020) para que el
+    re-rank por solape de producto elija los mejores pares de ambos. Orden estable, sin duplicados;
+    ``ciiu`` ausente/no numérico → solo el grupo del LLM (invariante). No fabrica sectores: solo
+    añade el que el CIIU ya implica de forma determinista (ADR-002).
+    """
+    sectores = [g_code] if g_code else []
+    div = ciiu_division_to_gics(ciiu)
+    if div and div not in sectores:
+        sectores.append(div)
+    return sectores

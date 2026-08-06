@@ -60,6 +60,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         CachedWebConnector,
     )
     from ic.infrastructure.sources.openalex_connector import OpenAlexConnector
+    from ic.shared.constants.ciiu_gics import sectores_ancla_local
     from ic.shared.constants.gics_groups import extract_gics_code
     from ic.shared.text_productos import producto_terms
 
@@ -71,6 +72,12 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     # solape producto↔candidato ordena globales y locales. Vacío → fallback a nivel grupo.
     productos = ctx.empresa.productos_servicios
     productos_terms = producto_terms(productos)
+    # DT-UI04b: el anclaje LOCAL consulta el grupo del LLM + el grupo canónico del CIIU (division).
+    # Desacopla la clasificación coloquial ("Energía", 1010) de dónde vive la data curada de pares
+    # (una eléctrica CIIU D3511 → 5510 Utilities: EPM/Celsia/Isagen). CIIU resuelto en N0 (RUES) →
+    # `ctx.empresa.actividad_ciiu`; fallback al pasado por CLI. Sin CIIU → solo el grupo.
+    ciiu_ancla = getattr(ctx.empresa, "actividad_ciiu", None) or ctx.params.ciiu
+    sectores_local = sectores_ancla_local(g_code, ciiu_ancla)
 
     def _descubrir_globales(store, web) -> None:
         """DT-062/DT-063: siembra globales LLM corroborados por web. Best-effort; nunca rompe.
@@ -200,12 +207,12 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 if s.anclaje_local_enabled and g_code:
                     n = s.anclaje_local_top_n
                     regionales = repo_kb.list_locales_by_sector(
-                        g_code, solo_establecidas=True, productos_terms=productos_terms, limit=n,
-                        exclude_nombre=e,
+                        sectores_local, solo_establecidas=True, productos_terms=productos_terms,
+                        limit=n, exclude_nombre=e,
                     )
                     startups = repo_kb.list_locales_by_sector(
-                        g_code, segmento=SEGMENTO_STARTUP, productos_terms=productos_terms, limit=n,
-                        exclude_nombre=e,
+                        sectores_local, segmento=SEGMENTO_STARTUP, productos_terms=productos_terms,
+                        limit=n, exclude_nombre=e,
                     )
                     jugadores_locales_ctx = format_jugadores_locales(regionales, startups)
                     kb_locales = [r.nombre for r in (*regionales, *startups)]

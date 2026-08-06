@@ -14,7 +14,11 @@ from ic.data.models.entidad import (
     ESTADO_VERIFICADO,
     TIPO_EMPRESA,
 )
-from ic.data.repositories.entidad_repo import EntidadRepository, EntidadRow
+from ic.data.repositories.entidad_repo import (
+    EntidadRepository,
+    EntidadRow,
+    _clave_exclusion,
+)
 
 # --- Migración idempotente (fake engine) ---
 
@@ -264,6 +268,55 @@ def test_list_locales_excluye_empresa_analizada():
     nombres = [r.nombre for r in locales]
     assert "ERCO ENERGIA" not in nombres
     assert nombres == ["Ecoflux"]
+
+
+def test_list_locales_multisector_usa_any_y_pasa_lista():
+    # DT-UI04b: con varios sectores el JOIN usa ANY(:sectores) y recibe la lista (grupo del LLM +
+    # grupo canónico del CIIU); así una eléctrica en 1010 alcanza a sus pares curados en 5510.
+    sess = _FakeSession(select_rows=[_local_row("Celsia", desc="energía solar", tam=800)])
+    locales = EntidadRepository(sess).list_locales_by_sector(
+        ["1010", "5510"], productos_terms={"energia", "solar"}
+    )
+    assert [r.nombre for r in locales] == ["Celsia"]
+    sql = sess.sqls[-1]
+    assert "es.sector_gics = ANY(:sectores)" in sql
+    assert sess.params[-1]["sectores"] == ["1010", "5510"]
+    # Prefetch escala con el nº de sectores (que un sector grande no desplace al otro del window).
+    assert sess.params[-1]["prefetch"] == 60 * 2
+
+
+def test_list_locales_acepta_str_una_lista():
+    # Backward-compat: un str se normaliza a lista de un elemento (comportamiento previo intacto).
+    sess = _FakeSession(select_rows=[_local_row("Colanta", desc="lácteos", tam=500)])
+    locales = EntidadRepository(sess).list_locales_by_sector("3020", productos_terms={"lacteos"})
+    assert [r.nombre for r in locales] == ["Colanta"]
+    assert sess.params[-1]["sectores"] == ["3020"]
+
+
+def test_list_locales_deduplica_por_nombre_normalizado():
+    # DT-UI04b: una entidad multi-sector (o duplicados cross-sector como "ERCO ENERGIA"×2) aparece
+    # una sola vez; el match es robusto a sufijos societarios y acentos.
+    sess = _FakeSession(select_rows=[
+        _local_row("ERCO ENERGIA", desc="energía solar", tam=900),
+        _local_row("Erco Energía S.A.S.", desc="energía solar", tam=800),
+        _local_row("Celsia", desc="energía solar", tam=700),
+    ])
+    locales = EntidadRepository(sess).list_locales_by_sector(
+        ["1010", "5510"], productos_terms={"energia", "solar"}
+    )
+    nombres = [r.nombre for r in locales]
+    # Las dos variantes de ERCO colapsan en una; Celsia queda. Sin claves normalizadas repetidas.
+    claves = [_clave_exclusion(n) for n in nombres]
+    assert len(claves) == len(set(claves))
+    assert sum(1 for c in claves if c == _clave_exclusion("ERCO ENERGIA")) == 1
+    assert "Celsia" in nombres
+
+
+def test_list_locales_sectores_vacio_no_consulta():
+    sess = _FakeSession()
+    assert EntidadRepository(sess).list_locales_by_sector([]) == []
+    assert EntidadRepository(sess).list_locales_by_sector("") == []
+    assert sess.sqls == []  # corto-circuito, sin tocar BD
 
 
 def test_list_competidores_sector_vacio_no_consulta():

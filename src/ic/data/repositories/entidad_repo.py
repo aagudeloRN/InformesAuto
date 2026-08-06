@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from sqlalchemy import text
@@ -349,7 +350,7 @@ class EntidadRepository:
 
     def list_locales_by_sector(
         self,
-        sector_gics: str,
+        sector_gics: str | Sequence[str],
         *,
         segmento: str | None = None,
         solo_establecidas: bool = False,
@@ -365,8 +366,19 @@ class EntidadRepository:
         actividad/vertical/descripción con los productos de la empresa analizada (DT-063): así una
         láctea ve Colanta/Alquería antes que un cárnico grande del mismo grupo. `productos_terms`
         vacío → orden por tamaño (fallback). Path GLOBAL (`list_competidores_by_sector`) aparte.
+
+        DT-UI04b: ``sector_gics`` acepta uno o **varios** sectores (el grupo del LLM + el grupo
+        canónico del CIIU, ver ``sectores_ancla_local``). Las filas de todos los sectores se juntan
+        en un solo pool y compiten por solape de producto: así una eléctrica clasificada en 1010
+        ve a sus pares curados de 5510 (EPM/Celsia/Isagen), no mineras. Se **deduplica por nombre
+        normalizado** (una entidad multi-sector aparece una vez; también colapsa duplicados
+        cross-sector como "ERCO ENERGIA"×2 hasta la reconciliación DT-050b).
         """
-        if not sector_gics:
+        if isinstance(sector_gics, str):
+            sectores = [sector_gics] if sector_gics else []
+        else:
+            sectores = [s for s in sector_gics if s]
+        if not sectores:
             return []
         ent = Entidad.__table__.fullname
         sec = EntidadSector.__table__.fullname
@@ -381,8 +393,10 @@ class EntidadRepository:
             "NULLIF(regexp_replace(split_part(a_ing.valor, ',', 1), '[^0-9]', '', 'g'), '')"
             "::bigint"
         )
-        # Prefetch generoso por tamaño; el re-rank fino por solape se hace en dominio (puro).
-        prefetch = max(limit * 10, 40)
+        # Prefetch generoso por tamaño; el re-rank fino por solape se hace en dominio (puro). Se
+        # escala por nº de sectores para que el pool incluya candidatos de solape de CADA sector
+        # (que uno grande no desplace del window a los pares relevantes del otro antes del re-rank).
+        prefetch = max(limit * 10, 40) * len(sectores)
         sql = text(
             f"SELECT e.nombre, e.ciudad, es.vertical, a_ing.valor, e.segmento, "
             f"       (e.estado = :verificado) AS verificado, {tamano_num} AS tam, a_desc.valor, "
@@ -395,7 +409,7 @@ class EntidadRepository:
             f"  ON a_desc.entidad_id = e.id AND a_desc.clave = 'descripcion' "
             f"LEFT JOIN {atr} a_prod "
             f"  ON a_prod.entidad_id = e.id AND a_prod.clave = 'productos_perfil' "
-            f"WHERE es.sector_gics = :sector AND e.alcance = :local "
+            f"WHERE es.sector_gics = ANY(:sectores) AND e.alcance = :local "
             f"  AND e.estado <> :descartado AND e.tipo IN ('competidor', 'empresa'){cond_seg} "
             f"ORDER BY verificado DESC, tam DESC NULLS LAST "
             f"LIMIT :prefetch"
@@ -403,7 +417,7 @@ class EntidadRepository:
         rows = self._db.execute(
             sql,
             {
-                "sector": sector_gics, "local": ALCANCE_LOCAL, "descartado": ESTADO_DESCARTADO,
+                "sectores": sectores, "local": ALCANCE_LOCAL, "descartado": ESTADO_DESCARTADO,
                 "verificado": ESTADO_VERIFICADO, "segmento": segmento, "prefetch": prefetch,
             },
         ).fetchall()
@@ -419,7 +433,19 @@ class EntidadRepository:
             descriptor = f"{r[8] or ''} {r[2] or ''} {r[7] or ''}"
             return (-producto_overlap(descriptor, terms), not r[5], -(int(r[6]) if r[6] else 0))
 
-        rows = sorted(rows, key=_clave)[:limit]
+        # Dedup por nombre normalizado tras el re-rank (una entidad multi-sector aparece una vez;
+        # colapsa duplicados cross-sector, p. ej. "ERCO ENERGIA"×2). Se conserva el mejor-rankeado.
+        vistos: set[str] = set()
+        deduped = []
+        for r in sorted(rows, key=_clave):
+            clave = _clave_exclusion(r[0])
+            if clave in vistos:
+                continue
+            vistos.add(clave)
+            deduped.append(r)
+            if len(deduped) >= limit:
+                break
+        rows = deduped
         return [
             LocalRow(
                 nombre=r[0], ciudad=r[1], actividad=r[2],
