@@ -108,6 +108,64 @@ def strip_preamble(texto: str) -> str:
     return "\n".join(lines).strip("\n")
 
 
+def _es_grito(texto: str, min_letras: int = 3, umbral: float = 0.7) -> bool:
+    """True si el texto está predominantemente en MAYÚSCULAS ("gritado"). Puro.
+
+    Guarda para no tocar texto ya en caja mixta/propia: exige ≥`min_letras` letras y que ≥`umbral`
+    de ellas sean mayúsculas. Un nombre propio o una descripción normal (con minúsculas) → False.
+    """
+    letras = [c for c in texto if c.isalpha()]
+    if len(letras) < min_letras:
+        return False
+    return sum(1 for c in letras if c.isupper()) / len(letras) >= umbral
+
+
+def _title_conservador(texto: str) -> str:
+    """Title Case que **preserva acrónimos cortos** (≤4 letras: BYD, AES, EPM, AI). Puro.
+
+    Solo re-capitaliza tokens en mayúsculas de >4 letras (GOLDEN→Golden, ECOCITY→Ecocity); deja
+    intactos los que ya tienen caja mixta y los acrónimos cortos.
+    """
+    def _tok(t: str) -> str:
+        letras = [c for c in t if c.isalpha()]
+        if not letras or not t.isupper():
+            return t  # ya tiene caja, o sin letras
+        if len(letras) <= 4:
+            return t  # acrónimo corto: preservar
+        return t.capitalize()
+    return " ".join(_tok(t) for t in texto.split(" "))
+
+
+_FIN_ORACION = ".!?:\n"
+
+
+def soften_caps(texto: str, *, titulo: bool = False) -> str:
+    """Normaliza texto en MAYÚSCULAS sostenidas a una caja legible (estandarización de estilo).
+
+    Los datos del directorio local (StartIA) se guardaron en MAYÚSCULAS; volcados tal cual dejaban
+    la subsección de startups "gritando". Saneo **conservador**: solo actúa si el texto es un
+    "grito" (`_es_grito`); el texto ya en caja propia se devuelve intacto. `titulo=True` → Title
+    Case que preserva acrónimos (nombres/país); si no → caja de oración (mayúscula inicial por
+    oración). Puro y determinista.
+    """
+    if not texto or not _es_grito(texto):
+        return texto
+    if titulo:
+        return _title_conservador(texto)
+    bajado = texto.lower()
+    out: list[str] = []
+    capitalizar = True
+    for ch in bajado:
+        if capitalizar and ch.isalpha():
+            out.append(ch.upper())
+            capitalizar = False
+        else:
+            out.append(ch)
+        if ch in _FIN_ORACION:
+            capitalizar = True
+    return "".join(out)
+
+
 def format_web_results_as_context(
     results: list[WebResult], max_chars_per_result: int = 1500
 ) -> str:

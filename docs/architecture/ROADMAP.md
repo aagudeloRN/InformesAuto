@@ -7,9 +7,23 @@
 >   pormenorizado `ROADMAP_FASE9+.md` (congelado ~F22/DT-064; tabla completa de DT-004..064).
 > - **Estado/decisiones activas:** memoria `project_roadmap_ago2026` + `project_historial_fases`.
 
-## Estado actual (2026-08-05)
+## Estado actual (2026-08-06)
 
 Rama `develop`. Últimos hitos (esta línea de trabajo, DT-050→):
+- **Estilo — estandarización (2026-08-06):** (1) la data local de StartIA venía en MAYÚSCULAS y dejaba
+  la subsección "Startups y Disruptores" gritando → `soften_caps` (`shared/text_utils.py`, puro:
+  Title Case que preserva acrónimos BYD/AES en nombres, caja de oración en descripciones; solo actúa
+  sobre texto "gritado") aplicado en `seccion21_assembler._ficha_prosa`. (2) Cap 5 Convergencia usaba
+  tono imperativo ("La empresa debe migrar/desarrollar/incorporar") porque `SYSTEM_PROMPT_06`/`_06A`
+  **prohibían "podría"** y exigían "tono directo" → reescrito a **PROPOSITIVO** (documento de
+  recomendación; decide el lector): quitada la prohibición de "podría", prohibido el imperativo/
+  obligación ("debe"/"tiene que"/"implemente"). Cap 6 Accionables tiene el mismo patrón (infinitivos)
+  — **pendiente decidir** si se estandariza igual. Tests: `test_text_utils.py` (soften_caps).
+- **DT-UI04b — Tier local vacío → anclaje local multi-sector (CERRADO 2026-08-06):** causa raíz de
+  config (flags ausentes de `.env`, no bug de código) + fix de routing multi-sector para que una
+  eléctrica clasificada en Energía(1010) vea sus pares curados de Utilities(5510). E2E ERCO OK
+  (Enerbit/EPM/Isagen en 2.1.2). Valida además UI04c/UI04a en el mismo `.docx`. Ver la sección
+  DT-UI04b abajo y `DT_UI04b_HALLAZGOS.md`.
 - **Higiene de suite (2026-08-05):** suite `not slow` al **100% verde** (630 passed, 2 skipped, 14
   deselected=slow). Se corrigió el único test que fallaba desde días atrás (`test_fase15_gate.py`):
   no era bug de código sino rutas obsoletas — `fase15_budget.json` y `fase14_final_filtered.json` se
@@ -102,24 +116,39 @@ repo (`exclude_nombre` en `list_competidores_by_sector`/`list_locales_by_sector`
 sufijos societarios vía `_clave_exclusion`); `generate_n1.py` pasa `exclude_nombre=e` en los tres
 anclajes + guard de descubrimiento. Tests en `test_kb_entidades.py`. Pendiente: verificar en E2E ERCO.
 
-### DT-UI04b — StartIA/EmpresasColombia no se inyectan en sectores no mapeados (BUG)
-Para ERCO en sector 5510 (EnergyTech), `list_locales_by_sector(g_code=5510)` devuelve vacío: las
-empresas de StartIA con vertical "ENERGYTECH" están indexadas en la BD por su GICS numérico, pero
-puede haber un gap en el mapeo `CatalogoVerticalesStartIAGICS.csv` o en la ingesta. Diagnóstico:
-verificar que `ENERGYTECH → 5510` (o código real) esté en el catálogo y que las entidades existan
-en `ic.entidades` con ese `sector_gics`. También verificar `sector_gics_code` que llega a N1.
+### DT-UI04b — Tier local (2.1.2/2.1.3) vacío pese a datos presentes (✅ CERRADO 2026-08-06)
+Detalle completo: **`DT_UI04b_HALLAZGOS.md`**.
 
-**Diagnóstico CORREGIDO con datos (verificación KB en vivo, 2026-08-05):** el KB tiene 115.369 filas
-(97.970 locales con NIT, 102 globales verificados, 390.095 atributos). **La hipótesis inicial "5510/3510
-sin datos" es FALSA:** ambos sectores están poblados — **5510: 525 locales + 19 startups**; **3510: 2288
-locales + 28 startups** (total 403 startups en el KB). Por tanto el bug NO es ausencia de datos ni gap
-del catálogo StartIA→GICS; es que **`list_locales_by_sector` no los devuelve en la corrida**. Sospechas
-por probar mañana, en orden: (1) `g_code` que llega a N1 — si `extract_gics_code(g)` devuelve nombre sin
-código o vacío, el guard `if s.anclaje_local_enabled and g_code:` corta el anclaje local entero (ver
-[[feedback_extract_gics_code]]); (2) el flag `anclaje_local_enabled` en esa corrida; (3) que el
-`sector_gics` de N1 sea de 4 dígitos y las entidades locales estén en `entidad_sectores` con CIIU largo
-(el JOIN usa `es.sector_gics`). **Globales sí persisten bien:** hoy quedaron ERCO/5510 → Engie, EVBox,
-First Solar, Fluence y HolaDr/3510 → Teladoc, Amwell, Ping An, Doctor On Demand (verificados).
+**Causa raíz (config, no código):** los flags `ANCLAJE_LOCAL_ENABLED`,
+`SECCION21_DETERMINISTA_ENABLED` y `DISCOVER_GLOBALES_ENABLED` **no estaban en `.env`** → default
+`False` → el guard `if s.anclaje_local_enabled and g_code:` cortaba el anclaje local entero. Todas las
+sospechas heredadas (JOIN `es.sector_gics`, `g_code`, ausencia de datos) fueron **refutadas** con
+reproducción aislada contra la BD real: `list_locales_by_sector("5510")`/`("3510")`/`("1010")`
+devuelven 6+6 jugadores; `extract_gics_code` resuelve bien; los tres sectores están poblados.
+
+**Segundo hallazgo (routing de sector):** al habilitar los flags, ERCO — que el usuario aclara **es
+Energía (1010), no Servicios públicos** — llenaba el tier local con **pares irrelevantes**
+(minería/construcción), porque en GICS canónico las eléctricas (incl. solar) son **Utilities (5510)**,
+no Energy (1010 = petróleo/gas/minería), y la data curada (EPM, Celsia, Isagen) fue sembrada bajo 5510
+(el seed usa `ciiu_division_to_gics`: D3511 → 5510). **Fix = anclaje local multi-sector:**
+`sectores_ancla_local(g_code, ciiu)` (grupo del LLM ∪ grupo canónico del CIIU por división);
+`list_locales_by_sector` acepta `str | Sequence[str]` (`ANY(:sectores)` + re-rank por solape + **dedup
+por nombre**, que colapsa "ERCO ENERGIA"×2); `generate_n1` toma el CIIU de `ctx.empresa.actividad_ciiu`.
+HolaDr sin regresión (8690→3510 = mismo sector). Tests: `test_fase14_ciiu_gics.py` +
+`test_kb_entidades.py`; suite `not slow` **638 passed**.
+
+**E2E validado (ERCO `--ciiu 3511 --refresh`, 2026-08-06):** 2.1.2 Regionales = Enerbit, EPM, Isagen,
+Neu Energy, BTG Pactual Energía, Vervantis (¡pares energéticos reales vía 5510!); startups = GOLDEN
+ENERGY, ECOCITY, TELEMETRIK, COVATIO, ECOLUMEN; globales (discover web) = BYD, EDF Renewables, First
+Solar, Fluence, AES, CATL, Enel Green Power. **UI04c** validado en el mismo `.docx` (los 6 capítulos
+inician con prosa/encabezado, cero gibberish). **UI04a** validado (ERCO no aparece en ningún tier).
+**HolaDr `--ciiu 8690` validado también:** 2.1.2 = Angiosur/Expert Médica/IQ Interquirófanos/Clínica
+Sandiego/Neurum/Genezen; startups healthtech (TERAL/COCO/SUNUBE…); globales Doctolib/Ping An/Teladoc;
+sin regresión (3510); UI04c/UI04a OK ("HOLADR." quedó fuera del top-6, no como propia competencia).
+
+**Deuda descubierta:** (a) "HOLADR." (forma pegada) NO se excluye contra "HOLA DOCTOR S.A.S." (sin
+tokens en común → endurecer UI04a por **aliases**, no por tokens); (b) duplicados KB (ERCO×2, ENERGY
+MASTER×2) → DT-050b; (c) fichas y anclaje **global** (2.1.1) siguen single-sector.
 
 ### DT-UI04c — Cap 3 inicia con texto tipo código/gibberish (✅ CERRADO 2026-08-05)
 ~~La primera línea del Cap 3 en el `.docx` ERCO era texto similar a código.~~ **Resuelto:** (1) regla
@@ -163,7 +192,9 @@ Abierta desde F19, **agravada esta línea de trabajo**:
 | DT-039 | `generate_informe.py` 576L → extraer `generate_n3.py` | sigue creciendo |
 | DT-040 | `_PRICING` hardcodea IDs; hook con puntos ciegos | Gemini sin trackear → **costo $0** |
 | DT-041 | cobertura `domain/` 69% < 80% | re-medir (P0) |
-| DT-050b | reconciliación EMIS↔NER por NIT + HITL | duplicados inertes hoy |
+| DT-050b | reconciliación EMIS↔NER por NIT + HITL | duplicados inertes hoy (ERCO×2, ENERGY MASTER×2); paliados por dedup en el anclaje |
+| DT-UI04a+ | exclusión focal por **aliases**, no solo nombre normalizado | "HOLADR." no se excluye vs "HOLA DOCTOR S.A.S." |
+| DT-UI04b+ | anclaje **global** (2.1.1) y fichas siguen single-sector | extender `sectores_ancla_local` a `list_competidores_by_sector`/fichas |
 
 **Triaje sugerido:** DT-037/039/040 (agravados aquí) antes de más features; DT-038 antes de HITL.
 

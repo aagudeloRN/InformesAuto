@@ -4,7 +4,7 @@ Foco DT-UI04c: strip_preamble — saneo determinista del preámbulo espurio (blo
 que algunos modelos anteponen al contenido real del capítulo. Función pura, sin IO.
 """
 
-from ic.shared.text_utils import strip_preamble
+from ic.shared.text_utils import soften_caps, strip_preamble
 
 INTRO = "El análisis tendencial describe las tendencias del sector empresarial."
 
@@ -46,3 +46,38 @@ def test_strip_preamble_sin_ruido_no_altera():
 
 def test_strip_preamble_texto_vacio():
     assert strip_preamble("") == ""
+
+
+# --- soften_caps (DT-UI04b estilo: normaliza el "grito" de la data StartIA) ---
+
+
+def test_soften_caps_nombre_multipalabra_a_title():
+    assert soften_caps("GOLDEN ENERGY", titulo=True) == "Golden Energy"
+    assert soften_caps("ECOCITY", titulo=True) == "Ecocity"
+
+
+def test_soften_caps_preserva_acronimos_cortos():
+    # Los acrónimos ≤4 letras (globales BYD/AES/CATL) NO deben volverse "Byd".
+    assert soften_caps("BYD", titulo=True) == "BYD"
+    assert soften_caps("AES", titulo=True) == "AES"
+    assert soften_caps("COCO AI & E - HEALTH", titulo=True) == "COCO AI & E - Health"
+
+
+def test_soften_caps_descripcion_a_caja_oracion():
+    crudo = "ECOCITY ES UNA PLATAFORMA DIGITAL QUE CONECTA GENERADORES. GESTIONA RESIDUOS."
+    assert soften_caps(crudo) == (
+        "Ecocity es una plataforma digital que conecta generadores. Gestiona residuos."
+    )
+
+
+def test_soften_caps_no_altera_caja_propia():
+    # Texto ya en caja mixta/propia (regionales, prosa normal) se devuelve intacto.
+    assert soften_caps("Enerbit S.A.S. E.S.P.", titulo=True) == "Enerbit S.A.S. E.S.P."
+    assert soften_caps("Empresa colombiana de energía solar.") == (
+        "Empresa colombiana de energía solar."
+    )
+
+
+def test_soften_caps_vacio():
+    assert soften_caps("") == ""
+    assert soften_caps("   ") == "   "

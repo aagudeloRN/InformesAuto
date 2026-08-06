@@ -25,6 +25,7 @@ from ic.domain.kb.ficha_parser import (
     TIER_REGIONAL,
     TIER_STARTUP,
 )
+from ic.shared.text_utils import soften_caps
 
 # Etiquetas humanas de cada tier (verdad de terreno DT064_FICHA_SPEC). El texto debe resolver por
 # ``_tier_de_heading`` al tier correcto (round-trip con ``parse_fichas_competidores``).
@@ -55,16 +56,18 @@ _TITULO_21 = "## 2.1. Jugadores Clave - Líderes del Mercado"
 def _ficha_prosa(nombre: str, campos: dict[str, str]) -> str:
     """Mini-párrafo en prosa de un competidor. Solo incluye campos con dato (colapso)."""
     pais = (campos.get("pais_origen") or "").strip()
-    encabezado = f"**{nombre}**"
+    # DT-UI04b (estilo): la data local de StartIA viene en MAYÚSCULAS → normalizar a caja legible
+    # (nombre/país en Title Case preservando acrónimos; descripciones en caja de oración).
+    encabezado = f"**{soften_caps(nombre, titulo=True)}**"
     if pais:
-        encabezado += f" *({pais})*"
+        encabezado += f" *({soften_caps(pais, titulo=True)})*"
     fragmentos: list[str] = []
     for clave in FICHA_KEYS:
         if clave == "pais_origen":
             continue
         valor = (campos.get(clave) or "").strip()
         if valor:
-            fragmentos.append(valor.rstrip("."))
+            fragmentos.append(soften_caps(valor).rstrip("."))
     if not fragmentos:
         return encabezado
     return encabezado + " — " + ". ".join(fragmentos) + "."
