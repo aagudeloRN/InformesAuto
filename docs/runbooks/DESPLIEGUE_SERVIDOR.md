@@ -85,7 +85,32 @@ ssh n8n@192.168.0.99 'cd ~/InformesAuto && docker compose -f docker-compose.serv
 ```
 Migrar cambios de KB re-corriendo el dump/restore del §2.1 (o los scripts de siembra en el server).
 
-## 5. Deuda / notas
+## 5. Sembrar los .docx de casos de estudio (historial)
+
+El historial (`informes_ic.historial_informes.ruta_documento_final`) referencia rutas como
+`./output/<empresa>_informe.docx` (relativas a `/app`). Para que la UI del servidor los abra, los
+`.docx` deben existir en `~/InformesAuto/output/` (bind mount → `/app/output`).
+
+⚠️ **`output/` en el servidor es root** (lo creó el docker daemon), así que `rsync`/`scp` como `n8n`
+falla con *Permission denied*. Sembrar vía `docker cp` (escribe en el bind mount con privilegios del
+daemon):
+```bash
+# dev → stage escribible en el servidor → dentro del contenedor
+rsync -az output/*.docx n8n@192.168.0.99:/tmp/ic_docx/
+ssh n8n@192.168.0.99 'docker cp /tmp/ic_docx/. informesauto_streamlit:/app/output/ && rm -rf /tmp/ic_docx'
+```
+(Nombres con acento como `erco_energía_sas_informe.docx` se copian bien; deben coincidir EXACTO con
+`ruta_documento_final` del historial.)
+
+## 6. Modelos: la generación usa la NUBE, no el Ollama del servidor
+
+El servidor **no tiene GPU** (Ollama lento). Configuración de routing (`.env`) para que la redacción
+NO caiga en local: `LLM_API_FREE_MODEL` (openrouter/Nemotron) como `api_llm`, `LLM_API_SYNTH_MODEL`
+(Gemini) para síntesis, fallback openrouter. El Ollama del host **solo** se usa para **embeddings**
+(`nomic-embed-text`, barato en CPU). Los modelos locales (`qwen3`/`llama3.2`) solo actuarían si TODA
+la nube fallara (degradaría mucho la UX — evitar quedarse sin cuota de API).
+
+## 7. Deuda / notas
 
 - **El wheel `ic` instalado por `uv sync` queda incompleto**; la app funciona porque `app.py`
   inserta `src/` en `sys.path`. Cualquier `uv run python -c "import ic.data"` sin `sys.path`
