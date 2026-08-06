@@ -1,0 +1,44 @@
+# Despliegue en SERVIDOR (192.168.0.99) — solo la UI Streamlit.
+#
+# La BD y Ollama son servicios COMPARTIDOS ya existentes en el servidor (TIER-1):
+#   - PostgreSQL+pgvector: contenedor `repositorio_postgres_server` en la red externa
+#     `repositoriorn_repositorio_network`, db `repositorio_ctie`, esquema dedicado `informes_ic`.
+#   - Ollama: corre en el HOST (:11434); el contenedor lo alcanza por `host.docker.internal`.
+#
+# NO se levanta un Postgres propio aquí (a diferencia del docker-compose.yml de dev): se reusa el
+# compartido. DATABASE_URL y OLLAMA_BASE_URL apuntan a esos servicios desde el `.env` del servidor
+# (host de la BD = nombre del contenedor en la red; NO `localhost`).
+#
+# Uso:
+#   docker compose -f docker-compose.server.yml up -d --build
+#
+services:
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    image: informesauto-streamlit
+    container_name: informesauto_streamlit
+    ports:
+      - "${STREAMLIT_PORT:-8503}:${STREAMLIT_PORT:-8503}"
+    env_file:
+      - .env
+    environment:
+      STREAMLIT_PORT: ${STREAMLIT_PORT:-8503}
+    volumes:
+      # .docx generados persisten fuera del contenedor
+      - ./output:/app/output
+      # .env montado read-only por si el build no lo incluyó
+      - ./.env:/app/.env:ro
+    # Ollama corre en el host del servidor: mapear host.docker.internal a la gateway del host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Red externa del stack de RepositorioRN, donde vive el Postgres compartido.
+    networks:
+      - repositorio_shared
+    restart: unless-stopped
+
+networks:
+  repositorio_shared:
+    external: true
+    name: repositoriorn_repositorio_network

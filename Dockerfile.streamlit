@@ -18,6 +18,9 @@ RUN uv sync --frozen --no-dev
 COPY src/ ./src/
 COPY templates/ ./templates/
 COPY source_prompts/ ./source_prompts/
+# Tabla CIIU→GICS leída en runtime por ic.shared.constants.ciiu_gics (clasificación GICS +
+# anclaje local multi-sector DT-UI04b). Ruta esperada: /app/documentos_sectoriales/…csv.
+COPY documentos_sectoriales/Comparacion_GICS_CIIU.csv ./documentos_sectoriales/Comparacion_GICS_CIIU.csv
 
 # Directorio de output — en producción se monta como bind mount
 RUN mkdir -p /app/output
