@@ -17,8 +17,9 @@ Rama `develop`. Últimos hitos (esta línea de trabajo, DT-050→):
   tono imperativo ("La empresa debe migrar/desarrollar/incorporar") porque `SYSTEM_PROMPT_06`/`_06A`
   **prohibían "podría"** y exigían "tono directo" → reescrito a **PROPOSITIVO** (documento de
   recomendación; decide el lector): quitada la prohibición de "podría", prohibido el imperativo/
-  obligación ("debe"/"tiene que"/"implemente"). Cap 6 Accionables tiene el mismo patrón (infinitivos)
-  — **pendiente decidir** si se estandariza igual. Tests: `test_text_utils.py` (soften_caps).
+  obligación ("debe"/"tiene que"/"implemente"). Mismo tratamiento en **Cap 6 Accionables**
+  (`SYSTEM_PROMPT_07`/`USER_PROMPT_07`): título como etiqueta neutra + cuerpo propositivo, sin mandato.
+  Tests: `test_text_utils.py` (soften_caps).
 - **DT-UI04b — Tier local vacío → anclaje local multi-sector (CERRADO 2026-08-06):** causa raíz de
   config (flags ausentes de `.env`, no bug de código) + fix de routing multi-sector para que una
   eléctrica clasificada en Energía(1010) vea sus pares curados de Utilities(5510). E2E ERCO OK
