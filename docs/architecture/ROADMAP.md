@@ -10,6 +10,12 @@
 ## Estado actual (2026-08-06)
 
 Rama `develop`. Últimos hitos (esta línea de trabajo, DT-050→):
+- **Despliegue en servidor local (2026-08-06):** UI Streamlit operativa en `http://192.168.0.99:8503`
+  (contenedor `informesauto_streamlit`, `docker-compose.server.yml`). Reusa servicios compartidos:
+  Postgres+pgvector `repositorio_postgres_server` (db `repositorio_ctie`, esquema dedicado
+  `informes_ic`, KB migrado por `pg_dump`/`pg_restore` — 115k entidades/26k embeddings) y Ollama del
+  host (`nomic-embed-text`). Fix `Dockerfile.streamlit` (faltaba el CSV CIIU→GICS de runtime).
+  Runbook: `docs/runbooks/DESPLIEGUE_SERVIDOR.md`.
 - **Estilo — estandarización (2026-08-06):** (1) la data local de StartIA venía en MAYÚSCULAS y dejaba
   la subsección "Startups y Disruptores" gritando → `soften_caps` (`shared/text_utils.py`, puro:
   Title Case que preserva acrónimos BYD/AES en nombres, caja de oración en descripciones; solo actúa
