@@ -88,7 +88,12 @@ def test_parse_ignora_variantes_de_ausencia_pero_conserva_parciales():
     assert len(fichas) == 1
     campos = fichas[0].campos
     # Ninguna frase de ausencia se persiste…
-    for k in ("resumen_estrategico", "portafolio", "presencia_geografica", "mayor_fortaleza"):
+    for k in (
+        "resumen_estrategico",
+        "portafolio",
+        "presencia_geografica",
+        "mayor_fortaleza",
+    ):
         assert k not in campos, f"{k} no debería persistirse (frase de ausencia)"
     # …pero un valor útil con nota parcial SÍ se conserva.
     assert campos["canales_precios"].startswith("B2B")
@@ -185,10 +190,12 @@ def test_format_fichas_conocidas_vacio_es_noop():
 
 
 def test_format_fichas_conocidas_lista_hechos():
-    bloque = format_fichas_conocidas({
-        "Nestlé": {"pais_origen": "Suiza", "portafolio": "Galletas."},
-        "Danone": {"pais_origen": "Francia"},
-    })
+    bloque = format_fichas_conocidas(
+        {
+            "Nestlé": {"pais_origen": "Suiza", "portafolio": "Galletas."},
+            "Danone": {"pais_origen": "Francia"},
+        }
+    )
     assert "Nestlé" in bloque and "Danone" in bloque
     assert "pais_origen: Suiza" in bloque
     assert "no los contradigas" in bloque  # instrucción de uso
@@ -202,12 +209,14 @@ def test_list_ficha_atributos_mapea_filas_a_dict():
         ("Danone", None, "pais_origen", "Francia"),
     ]
     sess = _FakeSession(rows=rows)
-    fichas = EntidadRepository(sess).list_ficha_atributos_by_sector("3020", ["Nestlé", "Danone"])
+    fichas = EntidadRepository(sess).list_ficha_atributos_by_sector(
+        "3020", ["Nestlé", "Danone"]
+    )
     assert fichas["Nestlé"] == {"pais_origen": "Suiza", "portafolio": "Galletas."}
     assert fichas["Danone"] == {"pais_origen": "Francia"}
     # restringe por sector/nombres y consulta claves de ficha + alias de fuentes locales
     assert "clave = ANY(:claves)" in sess.sqls[-1]
-    assert sess.params[-1]["sector"] == "3020"
+    assert sess.params[-1]["sectores"] == ["3020"]  # DT-UI04f: param es lista
     assert "descripcion" in sess.params[-1]["claves"]  # incluye alias (DT-065)
 
 
@@ -221,10 +230,14 @@ def test_list_ficha_atributos_alias_local_y_ciudad():
     f = EntidadRepository(_FakeSession(rows=rows)).list_ficha_atributos_by_sector(
         "4510", ["StartCo"]
     )["StartCo"]
-    assert f["resumen_estrategico"] == "Plataforma SaaS de logística."  # descripcion → resumen
+    assert (
+        f["resumen_estrategico"] == "Plataforma SaaS de logística."
+    )  # descripcion → resumen
     assert f["portafolio"] == "LOGTECH"  # verticales → portafolio
     assert f["factor_diferencial"] == "IA, cloud"  # tecnologias → factor_diferencial
-    assert f["presencia_geografica"] == "Medellín"  # columna ciudad → presencia_geografica
+    assert (
+        f["presencia_geografica"] == "Medellín"
+    )  # columna ciudad → presencia_geografica
     assert "pais_origen" not in f  # la columna región NO alimenta pais_origen
 
 
@@ -245,3 +258,19 @@ def test_list_ficha_atributos_sin_nombres_devuelve_vacio():
     sess = _FakeSession(rows=[])
     assert EntidadRepository(sess).list_ficha_atributos_by_sector("3020", []) == {}
     assert sess.sqls == []  # no consulta
+
+
+def test_list_ficha_atributos_multisector():
+    # DT-UI04f: lista de sectores → ANY(:sectores) cubre competidores de ambos grupos.
+    rows = [
+        ("Nestlé", None, "pais_origen", "Suiza"),
+        ("Danone", None, "pais_origen", "Francia"),
+    ]
+    sess = _FakeSession(rows=rows)
+    fichas = EntidadRepository(sess).list_ficha_atributos_by_sector(
+        ["3020", "3030"], ["Nestlé", "Danone"]
+    )
+    assert fichas["Nestlé"]["pais_origen"] == "Suiza"
+    assert fichas["Danone"]["pais_origen"] == "Francia"
+    assert "sector_gics = ANY(:sectores)" in sess.sqls[-1]
+    assert sess.params[-1]["sectores"] == ["3020", "3030"]

@@ -97,8 +97,12 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 repo = EntidadRepository(db_kb)
                 # El ranker global exige solape (require_overlap): `ya` ya son globales de ESTOS
                 # productos. KB caliente para estos productos ⇒ no re-descubrir.
+                # DT-UI04f: pasar todos los sectores ancla (grupo LLM + canónico CIIU).
                 ya = repo.list_competidores_by_sector(
-                    g_code, productos_terms=productos_terms, alcance=ALCANCE_GLOBAL, limit=100,
+                    sectores_local,
+                    productos_terms=productos_terms,
+                    alcance=ALCANCE_GLOBAL,
+                    limit=100,
                     exclude_nombre=e,
                 )
                 if len(ya) >= 8:
@@ -106,28 +110,42 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
 
                 def _seed(nombre: str, corroborado: bool, _hits: int) -> None:
                     estado = ESTADO_VERIFICADO if corroborado else ESTADO_CANDIDATO
-                    eid = repo.upsert_entidad(EntidadRow(
-                        nombre=nombre, nombre_normalizado=normalize_entity(nombre),
-                        tipo=TIPO_COMPETIDOR, sector_gics=g_code,
-                        alcance=ALCANCE_GLOBAL if corroborado else None, estado=estado,
-                    ))
+                    eid = repo.upsert_entidad(
+                        EntidadRow(
+                            nombre=nombre,
+                            nombre_normalizado=normalize_entity(nombre),
+                            tipo=TIPO_COMPETIDOR,
+                            sector_gics=g_code,
+                            alcance=ALCANCE_GLOBAL if corroborado else None,
+                            estado=estado,
+                        )
+                    )
                     repo.add_atributo(
-                        eid, "origen", "llm-corroborado" if corroborado else "llm",
-                        FUENTE_LLM, estado=estado,
+                        eid,
+                        "origen",
+                        "llm-corroborado" if corroborado else "llm",
+                        FUENTE_LLM,
+                        estado=estado,
                     )
                     # DT-063: perfil de producto del global (re-rank por solape del anclaje).
                     if corroborado and productos:
                         repo.add_atributo(
-                            eid, "productos_perfil", productos[:2000], FUENTE_LLM,
+                            eid,
+                            "productos_perfil",
+                            productos[:2000],
+                            FUENTE_LLM,
                             estado=ESTADO_VERIFICADO,
                         )
 
                 DiscoverGlobales(
                     chain=build_chain_pares_globales(ctx.api_llm or ctx.llm),
-                    web_connector=web, store=store,
+                    web_connector=web,
+                    store=store,
                     min_corrob=s.discover_globales_min_corrob,
                 ).discover(sector_gics=g, productos=productos, seed_repo_fn=_seed)
-        except Exception:  # noqa: BLE001 — el descubrimiento es un boost; nunca rompe la corrida.
+        except (
+            Exception
+        ):  # noqa: BLE001 — el descubrimiento es un boost; nunca rompe la corrida.
             logger.warning("Descubrimiento LLM de globales falló (sector %s)", g_code)
 
     # T16.0-B: cada thread abre su propia sesión y crea sus propios wrappers cached.
@@ -136,7 +154,9 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         with SessionLocal() as db:
             store = PGVectorStore(ctx.embedder, EmbeddingRepository(db), s)
             store.session_id = ctx.session_id
-            cached_web = CachedWebConnector(ctx.web, db, s, counter=ctx.cache_web_counter)
+            cached_web = CachedWebConnector(
+                ctx.web, db, s, counter=ctx.cache_web_counter
+            )
             cached_oal = CachedOpenAlexConnector(
                 OpenAlexConnector(s), db, s, counter=ctx.cache_oal_counter
             )
@@ -155,7 +175,8 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             return
         try:
             fichas = [
-                f for f in parse_fichas_competidores(cap.texto)
+                f
+                for f in parse_fichas_competidores(cap.texto)
                 if normalize_entity(f.nombre) in anclados
             ]
             if not fichas:
@@ -164,13 +185,19 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 ensure_entidades_tables(db_p.get_bind())
                 repo_p = EntidadRepository(db_p)
                 for f in fichas:
-                    ent_id = repo_p.get_id_by_nombre_sector(normalize_entity(f.nombre), g_code)
+                    ent_id = repo_p.get_id_by_nombre_sector(
+                        normalize_entity(f.nombre), g_code
+                    )
                     if ent_id is None:
                         continue
                     for clave, valor in f.campos.items():
                         repo_p.add_atributo(ent_id, clave, valor, FUENTE_WEB)
-        except Exception:  # noqa: BLE001 — la persistencia de fichas es un boost; nunca rompe.
-            logger.warning("No se pudieron persistir las fichas del Cap 2", exc_info=True)
+        except (
+            Exception
+        ):  # noqa: BLE001 — la persistencia de fichas es un boost; nunca rompe.
+            logger.warning(
+                "No se pudieron persistir las fichas del Cap 2", exc_info=True
+            )
 
     def _fn_cap2(store, web, _oal):
         # T22.4 (DT-054): cadena de identificación de entidades para búsqueda dirigida por
@@ -195,8 +222,12 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             with SessionLocal() as db_kb:
                 ensure_entidades_tables(db_kb.get_bind())
                 repo_kb = EntidadRepository(db_kb)
+                # DT-UI04f: pasar todos los sectores ancla para no perder globales de empresas
+                # multi-sector (la lista ya contiene g_code + canónico CIIU cuando corresponde).
                 kb_competidores = repo_kb.list_competidores_by_sector(
-                    g_code or "", productos_terms=productos_terms, alcance=ALCANCE_GLOBAL,
+                    sectores_local,
+                    productos_terms=productos_terms,
+                    alcance=ALCANCE_GLOBAL,
                     exclude_nombre=e,
                 )
                 regionales: list = []
@@ -207,22 +238,34 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 if s.anclaje_local_enabled and g_code:
                     n = s.anclaje_local_top_n
                     regionales = repo_kb.list_locales_by_sector(
-                        sectores_local, solo_establecidas=True, productos_terms=productos_terms,
-                        limit=n, exclude_nombre=e,
+                        sectores_local,
+                        solo_establecidas=True,
+                        productos_terms=productos_terms,
+                        limit=n,
+                        exclude_nombre=e,
                     )
                     startups = repo_kb.list_locales_by_sector(
-                        sectores_local, segmento=SEGMENTO_STARTUP, productos_terms=productos_terms,
-                        limit=n, exclude_nombre=e,
+                        sectores_local,
+                        segmento=SEGMENTO_STARTUP,
+                        productos_terms=productos_terms,
+                        limit=n,
+                        exclude_nombre=e,
                     )
-                    jugadores_locales_ctx = format_jugadores_locales(regionales, startups)
+                    jugadores_locales_ctx = format_jugadores_locales(
+                        regionales, startups
+                    )
                     kb_locales = [r.nombre for r in (*regionales, *startups)]
                 # DT-064/T4 + DT-065: pre-fill del prompt con los campos de ficha ya conocidos, de
                 # los globales anclados (persistidos por T3) Y de los locales (data estructurada de
                 # StartIA/EmpresasColombia mapeada a los campos de ficha) → el LLM escribe desde
                 # hechos, no fabrica. Vacío → invariante.
                 nombres_ficha = [*kb_competidores, *kb_locales]
-                if g_code and nombres_ficha:
-                    fichas_kb = repo_kb.list_ficha_atributos_by_sector(g_code, nombres_ficha)
+                if sectores_local and nombres_ficha:
+                    # DT-UI04f: pasar todos los sectores para que fichas de empresas multi-sector
+                    # sean accesibles independientemente de en cuál sector_gics están guardadas.
+                    fichas_kb = repo_kb.list_ficha_atributos_by_sector(
+                        sectores_local, nombres_ficha
+                    )
                     fichas_conocidas_ctx = format_fichas_conocidas(fichas_kb)
                 # DT-066/B2: tiers por subcategoría (global = clase mundial; regional/startup = del
                 # directorio). Alimentan el ensamblaje determinista de la tabla 2.1.
@@ -231,8 +274,12 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                     TIER_REGIONAL: [r.nombre for r in regionales],
                     TIER_STARTUP: [r.nombre for r in startups],
                 }
-        except Exception:  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
-            logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)
+        except (
+            Exception
+        ):  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
+            logger.warning(
+                "No se pudo consultar el KB de competidores (sector %s)", g_code
+            )
         # DT-066/B2: la 2.1 se ensambla desde el KB SOLO si el flag está ON y hay sujetos anclados.
         # En ese caso las cadenas (primaria + escalada) se construyen con omitir_21=True (el LLM no
         # redacta 2.1) y se pasa la cadena de hole-filling. OFF o sin anclas → invariante.
@@ -250,31 +297,50 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             tier = getattr(s, "benchmarking_escalation_tier", "synth")
             try:
                 escalation_chain = build_chain_03(
-                    build_api_llm(s, tier=tier, cost_tracker=ctx.tracker), omitir_21=b2_on
+                    build_api_llm(s, tier=tier, cost_tracker=ctx.tracker),
+                    omitir_21=b2_on,
                 )
-            except Exception:  # noqa: BLE001 — sin tier de escalada la corrida sigue igual.
-                logger.warning("No se pudo construir la cadena de escalada (tier=%s)", tier)
+            except (
+                Exception
+            ):  # noqa: BLE001 — sin tier de escalada la corrida sigue igual.
+                logger.warning(
+                    "No se pudo construir la cadena de escalada (tier=%s)", tier
+                )
         cap = GenerateBenchmarking(
             chain=build_chain_03(ctx.api_llm or ctx.llm, omitir_21=b2_on),
-            store=store, web_connector=web,
+            store=store,
+            web_connector=web,
             entidades_chain=build_chain_entidades(ctx.api_llm or ctx.llm),
-            kb_competidores=kb_competidores, kb_locales=kb_locales,
+            kb_competidores=kb_competidores,
+            kb_locales=kb_locales,
             jugadores_locales_ctx=jugadores_locales_ctx,
             fichas_conocidas_ctx=fichas_conocidas_ctx,
             escalation_chain=escalation_chain,
-            seccion21_enabled=b2_on, tiers=tiers_ancla, fichas_kb=fichas_kb,
-            holes_chain=holes_chain, holefill_max=s.seccion21_holefill_max,
+            seccion21_enabled=b2_on,
+            tiers=tiers_ancla,
+            fichas_kb=fichas_kb,
+            holes_chain=holes_chain,
+            holefill_max=s.seccion21_holefill_max,
         ).execute(
-            nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
-            sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+            nombre_empresa=e,
+            descripcion_empresa=ctx.empresa.texto,
+            sector_gics=g,
+            sector_gics_code=g_code,
+            empresa_id=ctx.empresa_id,
         )
         # DT-059/T3: auto-revisión sabor web (re-busca por faltantes + KB). Flag OFF = no-op.
         cap = review_web_cap(
-            settings=s, llm=ctx.api_llm or ctx.llm,
+            settings=s,
+            llm=ctx.api_llm or ctx.llm,
             capitulo_nombre="Cap 2 — Análisis Competitivo",
             criterios=CRITERIOS_CAPITULO["Cap 2 — Análisis Competitivo"],
-            cap_obj=cap, run_key=ctx.run_key, store=store, web=web,
-            sector_gics=g, sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+            cap_obj=cap,
+            run_key=ctx.run_key,
+            store=store,
+            web=web,
+            sector_gics=g,
+            sector_gics_code=g_code,
+            empresa_id=ctx.empresa_id,
             retrieval_query=f"{g} competitors benchmarking {e}",
             kb_competidores=kb_competidores,
             # DT-064/T2: reinyecta los sujetos anclados (globales + locales) al rescatar el Cap 2.
@@ -290,26 +356,40 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         return GenerateMercado(
             chain=build_chain_03b(ctx.api_llm), store=store, web_connector=web
         ).execute(
-            nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
-            sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+            nombre_empresa=e,
+            descripcion_empresa=ctx.empresa.texto,
+            sector_gics=g,
+            sector_gics_code=g_code,
+            empresa_id=ctx.empresa_id,
         )
 
     def _fn_cap3(store, web, oal):
         if ctx.api_llm is None:
             return None
         cap = GenerateTendencias(
-            chain=build_chain_04(ctx.api_llm), store=store,
-            web_connector=web, openalex_connector=oal,
+            chain=build_chain_04(ctx.api_llm),
+            store=store,
+            web_connector=web,
+            openalex_connector=oal,
         ).execute(
-            nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
-            sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+            nombre_empresa=e,
+            descripcion_empresa=ctx.empresa.texto,
+            sector_gics=g,
+            sector_gics_code=g_code,
+            empresa_id=ctx.empresa_id,
         )
         return review_web_cap(
-            settings=s, llm=ctx.api_llm,
+            settings=s,
+            llm=ctx.api_llm,
             capitulo_nombre="Cap 3 — Análisis Sectorial Tendencial",
             criterios=CRITERIOS_CAPITULO["Cap 3 — Análisis Sectorial Tendencial"],
-            cap_obj=cap, run_key=ctx.run_key, store=store, web=web,
-            sector_gics=g, sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+            cap_obj=cap,
+            run_key=ctx.run_key,
+            store=store,
+            web=web,
+            sector_gics=g,
+            sector_gics_code=g_code,
+            empresa_id=ctx.empresa_id,
             retrieval_query=f"{g} tendencias sectoriales tecnológicas {e}",
         )
 
@@ -317,24 +397,40 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         if ctx.api_llm is None:
             return None
         cap = GenerateEcosistema(
-            chain=build_chain_05(ctx.api_llm), store=store, web_connector=web,
+            chain=build_chain_05(ctx.api_llm),
+            store=store,
+            web_connector=web,
         ).execute(
-            nombre_empresa=e, descripcion_empresa=ctx.empresa.texto, sector_gics=g,
-            sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+            nombre_empresa=e,
+            descripcion_empresa=ctx.empresa.texto,
+            sector_gics=g,
+            sector_gics_code=g_code,
+            empresa_id=ctx.empresa_id,
         )
         return review_web_cap(
-            settings=s, llm=ctx.api_llm,
+            settings=s,
+            llm=ctx.api_llm,
             capitulo_nombre="Cap 4 — Panorama Ecosistema",
             criterios=CRITERIOS_CAPITULO["Cap 4 — Panorama Ecosistema"],
-            cap_obj=cap, run_key=ctx.run_key, store=store, web=web,
-            sector_gics=g, sector_gics_code=g_code, empresa_id=ctx.empresa_id,
+            cap_obj=cap,
+            run_key=ctx.run_key,
+            store=store,
+            web=web,
+            sector_gics=g,
+            sector_gics_code=g_code,
+            empresa_id=ctx.empresa_id,
             retrieval_query=f"{g} ecosistema inversiones fusiones adquisiciones alianzas {e}",
         )
 
     # T22.3 (DT-030): --resume salta los caps ya persistidos; solo se computan los faltantes.
     from ic.domain.use_cases import checkpoint_hooks
 
-    _fns = {"cap2": _fn_cap2, "mercado": _fn_mercado, "cap3": _fn_cap3, "cap4": _fn_cap4}
+    _fns = {
+        "cap2": _fn_cap2,
+        "mercado": _fn_mercado,
+        "cap3": _fn_cap3,
+        "cap4": _fn_cap4,
+    }
     _caps = ctx.params.caps_incluidos
     if _caps is not None:
         _fns = {k: v for k, v in _fns.items() if k in ("cap2", "mercado") or k in _caps}
@@ -361,20 +457,34 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             (ctx.cap_tend, "Análisis Sectorial Tendencial", "cap3"),
             (ctx.cap_eco, "Ecosistema Empresarial", "cap4"),
         ]:
-            if _restored[name] is None and cap_obj is not None and cap_obj.retrieval_suficiente:
-                intro = ctx.intro_chain.invoke({
-                    "titulo": titulo, "empresa": ctx.params.empresa,
-                    "resumen_cap": cap_obj.texto[:500],
-                })
+            if (
+                _restored[name] is None
+                and cap_obj is not None
+                and cap_obj.retrieval_suficiente
+            ):
+                intro = ctx.intro_chain.invoke(
+                    {
+                        "titulo": titulo,
+                        "empresa": ctx.params.empresa,
+                        "resumen_cap": cap_obj.texto[:500],
+                    }
+                )
                 # DT-055: intro saneado puede quedar vacío → no anteponer líneas en blanco
                 if intro:
                     cap_obj.texto = intro + "\n\n" + cap_obj.texto
 
     # Persistir los caps recién computados (con intro) con keep-best + fallback (Fase 1).
-    _slots = {"cap2": "cap", "mercado": "cap_mercado", "cap3": "cap_tend", "cap4": "cap_eco"}
+    _slots = {
+        "cap2": "cap",
+        "mercado": "cap_mercado",
+        "cap3": "cap_tend",
+        "cap4": "cap_eco",
+    }
     for name, obj in [
-        ("cap2", ctx.cap), ("mercado", ctx.cap_mercado),
-        ("cap3", ctx.cap_tend), ("cap4", ctx.cap_eco),
+        ("cap2", ctx.cap),
+        ("mercado", ctx.cap_mercado),
+        ("cap3", ctx.cap_tend),
+        ("cap4", ctx.cap_eco),
     ]:
         if _restored[name] is None:
             setattr(ctx, _slots[name], checkpoint_hooks.commit_best(ctx, name, obj))
