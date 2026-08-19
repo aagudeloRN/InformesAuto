@@ -458,7 +458,8 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             (ctx.cap_eco, "Ecosistema Empresarial", "cap4"),
         ]:
             if (
-                _restored[name] is None
+                name in _restored
+                and _restored[name] is None
                 and cap_obj is not None
                 and cap_obj.retrieval_suficiente
             ):
@@ -486,5 +487,5 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         ("cap3", ctx.cap_tend),
         ("cap4", ctx.cap_eco),
     ]:
-        if _restored[name] is None:
+        if name in _restored and _restored[name] is None:
             setattr(ctx, _slots[name], checkpoint_hooks.commit_best(ctx, name, obj))
