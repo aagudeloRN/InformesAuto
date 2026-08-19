@@ -87,6 +87,7 @@ class PGVectorStore:
         empresa_id: uuid.UUID | None = None,
         sector_gics: str | None = None,
         solo_activos: bool = True,
+        fuente_tipo_filter: str | None = None,
     ) -> list[ChunkResult]:
         k = top_k if top_k is not None else self._top_k
         t = threshold if threshold is not None else self._threshold
@@ -102,6 +103,7 @@ class PGVectorStore:
             solo_activos=solo_activos,
             max_chunks_per_doc=self._max_chunks_per_doc,
             mmr_lambda=self._mmr_lambda,
+            fuente_tipo_filter=fuente_tipo_filter,
         )
         rows = pool[:k]
 
@@ -119,6 +121,7 @@ class PGVectorStore:
                 sector_gics=sector_gics,
                 solo_activos=solo_activos,
                 sector_estricto=True,
+                fuente_tipo_filter=fuente_tipo_filter,
             )
 
         # Capa 2 — docs globales cross-sector (Fase 18, DT-031)
@@ -128,6 +131,7 @@ class PGVectorStore:
                 query_vec, self._global_reserve, t_reserve, None,
                 solo_activos=solo_activos,
                 global_estricto=True,
+                fuente_tipo_filter=fuente_tipo_filter,
             )
 
         # Capa 3 — docs de la empresa específica del informe (Fase 18, T18.3)
@@ -137,6 +141,7 @@ class PGVectorStore:
                 query_vec, self._empresa_reserve, t_reserve, empresa_id,
                 solo_activos=solo_activos,
                 empresa_estricto=True,
+                fuente_tipo_filter=fuente_tipo_filter,
             )
 
         # Ensamblar en orden de prioridad decreciente: empresa > sector > global > resto.

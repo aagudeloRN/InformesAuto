@@ -60,6 +60,43 @@ class Referencia:
 
 
 @dataclass
+class Cap21Globales:
+    texto: str
+    candidatos: list[str]
+    n_candidatos_con_web: int
+    retrieval_suficiente: bool
+    chunks_usados: list["ChunkResult"] = field(default_factory=list)
+
+
+@dataclass
+class Cap21Regionales:
+    texto: str
+    empresas_emis: list[str]
+    n_con_emis: int
+    retrieval_suficiente: bool
+    chunks_usados: list["ChunkResult"] = field(default_factory=list)
+
+
+@dataclass
+class Cap21Startups:
+    texto: str
+    locales: list[str]
+    internacionales: list[str]
+    retrieval_suficiente: bool
+    chunks_usados: list["ChunkResult"] = field(default_factory=list)
+
+
+@dataclass
+class Cap21Jugadores:
+    texto: str
+    globales: "Cap21Globales | None"
+    regionales: "Cap21Regionales | None"
+    startups: "Cap21Startups | None"
+    retrieval_suficiente: bool
+    chunks_usados: list["ChunkResult"] = field(default_factory=list)
+
+
+@dataclass
 class CostReport:
     """Registro de costo de una llamada LLM individual."""
     modelo: str

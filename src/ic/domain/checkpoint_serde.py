@@ -11,6 +11,10 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from ic.shared.types import (
+    Cap21Globales,
+    Cap21Jugadores,
+    Cap21Regionales,
+    Cap21Startups,
     CapAccionables,
     CapBenchmarking,
     CapConvergencia,
@@ -34,6 +38,10 @@ _REGISTRY: dict[str, type] = {
         CapEcosistema,
         CapConvergencia,
         CapAccionables,
+        Cap21Globales,
+        Cap21Regionales,
+        Cap21Startups,
+        Cap21Jugadores,
     )
 }
 

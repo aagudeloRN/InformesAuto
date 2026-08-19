@@ -12,6 +12,7 @@ from ic.domain.chains.chain_03_benchmarking import format_chunks_as_context
 from ic.domain.kb.relevance import format_referentes_globales
 from ic.domain.kb.seccion21_assembler import assemble_seccion_21
 from ic.domain.kb.seccion21_holes import fill_holes
+from ic.domain.use_cases.generate_21_jugadores import Generate21Jugadores
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
 from ic.shared.text_utils import has_cjk_characters, is_llm_refusal
@@ -115,6 +116,8 @@ class GenerateBenchmarking:
         fichas_kb: dict[str, dict[str, str]] | None = None,
         holes_chain: Runnable | None = None,
         holefill_max: int = 0,
+        jugadores_use_case: Generate21Jugadores | None = None,
+        sectores_ancla: list[str] | None = None,
     ) -> None:
         self._chain = chain
         self._store = store
@@ -145,6 +148,8 @@ class GenerateBenchmarking:
         self._fichas_kb = fichas_kb or {}
         self._holes_chain = holes_chain
         self._holefill_max = holefill_max
+        self._jugadores_use_case = jugadores_use_case
+        self._sectores_ancla = sectores_ancla or []
 
     def _identificar_entidades(self, chunks, sector_gics: str) -> list[str]:
         """Entidades competidoras a explotar: KB (canónico) + las ancladas en la evidencia.
@@ -337,12 +342,30 @@ class GenerateBenchmarking:
             "fichas_conocidas": self._fichas_conocidas_ctx,
         }
 
+        # Integración Cap 2.1 modular: cuando jugadores_use_case está inyectado, delega la
+        # generación de la sección 2.1 al orquestador Generate21Jugadores (US1+US2+US3).
+        # Esta ruta tiene prioridad sobre seccion21_enabled (KB assembler).
+        seccion_21_md = ""
+        if self._jugadores_use_case is not None:
+            try:
+                cap21 = self._jugadores_use_case.execute(
+                    nombre_empresa=nombre_empresa,
+                    descripcion_empresa=descripcion_empresa,
+                    sector_gics=sector_gics,
+                    sector_gics_code=sector_gics_code,
+                    sectores_ancla=self._sectores_ancla or [sector_gics_code or sector_gics],
+                    empresa_id=empresa_id,
+                )
+                if cap21.retrieval_suficiente:
+                    seccion_21_md = cap21.texto
+            except Exception as exc:
+                logger.warning("Generate21Jugadores falló, continuando sin 2.1 modular: %s", exc)
+
         # DT-066/B2: ensamblar la sección 2.1 desde el KB (hechos deterministas) + hole-filling de
         # los campos faltantes con la evidencia RAG ya recuperada. El LLM redacta solo la prosa
         # (2.2/2.4/2.5) recibiendo la 2.1 hecha como contexto. Si no está habilitado, la
         # 2.1 la escribe el LLM como hasta ahora (invariante).
-        seccion_21_md = ""
-        if self._seccion21_enabled:
+        if not seccion_21_md and self._seccion21_enabled:
             # DT-UI03: busca web por los top-3 globales anclados, extrae campos y persiste al KB.
             # La siguiente corrida del mismo sector reutiliza los datos sin llamadas adicionales.
             globales = self._tiers.get("global", [])

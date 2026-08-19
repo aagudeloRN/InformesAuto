@@ -194,6 +194,7 @@ class EmbeddingRepository:
         global_estricto: bool = False,
         empresa_estricto: bool = False,
         mmr_lambda: float = 1.0,
+        fuente_tipo_filter: str | None = None,
     ) -> list[tuple[EmbeddingVectorial, float]]:
         # Margen amplio: el filtro sectorial + el cap por documento reducen candidatos
         fetch_k = top_k * 4
@@ -237,6 +238,10 @@ class EmbeddingRepository:
         if solo_activos:
             # Activo o sin documento asociado (chunks web no tienen documento_id)
             conditions.append("(d.activo IS NOT FALSE)")
+
+        if fuente_tipo_filter is not None:
+            conditions.append("e.fuente_tipo = :fuente_tipo")
+            params["fuente_tipo"] = fuente_tipo_filter
 
         where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
