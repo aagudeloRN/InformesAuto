@@ -12,6 +12,7 @@ import uuid
 
 from langchain_core.runnables import Runnable
 
+from ic.data.repositories.entidad_repo import _clave_exclusion
 from ic.domain.absent_data import build_absent_paragraph
 from ic.domain.chains.chain_03_benchmarking import format_chunks_as_context
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
@@ -93,8 +94,10 @@ class Generate21Regionales:
                 retrieval_suficiente=False,
             )
 
-        # 3. Extraer nombres y recortar a max_empresas
+        # 3. Extraer nombres, filtrar empresa focal y recortar a max_empresas
         nombres_emis = _extraer_nombres_emis(chunks_emis)
+        clave_focal = _clave_exclusion(nombre_empresa)
+        nombres_emis = [n for n in nombres_emis if _clave_exclusion(n) != clave_focal]
         nombres_emis = nombres_emis[: self._max_empresas]
 
         # 4. Complemento web opcional (solo si hay base EMIS)

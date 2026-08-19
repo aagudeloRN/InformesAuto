@@ -317,7 +317,8 @@ def list_locales_by_sector(
     sql = text(
         f"SELECT e.nombre, e.ciudad, es.vertical, a_ing.valor, e.segmento, "
         f"       (e.estado = :verificado) AS verificado, {tamano_num} AS tam, a_desc.valor, "
-        f"       a_prod.valor "
+        f"       a_prod.valor, "
+        f"       NULLIF(regexp_replace(a_ven.valor, '[^0-9.]', '', 'g'), '')::float AS ventas_cop "
         f"FROM {ent} e "
         f"JOIN {sec} es ON es.entidad_id = e.id "
         f"LEFT JOIN {atr} a_ing "
@@ -326,6 +327,8 @@ def list_locales_by_sector(
         f"  ON a_desc.entidad_id = e.id AND a_desc.clave = 'descripcion' "
         f"LEFT JOIN {atr} a_prod "
         f"  ON a_prod.entidad_id = e.id AND a_prod.clave = 'productos_perfil' "
+        f"LEFT JOIN {atr} a_ven "
+        f"  ON a_ven.entidad_id = e.id AND a_ven.clave = 'ventas_2025_cop' "
         f"WHERE es.sector_gics = ANY(:sectores) AND e.alcance = :local "
         f"  AND e.estado <> :descartado AND e.tipo IN ('competidor', 'empresa'){cond_seg} "
         f"ORDER BY verificado DESC, tam DESC NULLS LAST "
@@ -350,10 +353,13 @@ def list_locales_by_sector(
 
     def _clave(r):
         descriptor = f"{r[8] or ''} {r[2] or ''} {r[7] or ''}"
+        ventas = r[9] if r[9] is not None else 0.0
+        tam = int(r[6]) if r[6] else 0
         return (
             -producto_overlap(descriptor, terms),
             not r[5],
-            -(int(r[6]) if r[6] else 0),
+            -ventas,
+            -tam,
         )
 
     # Dedup por nombre normalizado tras el re-rank; conserva el mejor-rankeado.
@@ -374,6 +380,7 @@ def list_locales_by_sector(
             actividad=r[2],
             tamano=(str(r[3]) if r[3] else None),
             segmento=r[4],
+            ventas_2025_cop=(float(r[9]) if r[9] is not None else None),
         )
         for r in deduped
     ]

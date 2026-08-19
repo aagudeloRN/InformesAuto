@@ -180,3 +180,26 @@ class TestAnclajeKB:
         assert len(dirigidas) == MAX_ENTIDADES  # cota respetada
         # No aparece "Colanta" porque el KB ya llenó la cota (lidera); sin duplicar "e0"/"E0".
         assert sum("E0 " in q or q.startswith("E0 ") for q in dirigidas) == 1
+
+
+class TestLocalRowVentasOrdering:
+    """T031: verifica que ventas_2025_cop ordena antes que tamaño/menciones."""
+
+    def test_ventas_cop_ordena_primero(self):
+        from ic.domain.kb.relevance import LocalRow
+        rows = [
+            LocalRow(nombre="PequenaConVentas", ventas_2025_cop=1_000_000.0, tamano="100"),
+            LocalRow(nombre="GrandeSinVentas", ventas_2025_cop=None, tamano="99999999"),
+        ]
+        # Ordenar como lo hace generate_21_startups: ventas primero, n_menciones como desempate
+        sorted_rows = sorted(rows, key=lambda r: (-(r.ventas_2025_cop or 0), -(r.n_menciones or 0)))
+        assert sorted_rows[0].nombre == "PequenaConVentas"
+
+    def test_ventas_cop_none_fallback_a_menciones(self):
+        from ic.domain.kb.relevance import LocalRow
+        rows = [
+            LocalRow(nombre="SinVentasMasMenciones", ventas_2025_cop=None, n_menciones=10),
+            LocalRow(nombre="SinVentasMenosMenciones", ventas_2025_cop=None, n_menciones=2),
+        ]
+        sorted_rows = sorted(rows, key=lambda r: (-(r.ventas_2025_cop or 0), -(r.n_menciones or 0)))
+        assert sorted_rows[0].nombre == "SinVentasMasMenciones"

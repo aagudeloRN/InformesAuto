@@ -72,11 +72,11 @@ class Generate21Startups:
         # 2. Claves de dedup (locales)
         claves_locales = {_clave_exclusion(n) for n in nombres_locales}
 
-        # 3. Internacionales vía web (solo si hay espacio)
+        # 3. Internacionales vía web (siempre, independiente de cuántos locales hay)
         chunks_internacionales: list[ChunkResult] = []
         nombres_internacionales: list[str] = []
 
-        if len(filas_locales) < self._max_locales:
+        if True:
             query_intl = (
                 f"{sector_gics} startups disruptors innovative companies 2024 2025 "
                 "venture backed emerging technology"

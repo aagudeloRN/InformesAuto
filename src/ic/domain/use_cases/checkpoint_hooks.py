@@ -71,6 +71,29 @@ def save(ctx: _PipelineContext, nombre: str, obj) -> None:
         logger.warning("No se pudo persistir checkpoint de '%s'", nombre, exc_info=True)
 
 
+def save_cap(engine, run_key: str | None, nombre: str, obj) -> None:
+    """Persiste un capítulo directamente dado engine y run_key (sin ctx).
+
+    Para sub-módulos que no tienen acceso al pipeline context (FR-012, SC-004).
+    Si engine o run_key son None, omite la persistencia silenciosamente.
+    Best-effort: cualquier fallo de BD nunca aborta la corrida.
+    """
+    if engine is None or run_key is None or obj is None:
+        return
+    from sqlalchemy.orm import Session
+
+    from ic.data.models.checkpoint import ensure_checkpoint_table
+    from ic.data.repositories.checkpoint_repo import CheckpointRepository
+    from ic.domain.checkpoint_serde import serialize_cap
+
+    try:
+        ensure_checkpoint_table(engine)
+        with Session(engine) as db:
+            CheckpointRepository(db).save_capitulo(run_key, nombre, serialize_cap(obj))
+    except Exception:
+        logger.warning("No se pudo persistir checkpoint de '%s' (save_cap)", nombre, exc_info=True)
+
+
 def commit_best(ctx: _PipelineContext, nombre: str, fresh):
     """Persiste el MEJOR capítulo (keep-best) y devuelve el que debe usar el informe (fallback).
 

@@ -13,6 +13,7 @@ from dataclasses import replace
 
 from ic.data.repositories.entidad_repo import _clave_exclusion
 from ic.domain.absent_data import build_absent_paragraph
+from ic.domain.use_cases import checkpoint_hooks
 from ic.domain.use_cases.generate_21_globales import Generate21Globales
 from ic.domain.use_cases.generate_21_regionales import Generate21Regionales
 from ic.domain.use_cases.generate_21_startups import Generate21Startups
@@ -90,6 +91,8 @@ class Generate21Jugadores:
         cached_globales: Cap21Globales | None = None,
         cached_regionales: Cap21Regionales | None = None,
         cached_startups: Cap21Startups | None = None,
+        engine=None,
+        run_key: str | None = None,
     ) -> Cap21Jugadores:
         base_kwargs = dict(
             nombre_empresa=nombre_empresa,
@@ -135,10 +138,13 @@ class Generate21Jugadores:
                         resultado = None
                     if nombre == "globales":
                         globales = resultado
+                        checkpoint_hooks.save_cap(engine, run_key, "cap2_21_globales", globales)
                     elif nombre == "regionales":
                         regionales = resultado
+                        checkpoint_hooks.save_cap(engine, run_key, "cap2_21_regionales", regionales)
                     else:
                         startups = resultado
+                        checkpoint_hooks.save_cap(engine, run_key, "cap2_21_startups", startups)
 
         # Deduplicación cross-tier (Global > Regional > Startup)
         if (

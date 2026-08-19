@@ -129,3 +129,19 @@ uv run pytest tests/test_generate_benchmarking.py -v
 | SC-005: Reutilización de checkpoint | Segunda ejecución con misma empresa → `restore` devuelve valores sin re-generar |
 | SC-006: ≥70% perfiles regionales desde EMIS | `chunks_usados` de `Cap21Regionales` tienen `fuente_tipo='emis'` |
 | SC-007: Al menos 1 startup de StartIA | `locales` en `Cap21Startups` no vacío cuando sector tiene registros |
+
+---
+
+## Validación de integración (requiere entorno completo)
+
+Los criterios SC-003, SC-004, SC-005, SC-006 y SC-007 **no pueden validarse con tests unitarios**
+sin BD real, LLM activo y corpus EMIS indexado. Ejecutar cuando el entorno esté disponible:
+
+```bash
+# Requiere: DB PostgreSQL+pgvector levantada, EMIS indexado para el sector,
+#           StartIA sembrada con segmento='startup', TAVILY_API_KEY y LLM en .env
+uv run pytest tests/ -m integration -v
+```
+
+Mientras el entorno de integración no esté disponible, marcar estos criterios como
+**pendientes de validación E2E** y no bloquear el merge por ellos.

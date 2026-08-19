@@ -156,6 +156,33 @@ def test_deduplicacion_local_vs_internacional():
     assert "StartupCo" not in result.internacionales
 
 
+def test_internacionales_buscados_cuando_locales_llenos():
+    """Con max_locales=3 locales, se buscan internacionales igualmente (FR-009, US3/AC2)."""
+    locales = [
+        LocalRow(nombre=f"Startup{i}", ciudad="Bogotá", segmento="startup")
+        for i in range(3)
+    ]
+    web_chunk = ChunkResult(
+        chunk_texto="International Disruptor content",
+        fuente_tipo="web",
+        fuente_url="http://intl.com",
+        score=0.85,
+    )
+    uc = _make_use_case(locales=locales, web_chunks=[web_chunk], web_has_results=True)
+    result = uc.execute(
+        nombre_empresa="Alpina",
+        descripcion_empresa="Empresa láctea",
+        sector_gics="3020",
+        sector_gics_code="3020",
+        sectores_ancla=["3020"],
+        empresa_id=None,
+    )
+    assert result.retrieval_suficiente is True
+    assert len(result.locales) == 3
+    # internacionales se buscan aunque locales estén llenos
+    assert len(result.internacionales) > 0
+
+
 def test_locales_aparecen_primero_en_prosa():
     locales = [LocalRow(nombre="LocalStartup", ciudad="Bogotá", segmento="startup")]
     chain = _FakeChain()

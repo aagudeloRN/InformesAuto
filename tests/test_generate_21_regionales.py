@@ -134,3 +134,25 @@ def test_max_3_empresas_regionales():
     )
     assert result.retrieval_suficiente is True
     assert len(result.empresas_emis) <= 3
+
+
+def test_excluye_empresa_focal_de_regionales():
+    """Los nombres EMIS que coinciden con la empresa focal no deben aparecer en empresas_emis."""
+    # Alpina aparece en los metadatos de un chunk EMIS
+    emis = [
+        _emis_chunk("Alpina"),   # empresa focal → debe filtrarse
+        _emis_chunk("Nutresa"),
+        _emis_chunk("Colanta"),
+    ]
+    uc = _make_use_case(emis_chunks=emis)
+    result = uc.execute(
+        nombre_empresa="Alpina",
+        descripcion_empresa="Empresa láctea",
+        sector_gics="3020",
+        sector_gics_code="3020",
+        empresa_id=None,
+    )
+    assert result.retrieval_suficiente is True
+    assert "Alpina" not in result.empresas_emis
+    assert "Nutresa" in result.empresas_emis
+    assert "Colanta" in result.empresas_emis

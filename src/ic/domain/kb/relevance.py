@@ -140,6 +140,8 @@ class LocalRow:
     actividad: str | None = None
     tamano: str | None = None
     segmento: str | None = None
+    ventas_2025_cop: float | None = None
+    n_menciones: int = 0
 
 
 def _linea_local(r: LocalRow) -> str:
