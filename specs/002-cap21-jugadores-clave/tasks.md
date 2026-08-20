@@ -150,6 +150,24 @@ description: "Task list — Cap 2.1 Jugadores Clave Modular"
 
 ---
 
+## Phase 9: Convergence
+
+- [X] T036 Pasar `engine` y `run_key` desde `GenerateBenchmarking.execute` a `jugadores_use_case.execute`: en `src/ic/domain/use_cases/generate_benchmarking.py` (línea ~351), añadir `engine=ctx_engine, run_key=ctx_run_key` a la llamada (donde `ctx_engine`/`ctx_run_key` son los mismos que usa el pipeline para otros capítulos); sin `engine`/`run_key` los checkpoints SC-004 se omiten silenciosamente per FR-012, SC-004 (partial)
+- [X] T037 Implementar lookup de cache sectorial antes de invocar el orquestador en `generate_benchmarking.execute`: si `engine` está disponible, intentar cargar `cap2_21_globales`, `cap2_21_regionales`, `cap2_21_startups` desde `checkpoint_repo` usando una clave derivada de `(sector_gics_code, sub_gics)`; pasar los resultados encontrados como `cached_globales/cached_regionales/cached_startups` al orquestador para evitar re-ejecutar sub-módulos ya calculados; si no hay cache o hay error, continuar sin él per SC-005, FR-012 (missing)
+- [X] T038 Añadir `e.n_menciones` al SELECT de `_list_locales` en `src/ic/data/repositories/_entidad_queries.py`: incluir columna `e.n_menciones` en la query (junto a `ventas_cop`), poblar `LocalRow.n_menciones` desde el resultado (`r[10]` o el índice correspondiente), y reemplazar `-tam` por `-(r.n_menciones or 0)` como 4th key en `_clave()`; actualizar `TestLocalRowVentasOrdering.test_ventas_cop_none_fallback_a_menciones` para verificar el comportamiento real de `_list_locales` con un stub de sesión per FR-008 (partial)
+- [X] T039 Eliminar la importación directa de `langchain_core.runnables.Runnable` en los tres use cases del dominio: reemplazar por un `Protocol` local `InvokableChain` definido en `src/ic/shared/types.py` o `src/ic/shared/protocols.py` con método `invoke(self, payload: dict) -> str`; actualizar `generate_21_globales.py:12`, `generate_21_regionales.py:13`, `generate_21_startups.py:13` per plan.md "LangChain solo en chains, no en use cases", Constitution II (contradicts)
+- [X] T040 Documentar la decisión de usar `execute()` parameters en lugar de constructor injection para `engine`/`run_key` en `generate_21_jugadores.py`: añadir comentario en el método `execute` explicando por qué se eligió method-injection (flexibilidad por corrida); actualizar `quickstart.md` para reflejar la firma real del orquestador per FR-012 clarificación (contradicts)
+
+---
+
+## Phase 10: Convergence
+
+- [X] T041 CRITICAL: Reemplazar `from langchain_core.runnables import Runnable` en `src/ic/domain/use_cases/generate_benchmarking.py:7` con `from ic.shared.protocols import InvokableChain as Runnable`; el alias `Runnable` preserva todas las anotaciones de tipo en el constructor sin cambios adicionales; correr `uv run pytest tests/test_generate_benchmarking*.py -v` → 0 fallos per Constitution II (contradicts)
+- [X] T042 Añadir test `test_sector_cache_hit_evita_reejecutar_submodulos` en `tests/test_generate_benchmarking_jugadores.py`: instanciar `GenerateBenchmarking` con un `jugadores_use_case` stub y un `engine` que devuelve checkpoint pre-cacheado (`cached_globales=<Cap21Globales válido>`); verificar que `jugadores_use_case.execute` recibe `cached_globales` no-None y se llama una sola vez sin re-ejecutar sub-módulos; usar `_FakeStore` + `_FakeChain` ya en el archivo per Constitution V, SC-005 (partial)
+- [X] T043 Escalar a humano la decisión de refactorizar `src/ic/domain/use_cases/generate_benchmarking.py` (503 líneas, límite 300): documentar en un comentario `# LEGACY: investigar` al inicio del archivo la violación de Constitution I y proponer el split mínimo (p.ej. extraer `_load_sector_cache` y la lógica de 2.1 modular a un módulo `_benchmarking_jugadores.py` en el mismo paquete) per Constitution I (contradicts)
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

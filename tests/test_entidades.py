@@ -183,23 +183,35 @@ class TestAnclajeKB:
 
 
 class TestLocalRowVentasOrdering:
-    """T031: verifica que ventas_2025_cop ordena antes que tamaño/menciones."""
+    """T031/T038: ventas_2025_cop ordena primero; n_menciones es desempate (via _list_locales)."""
 
     def test_ventas_cop_ordena_primero(self):
-        from ic.domain.kb.relevance import LocalRow
-        rows = [
-            LocalRow(nombre="PequenaConVentas", ventas_2025_cop=1_000_000.0, tamano="100"),
-            LocalRow(nombre="GrandeSinVentas", ventas_2025_cop=None, tamano="99999999"),
-        ]
-        # Ordenar como lo hace generate_21_startups: ventas primero, n_menciones como desempate
-        sorted_rows = sorted(rows, key=lambda r: (-(r.ventas_2025_cop or 0), -(r.n_menciones or 0)))
-        assert sorted_rows[0].nombre == "PequenaConVentas"
+        """list_locales_by_sector pone primero la entidad con ventas sobre la grande sin ventas."""
+        from ic.data.repositories._entidad_queries import list_locales_by_sector
+        # r: nombre, ciudad, vertical, ing_valor, segmento, verificado, tam, desc, prod, ventas, menciones
+        row_con_ventas  = ("PequenaConVentas", None, None, None, None, False, 100, None, None, 1_000_000.0, 0)
+        row_sin_ventas  = ("GrandeSinVentas",  None, None, None, None, False, 99_999_999, None, None, None, 0)
+
+        class _FakeDB:
+            def execute(self, *a, **kw):
+                return self
+            def fetchall(self):
+                return [row_sin_ventas, row_con_ventas]
+
+        result = list_locales_by_sector(_FakeDB(), ["3020"], limit=10)
+        assert result[0].nombre == "PequenaConVentas"
 
     def test_ventas_cop_none_fallback_a_menciones(self):
-        from ic.domain.kb.relevance import LocalRow
-        rows = [
-            LocalRow(nombre="SinVentasMasMenciones", ventas_2025_cop=None, n_menciones=10),
-            LocalRow(nombre="SinVentasMenosMenciones", ventas_2025_cop=None, n_menciones=2),
-        ]
-        sorted_rows = sorted(rows, key=lambda r: (-(r.ventas_2025_cop or 0), -(r.n_menciones or 0)))
-        assert sorted_rows[0].nombre == "SinVentasMasMenciones"
+        """Cuando ventas=None en todas, n_menciones decide el orden en list_locales_by_sector."""
+        from ic.data.repositories._entidad_queries import list_locales_by_sector
+        row_mas_menciones   = ("SinVentasMasMenciones",   None, None, None, None, False, 0, None, None, None, 10)
+        row_menos_menciones = ("SinVentasMenosMenciones", None, None, None, None, False, 0, None, None, None, 2)
+
+        class _FakeDB:
+            def execute(self, *a, **kw):
+                return self
+            def fetchall(self):
+                return [row_menos_menciones, row_mas_menciones]
+
+        result = list_locales_by_sector(_FakeDB(), ["3020"], limit=10)
+        assert result[0].nombre == "SinVentasMasMenciones"

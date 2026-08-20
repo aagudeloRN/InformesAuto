@@ -318,7 +318,8 @@ def list_locales_by_sector(
         f"SELECT e.nombre, e.ciudad, es.vertical, a_ing.valor, e.segmento, "
         f"       (e.estado = :verificado) AS verificado, {tamano_num} AS tam, a_desc.valor, "
         f"       a_prod.valor, "
-        f"       NULLIF(regexp_replace(a_ven.valor, '[^0-9.]', '', 'g'), '')::float AS ventas_cop "
+        f"       NULLIF(regexp_replace(a_ven.valor, '[^0-9.]', '', 'g'), '')::float AS ventas_cop, "
+        f"       COALESCE(e.n_menciones, 0) AS n_menciones "
         f"FROM {ent} e "
         f"JOIN {sec} es ON es.entidad_id = e.id "
         f"LEFT JOIN {atr} a_ing "
@@ -354,12 +355,12 @@ def list_locales_by_sector(
     def _clave(r):
         descriptor = f"{r[8] or ''} {r[2] or ''} {r[7] or ''}"
         ventas = r[9] if r[9] is not None else 0.0
-        tam = int(r[6]) if r[6] else 0
+        menciones = int(r[10]) if r[10] is not None else 0
         return (
             -producto_overlap(descriptor, terms),
             not r[5],
             -ventas,
-            -tam,
+            -menciones,
         )
 
     # Dedup por nombre normalizado tras el re-rank; conserva el mejor-rankeado.
@@ -381,6 +382,7 @@ def list_locales_by_sector(
             tamano=(str(r[3]) if r[3] else None),
             segmento=r[4],
             ventas_2025_cop=(float(r[9]) if r[9] is not None else None),
+            n_menciones=(int(r[10]) if r[10] is not None else 0),
         )
         for r in deduped
     ]

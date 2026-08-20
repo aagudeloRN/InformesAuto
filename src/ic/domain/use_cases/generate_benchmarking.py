@@ -1,10 +1,12 @@
+# LEGACY: investigar — este archivo supera el límite de 300 líneas (Constitution I, SoC).
+# Split mínimo propuesto: extraer `_load_sector_cache` + lógica Cap 2.1 modular
+# (jugadores_use_case / sector_run_key) a `_benchmarking_jugadores.py` en este mismo paquete.
+# Requiere decisión explícita del humano antes de ejecutar el refactor (Chesterton's Fence).
 from __future__ import annotations
 
 import json
 import logging
 import re
-
-from langchain_core.runnables import Runnable
 
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
 from ic.domain.chains.chain_02b_entidades import MAX_ENTIDADES, parse_entidades
@@ -15,12 +17,58 @@ from ic.domain.kb.seccion21_holes import fill_holes
 from ic.domain.use_cases.generate_21_jugadores import Generate21Jugadores
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
+from ic.shared.protocols import InvokableChain as Runnable
 from ic.shared.text_utils import has_cjk_characters, is_llm_refusal
 from ic.shared.types import CapBenchmarking
 
 logger = logging.getLogger(__name__)
 
 _MIN_CHUNKS = 5
+
+
+def _load_sector_cache(engine, sector_run_key: str):
+    """Carga los tres sub-módulos de 2.1 desde el cache sectorial (SC-005, T037).
+
+    Usa el run_key compuesto `sector_{sector_gics_code}_{sub_gics}` para recuperar
+    resultados de corridas previas del mismo sector. Best-effort: cualquier fallo
+    devuelve (None, None, None) y la corrida continúa sin cache.
+    """
+    try:
+        from sqlalchemy.orm import Session
+
+        from ic.data.models.checkpoint import ensure_checkpoint_table
+        from ic.data.repositories.checkpoint_repo import CheckpointRepository
+        from ic.domain.checkpoint_serde import deserialize_cap
+
+        ensure_checkpoint_table(engine)
+        with Session(engine) as db:
+            repo = CheckpointRepository(db)
+            caps = repo.load_capitulos(sector_run_key)
+
+        def _deserialize(nombre):
+            payload = caps.get(nombre)
+            if payload is None:
+                return None
+            try:
+                return deserialize_cap(payload)
+            except Exception:
+                return None
+
+        globales   = _deserialize("cap2_21_globales")
+        regionales = _deserialize("cap2_21_regionales")
+        startups   = _deserialize("cap2_21_startups")
+        if any(x is not None for x in (globales, regionales, startups)):
+            logger.info(
+                "Cache sectorial '%s': globales=%s regionales=%s startups=%s",
+                sector_run_key,
+                globales is not None,
+                regionales is not None,
+                startups is not None,
+            )
+        return globales, regionales, startups
+    except Exception:
+        logger.debug("Cache sectorial no disponible para '%s'", sector_run_key, exc_info=True)
+        return None, None, None
 
 # Bloque cercado del radar emitido al final de la respuesta del LLM (T16.1).
 # Tolera etiquetas de lenguaje variables: ```radar_json, ```json o ``` a secas (T22.2, DT-027).
@@ -118,6 +166,9 @@ class GenerateBenchmarking:
         holefill_max: int = 0,
         jugadores_use_case: Generate21Jugadores | None = None,
         sectores_ancla: list[str] | None = None,
+        sub_gics: str | None = None,
+        engine=None,
+        run_key: str | None = None,
     ) -> None:
         self._chain = chain
         self._store = store
@@ -150,6 +201,9 @@ class GenerateBenchmarking:
         self._holefill_max = holefill_max
         self._jugadores_use_case = jugadores_use_case
         self._sectores_ancla = sectores_ancla or []
+        self._sub_gics = sub_gics
+        self._engine = engine
+        self._run_key = run_key
 
     def _identificar_entidades(self, chunks, sector_gics: str) -> list[str]:
         """Entidades competidoras a explotar: KB (canónico) + las ancladas en la evidencia.
@@ -348,6 +402,17 @@ class GenerateBenchmarking:
         seccion_21_md = ""
         if self._jugadores_use_case is not None:
             try:
+                # T037: clave de cache sectorial para reusar sub-módulos de corridas previas
+                # del mismo (sector_gics_code, sub_gics) sin repetir búsquedas web (SC-005).
+                sector_run_key = (
+                    f"sector_{sector_gics_code}_{self._sub_gics or 'any'}"
+                    if sector_gics_code else None
+                )
+                cached_globales = cached_regionales = cached_startups = None
+                if self._engine is not None and sector_run_key is not None:
+                    cached_globales, cached_regionales, cached_startups = (
+                        _load_sector_cache(self._engine, sector_run_key)
+                    )
                 cap21 = self._jugadores_use_case.execute(
                     nombre_empresa=nombre_empresa,
                     descripcion_empresa=descripcion_empresa,
@@ -355,6 +420,11 @@ class GenerateBenchmarking:
                     sector_gics_code=sector_gics_code,
                     sectores_ancla=self._sectores_ancla or [sector_gics_code or sector_gics],
                     empresa_id=empresa_id,
+                    cached_globales=cached_globales,
+                    cached_regionales=cached_regionales,
+                    cached_startups=cached_startups,
+                    engine=self._engine,
+                    run_key=sector_run_key,
                 )
                 if cap21.retrieval_suficiente:
                     seccion_21_md = cap21.texto

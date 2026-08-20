@@ -10,14 +10,13 @@ from __future__ import annotations
 import logging
 import uuid
 
-from langchain_core.runnables import Runnable
-
 from ic.data.repositories.entidad_repo import EntidadRepository, _clave_exclusion
 from ic.domain.absent_data import build_absent_paragraph
 from ic.domain.chains.chain_03_benchmarking import format_chunks_as_context
 from ic.domain.kb.relevance import LocalRow
 from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
 from ic.infrastructure.sources.web_connector import WebConnector
+from ic.shared.protocols import InvokableChain as Runnable
 from ic.shared.types import Cap21Startups, ChunkResult
 
 logger = logging.getLogger(__name__)

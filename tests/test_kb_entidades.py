@@ -206,12 +206,15 @@ def _row(
 
 
 def _local_row(
-    nombre, desc="", tam=0, ciudad=None, vertical=None, segmento=None, verificado=True
+    nombre, desc="", tam=0, ciudad=None, vertical=None, segmento=None, verificado=True,
+    ventas_cop=None, n_menciones=0,
 ):
     """Tupla en el orden del SELECT de list_locales_by_sector:
-    (nombre, ciudad, vertical, ingreso, segmento, verificado, tam, descripcion, prod_perfil).
+    (nombre, ciudad, vertical, ingreso, segmento, verificado, tam, descripcion,
+     prod_perfil, ventas_cop, n_menciones).
     """
-    return (nombre, ciudad, vertical, None, segmento, verificado, tam, None, desc)
+    return (nombre, ciudad, vertical, None, segmento, verificado, tam, None, desc,
+            ventas_cop, n_menciones)
 
 
 def test_list_competidores_sin_productos_ordena_por_evidencia():

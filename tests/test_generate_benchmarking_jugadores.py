@@ -103,3 +103,43 @@ def test_fallback_a_kb_assembler_si_jugadores_falla():
     assert isinstance(result, CapBenchmarking)
     assert jugadores.called
     assert result.texto  # sigue produciendo texto aunque falle el sub-módulo
+
+
+def test_sector_cache_hit_evita_reejecutar_submodulos():
+    """T042: cached_globales no-None se pasa a jugadores.execute cuando hay sector cache hit (SC-005)."""
+    from unittest.mock import patch
+
+    from ic.shared.types import Cap21Globales
+
+    cached_globales = Cap21Globales(
+        texto="### Referentes Globales\n\nNestlé.",
+        candidatos=["Nestlé"],
+        n_candidatos_con_web=1,
+        retrieval_suficiente=True,
+    )
+
+    jugadores = _FakeJugadoresUseCase(result=_cap21_suficiente())
+    uc = GenerateBenchmarking(
+        chain=_FakeChain(),
+        store=_FakeStore(),
+        web_connector=_FakeWebConnector(),
+        jugadores_use_case=jugadores,
+        engine=object(),  # engine no-None activa el lookup de cache sectorial
+        sub_gics="30201010",
+    )
+
+    with patch(
+        "ic.domain.use_cases.generate_benchmarking._load_sector_cache",
+        return_value=(cached_globales, None, None),
+    ):
+        uc.execute(
+            nombre_empresa="Alpina",
+            descripcion_empresa="Empresa láctea",
+            sector_gics="Alimentos",
+            sector_gics_code="3020",
+        )
+
+    assert jugadores.called
+    assert jugadores.last_kwargs.get("cached_globales") is cached_globales
+    assert jugadores.last_kwargs.get("cached_regionales") is None
+    assert jugadores.last_kwargs.get("cached_startups") is None

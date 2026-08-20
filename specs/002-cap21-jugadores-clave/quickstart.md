@@ -109,12 +109,37 @@ uv run pytest tests/test_generate_21_jugadores.py -v
 **Objetivo**: Verificar que el refactor de 2.1 no rompe el flujo existente de Cap 2.
 
 ```bash
-uv run pytest tests/test_generate_benchmarking.py -v
+uv run pytest tests/test_generate_benchmarking.py tests/test_generate_benchmarking_jugadores.py -v
 
 # Resultado esperado: todos los tests existentes PASAN sin modificación
 # El orquestador generate_21_jugadores debe ser invocable desde generate_benchmarking
 # sin cambios en la interfaz pública de CapBenchmarking
 ```
+
+**Firma real del orquestador** (T040 — FR-012 clarificación 2026-08-20):
+
+`Generate21Jugadores.execute()` acepta `engine` y `run_key` como parámetros opcionales del
+**método** (no del constructor), lo que permite al llamador usar claves distintas por corrida
+(ej. cache sectorial usa `run_key=f"sector_{code}_{sub}"`, corrida principal usa el run_key del pipeline):
+
+```python
+cap21 = jugadores_use_case.execute(
+    nombre_empresa=...,
+    sector_gics=...,
+    sector_gics_code=...,
+    sectores_ancla=...,
+    empresa_id=...,
+    # Parámetros opcionales de persistencia:
+    cached_globales=None,   # inyectar si ya hay cache sectorial
+    cached_regionales=None,
+    cached_startups=None,
+    engine=engine,          # None → persistencia omitida silenciosamente
+    run_key="sector_3020_any",  # run_key compuesto por sector (SC-005)
+)
+```
+
+`GenerateBenchmarking` recibe `engine`, `run_key` y `sub_gics` en su **constructor** y los inyecta
+automáticamente en cada llamada a `jugadores_use_case.execute()` (T036/T037).
 
 ---
 

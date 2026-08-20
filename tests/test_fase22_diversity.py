@@ -40,6 +40,7 @@ class _FakeRepo:
         self, _vec, top_k, _threshold, _empresa_id=None, sector_gics=None,
         solo_activos=True, max_chunks_per_doc=None, sector_estricto=False,
         global_estricto=False, empresa_estricto=False, mmr_lambda=1.0,
+        fuente_tipo_filter=None,
     ) -> list[tuple]:
         if sector_estricto or global_estricto or empresa_estricto:
             return []

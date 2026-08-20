@@ -91,6 +91,9 @@ class Generate21Jugadores:
         cached_globales: Cap21Globales | None = None,
         cached_regionales: Cap21Regionales | None = None,
         cached_startups: Cap21Startups | None = None,
+        # engine y run_key van en execute() (no en __init__) para que el llamador pueda usar
+        # claves distintas por corrida: cache sectorial → f"sector_{code}_{sub}"; corrida principal
+        # → ctx.run_key. Constructor injection haría imposible esta diferenciación (FR-012).
         engine=None,
         run_key: str | None = None,
     ) -> Cap21Jugadores:
