@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Callable
 
 from ic.data.repositories.entidad_repo import EntidadRepository, _clave_exclusion
 from ic.domain.absent_data import build_absent_paragraph
@@ -21,7 +22,7 @@ from ic.shared.types import Cap21Startups, ChunkResult
 
 logger = logging.getLogger(__name__)
 
-_HEADING = "### Startups y Disruptores del sector"
+_HEADING = "### 2.1.3. Startups y Disruptores del sector"
 _SECTION_LABEL = "Startups y Disruptores del sector"
 
 
@@ -39,7 +40,8 @@ class Generate21Startups:
         chain_perfil: Runnable,
         store: PGVectorStore,
         web_connector: WebConnector,
-        entidad_repo: EntidadRepository,
+        entidad_repo: EntidadRepository | None = None,
+        db_factory: Callable | None = None,
         max_locales: int = 3,
         max_internacionales: int = 2,
     ) -> None:
@@ -47,6 +49,7 @@ class Generate21Startups:
         self._store = store
         self._web = web_connector
         self._entidad_repo = entidad_repo
+        self._db_factory = db_factory
         self._max_locales = max_locales
         self._max_internacionales = max_internacionales
 
@@ -60,12 +63,24 @@ class Generate21Startups:
         empresa_id: uuid.UUID | None,
     ) -> Cap21Startups:
         # 1. Startups locales desde StartIA
-        filas_locales: list[LocalRow] = self._entidad_repo.list_locales_by_sector(
-            sectores_ancla,
-            segmento="startup",
-            limit=self._max_locales,
-            exclude_nombre=nombre_empresa,
-        )
+        if self._db_factory is not None:
+            with self._db_factory() as _db:
+                _repo = EntidadRepository(_db)
+                filas_locales: list[LocalRow] = _repo.list_locales_by_sector(
+                    sectores_ancla,
+                    segmento="startup",
+                    limit=self._max_locales,
+                    exclude_nombre=nombre_empresa,
+                )
+        elif self._entidad_repo is not None:
+            filas_locales = self._entidad_repo.list_locales_by_sector(
+                sectores_ancla,
+                segmento="startup",
+                limit=self._max_locales,
+                exclude_nombre=nombre_empresa,
+            )
+        else:
+            filas_locales = []
         nombres_locales = [r.nombre for r in filas_locales]
 
         # 2. Claves de dedup (locales)

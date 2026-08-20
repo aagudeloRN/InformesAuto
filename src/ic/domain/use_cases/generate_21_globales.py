@@ -21,7 +21,7 @@ from ic.shared.types import Cap21Globales, ChunkResult
 logger = logging.getLogger(__name__)
 
 _MIN_CHUNKS = 3
-_HEADING = "### Referentes Globales"
+_HEADING = "### 2.1.1. Referentes Globales"
 _SECTION_LABEL = "Referentes Globales"
 
 

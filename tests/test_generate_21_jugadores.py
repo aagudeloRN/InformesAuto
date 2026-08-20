@@ -159,3 +159,30 @@ def test_ausencia_total_si_todos_fallan():
     # Sin los tres sub-encabezados ###
     assert "### Referentes Globales" not in result.texto
     assert "Dato no disponible" in result.texto or "## 2.1." in result.texto
+
+
+def test_subseccion_ausente_excluida_del_texto_ensamblado():
+    """FR-006 / US1/AC2: sub-módulo con retrieval_suficiente=False no produce sub-encabezado."""
+    # Caso A: Regionales ausentes — 2.1.2 no debe aparecer; 2.1.1 y 2.1.3 sí
+    orch_a, _, _, _ = _make_orchestrator(
+        globales_result=_globales("### 2.1.1. Referentes Globales\n\nNestlé."),
+        regionales_result=_ausente_regionales(),
+        startups_result=_startups("### 2.1.3. Startups y Disruptores del sector\n\nStartupCo."),
+    )
+    res_a = orch_a.execute(**_EXECUTE_KWARGS)
+    assert res_a.retrieval_suficiente is True
+    assert "### 2.1.1. Referentes Globales" in res_a.texto
+    assert "### 2.1.2." not in res_a.texto, "Heading ausente no debe aparecer"
+    assert "### 2.1.3. Startups y Disruptores del sector" in res_a.texto
+
+    # Caso B: Startups ausentes — 2.1.3 no debe aparecer; 2.1.1 y 2.1.2 sí
+    orch_b, _, _, _ = _make_orchestrator(
+        globales_result=_globales("### 2.1.1. Referentes Globales\n\nNestlé."),
+        regionales_result=_regionales("### 2.1.2. Referentes Regionales LatAm/Colombia\n\nNutresa."),
+        startups_result=_ausente_startups(),
+    )
+    res_b = orch_b.execute(**_EXECUTE_KWARGS)
+    assert res_b.retrieval_suficiente is True
+    assert "### 2.1.1. Referentes Globales" in res_b.texto
+    assert "### 2.1.2. Referentes Regionales LatAm/Colombia" in res_b.texto
+    assert "### 2.1.3." not in res_b.texto, "Heading ausente no debe aparecer"

@@ -21,7 +21,7 @@ from ic.shared.types import Cap21Regionales, ChunkResult
 logger = logging.getLogger(__name__)
 
 _MIN_CHUNKS_EMIS = 3
-_HEADING = "### Referentes Regionales LatAm/Colombia"
+_HEADING = "### 2.1.2. Referentes Regionales LatAm/Colombia"
 _SECTION_LABEL = "Referentes Regionales LatAm/Colombia"
 
 # Patrón simple para extraer nombres de empresa de texto de chunk (heurístico, no NER completo)

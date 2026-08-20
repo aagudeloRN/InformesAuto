@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 def run_n1_parallel(ctx: _PipelineContext) -> None:
     """Ejecuta Caps 2/3/4 en paralelo + párrafos introductivos N1."""
     from ic.data.database import SessionLocal
+    from ic.data.database import engine as db_engine
     from ic.data.models.entidad import (
         ALCANCE_GLOBAL,
         ESTADO_CANDIDATO,
@@ -38,6 +39,9 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     from ic.domain.chains.chain_03b_mercado import build_chain_03b
     from ic.domain.chains.chain_04_tendencias import build_chain_04
     from ic.domain.chains.chain_05_ecosistema import build_chain_05
+    from ic.domain.chains.chain_cap2_21_globales import build_chain_cap2_21_globales
+    from ic.domain.chains.chain_cap2_21_regionales import build_chain_cap2_21_regionales
+    from ic.domain.chains.chain_cap2_21_startups import build_chain_cap2_21_startups
     from ic.domain.chains.chain_judge import CRITERIOS_CAPITULO
     from ic.domain.kb.ficha_parser import (
         TIER_GLOBAL,
@@ -47,6 +51,10 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     )
     from ic.domain.kb.relevance import format_fichas_conocidas, format_jugadores_locales
     from ic.domain.use_cases.discover_globales import DiscoverGlobales
+    from ic.domain.use_cases.generate_21_globales import Generate21Globales
+    from ic.domain.use_cases.generate_21_jugadores import Generate21Jugadores
+    from ic.domain.use_cases.generate_21_regionales import Generate21Regionales
+    from ic.domain.use_cases.generate_21_startups import Generate21Startups
     from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
     from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
     from ic.domain.use_cases.generate_mercado import GenerateMercado
@@ -306,6 +314,26 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 logger.warning(
                     "No se pudo construir la cadena de escalada (tier=%s)", tier
                 )
+        llm_21 = ctx.api_llm or ctx.llm
+        jugadores_use_case = Generate21Jugadores(
+            gen_globales=Generate21Globales(
+                chain_candidatos=build_chain_pares_globales(llm_21),
+                chain_perfil=build_chain_cap2_21_globales(llm_21),
+                store=store,
+                web_connector=web,
+            ),
+            gen_regionales=Generate21Regionales(
+                chain_perfil=build_chain_cap2_21_regionales(llm_21),
+                store=store,
+                web_connector=web,
+            ),
+            gen_startups=Generate21Startups(
+                chain_perfil=build_chain_cap2_21_startups(llm_21),
+                store=store,
+                web_connector=web,
+                db_factory=SessionLocal,
+            ),
+        )
         cap = GenerateBenchmarking(
             chain=build_chain_03(ctx.api_llm or ctx.llm, omitir_21=b2_on),
             store=store,
@@ -321,6 +349,9 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
             fichas_kb=fichas_kb,
             holes_chain=holes_chain,
             holefill_max=s.seccion21_holefill_max,
+            jugadores_use_case=jugadores_use_case,
+            engine=db_engine,
+            sub_gics=g_code,
         ).execute(
             nombre_empresa=e,
             descripcion_empresa=ctx.empresa.texto,
