@@ -84,6 +84,7 @@ class _PipelineContext:
     cap_eco: Any = None
     cap_conv: Any = None
     cap_acc: Any = None
+    cap22_division: Any = None  # Cap 2.2 generado en _fn_cap2_with_22 de generate_n1
     resumen: Any = None
     cache_web_counter: Any = None
     cache_oal_counter: Any = None
@@ -526,6 +527,7 @@ class GenerateInforme:
         informe = InformePiloto(
             empresa=ctx.empresa, gics=ctx.gics, cap_benchmarking=ctx.cap,
             cap_mercado=ctx.cap_mercado,
+            cap_22_division=ctx.cap22_division,
             cap_tendencias=ctx.cap_tend, cap_ecosistema=ctx.cap_eco,
             cap_convergencia=ctx.cap_conv, cap_accionables=ctx.cap_acc,
             resumen_ejecutivo=ctx.resumen, referencias=refs,

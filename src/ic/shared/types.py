@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from enum import Enum
 
 
 @dataclass
@@ -57,6 +58,32 @@ class Referencia:
     fuente: str
     url: str | None
     apa_string: str
+
+
+class CuadranteKey(str, Enum):
+    """Identificadores internos de los cuatro cuadrantes de la matriz 2×2 de Cap 2.2."""
+    MASIVO_TRADICIONAL = "masivo_tradicional"
+    MASIVO_INNOVADOR   = "masivo_innovador"
+    NICHO_TRADICIONAL  = "nicho_tradicional"
+    NICHO_INNOVADOR    = "nicho_innovador"
+
+
+@dataclass
+class ClasificacionCompetidor:
+    """Asignación de un competidor de Cap 2.1 a uno de los cuatro cuadrantes."""
+    nombre: str
+    cuadrante: CuadranteKey
+    dato_no_disponible: bool = False
+
+
+@dataclass
+class Cap22Division:
+    """Resultado completo del subcapítulo 2.2 División de Competidores."""
+    texto: str
+    clasificaciones: list["ClasificacionCompetidor"]
+    n_empresas_procesadas: int
+    retrieval_suficiente: bool
+    warnings_nombres_ajenos: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -160,6 +187,7 @@ class InformePiloto:
     empresa: DescripcionEmpresa
     gics: ClasificacionGICS
     cap_benchmarking: CapBenchmarking
+    cap_22_division: "Cap22Division | None" = None
     cap_mercado: "CapMercado | None" = None
     cap_tendencias: "CapTendencias | None" = None
     cap_ecosistema: "CapEcosistema | None" = None

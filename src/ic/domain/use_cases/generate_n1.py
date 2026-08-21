@@ -455,9 +455,10 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
 
     # T22.3 (DT-030): --resume salta los caps ya persistidos; solo se computan los faltantes.
     from ic.domain.use_cases import checkpoint_hooks
+    from ic.domain.use_cases.generate_n1_cap22 import build_fn_cap2_with_22
 
     _fns = {
-        "cap2": _fn_cap2,
+        "cap2": build_fn_cap2_with_22(_fn_cap2, ctx),
         "mercado": _fn_mercado,
         "cap3": _fn_cap3,
         "cap4": _fn_cap4,

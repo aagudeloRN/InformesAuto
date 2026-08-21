@@ -15,6 +15,7 @@ from ic.shared.types import (
     Cap21Jugadores,
     Cap21Regionales,
     Cap21Startups,
+    Cap22Division,
     CapAccionables,
     CapBenchmarking,
     CapConvergencia,
@@ -22,7 +23,9 @@ from ic.shared.types import (
     CapMercado,
     CapTendencias,
     ChunkResult,
+    ClasificacionCompetidor,
     ClasificacionGICS,
+    CuadranteKey,
     DescripcionEmpresa,
 )
 
@@ -42,6 +45,7 @@ _REGISTRY: dict[str, type] = {
         Cap21Regionales,
         Cap21Startups,
         Cap21Jugadores,
+        Cap22Division,
     )
 }
 
@@ -72,4 +76,14 @@ def deserialize_cap(payload: dict):
     chunks = data.get("chunks_usados")
     if chunks:
         data["chunks_usados"] = [ChunkResult(**c) for c in chunks]
+    if tname == "Cap22Division":
+        raw_clases = data.get("clasificaciones") or []
+        data["clasificaciones"] = [
+            ClasificacionCompetidor(
+                nombre=c["nombre"],
+                cuadrante=CuadranteKey(c["cuadrante"]),
+                dato_no_disponible=c.get("dato_no_disponible", False),
+            )
+            for c in raw_clases
+        ]
     return cls(**data)

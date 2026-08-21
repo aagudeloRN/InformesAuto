@@ -50,6 +50,30 @@ _AVISO_IA_PARRAFOS = (
 )
 
 
+def _replace_section(blocks: list, replace_with: list, prefix: str) -> list:
+    """Reemplaza la sección cuyo Heading empieza por `prefix` con `replace_with`.
+
+    Si no se encuentra el ancla, `replace_with` se añade al final. Usado para
+    sustituir el stub LLM de § 2.2 por el contenido generado por Cap22Division
+    sin duplicar el heading (T030, FR-013).
+    """
+    start = None
+    end = None
+    for i, blk in enumerate(blocks):
+        if start is None:
+            if isinstance(blk, Heading) and blk.text.lstrip().startswith(prefix):
+                start = i
+        else:
+            if isinstance(blk, Heading) and blk.level <= blocks[start].level:
+                end = i
+                break
+    if start is None:
+        return blocks + replace_with
+    if end is None:
+        return blocks[:start] + replace_with
+    return blocks[:start] + replace_with + blocks[end:]
+
+
 def _insert_before_subheading(blocks: list, insert: list, prefix: str) -> list:
     """Inserta `insert` justo antes del primer Heading cuyo texto empiece por `prefix`.
 
@@ -90,6 +114,12 @@ class PilotAssembler:
         blocks.append(Heading("Capítulo 2. Análisis Competitivo", level=2))
         if informe.cap_benchmarking.retrieval_suficiente:
             bench_blocks = parse_markdown(informe.cap_benchmarking.texto)
+            # Cap 2.2: reemplaza el stub LLM con el contenido generado (T030, FR-013).
+            cap_22 = getattr(informe, "cap_22_division", None)
+            if cap_22 is not None:
+                bench_blocks = _replace_section(
+                    bench_blocks, parse_markdown(cap_22.texto), prefix="2.2"
+                )
             # 2.3 Mercado (T21.6, DT-044): se intercala entre 2.2 y 2.4 dentro del Cap 2.
             cap_mercado = getattr(informe, "cap_mercado", None)
             if cap_mercado is not None and cap_mercado.retrieval_suficiente:
