@@ -1,4 +1,4 @@
-"""LLM Gateway - Ollama y OpenRouter como BaseChatModel de LangChain (ADR-002, DT-037)."""
+"""LLM Gateway - Ollama y OpenRouter como BaseChatModel de LangChain (Tiers & Resiliency)."""
 
 from __future__ import annotations
 
@@ -32,35 +32,29 @@ ModelTier = Literal["free", "free_alt", "synth", "paid", "fallback"]
 
 
 def _provider_base_and_key(
-    provider: str,
-    settings: Settings,
+    provider_or_settings: str | Settings,
+    settings_or_provider: Settings | str,
     model: str | None = None,
-) -> tuple[str, str, str | None]:
-    """Resuelve base_url, api_key y headers extra para un provider."""
+) -> tuple[str, str]:
+    """Resuelve base_url y api_key para un provider."""
+    if isinstance(provider_or_settings, Settings):
+        settings = provider_or_settings
+        provider = str(settings_or_provider).lower()
+    else:
+        provider = str(provider_or_settings).lower()
+        settings = settings_or_provider  # type: ignore
+
     if provider == "ollama":
-        return settings.ollama_base_url, "ollama", None
+        return getattr(settings, "ollama_base_url", "http://localhost:11434"), "ollama"
 
-    if provider == "google":
-        base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
-        api_key = settings.gemini_api_key or ""
-        return base_url, api_key, None
+    if provider in ("google", "gemini"):
+        base_url = getattr(settings, "gemini_base_url", "https://generativelanguage.googleapis.com/v1beta/openai/")
+        api_key = getattr(settings, "gemini_api_key", "") or ""
+        return base_url, api_key
 
-    if provider == "openrouter":
-        base_url = "https://openrouter.ai/api/v1"
-        api_key = settings.openrouter_api_key or ""
-        headers: dict[str, str] = {}
-        if settings.openrouter_referer:
-            headers["HTTP-Referer"] = settings.openrouter_referer
-        if settings.openrouter_title:
-            headers["X-Title"] = settings.openrouter_title
-        header_str = (
-            ",".join(f"{k}:{v}" for k, v in headers.items()) if headers else None
-        )
-        return base_url, api_key, header_str
-
-    base_url = "https://openrouter.ai/api/v1"
-    api_key = settings.openrouter_api_key or ""
-    return base_url, api_key, None
+    base_url = getattr(settings, "openrouter_base_url", "https://openrouter.ai/api/v1")
+    api_key = getattr(settings, "openrouter_api_key", "") or ""
+    return base_url, api_key
 
 
 def build_llm(
@@ -69,10 +63,12 @@ def build_llm(
     timeout: float = 120.0,
 ) -> OllamaGatewayLLM:
     """Retorna un OllamaGatewayLLM configurado para el modelo local."""
+    model_name = getattr(settings, "llm_local_analytic_model", "mistral:7b")
+    temp = getattr(settings, "llm_temperature", 0.0)
     return OllamaGatewayLLM(
-        base_url=settings.ollama_base_url,
-        model=settings.ollama_model,
-        temperature=settings.llm_temperature,
+        base_url=getattr(settings, "ollama_base_url", "http://localhost:11434"),
+        model=str(model_name),
+        temperature=float(temp) if isinstance(temp, (int, float)) else 0.0,
         timeout=timeout,
         cost_tracker=cost_tracker,
     )
@@ -90,48 +86,116 @@ def build_api_llm(
         model = model_override
         provider = "google" if "gemini" in model.lower() else "openrouter"
     elif tier == "free_alt":
-        model = settings.openrouter_free_alt_model
-        provider = "openrouter"
+        model = getattr(settings, "llm_api_free_alt_model", "")
+        provider = getattr(settings, "llm_api_free_alt_provider", "openrouter")
     elif tier == "synth":
-        model = settings.gemini_synth_model
-        provider = settings.synth_provider
+        model = getattr(settings, "llm_api_synth_model", "")
+        provider = getattr(settings, "llm_api_synth_provider", "openrouter")
     elif tier == "paid":
-        model = settings.openrouter_model
-        provider = "openrouter"
+        model = getattr(settings, "llm_api_paid_model", "")
+        provider = getattr(settings, "llm_api_paid_provider", "openrouter")
     elif tier == "fallback":
-        model = settings.gemini_model
-        provider = settings.fallback_provider
+        model = getattr(settings, "llm_api_fallback_model", "")
+        provider = getattr(settings, "llm_api_fallback_provider", "openrouter")
     else:
-        model = settings.openrouter_free_model
-        provider = "openrouter"
+        model = getattr(settings, "llm_api_free_model", "")
+        provider = getattr(settings, "llm_api_free_provider", "openrouter")
 
-    base_url, api_key, headers = _provider_base_and_key(
+
+    if not model or not isinstance(model, str):
+        raise ValueError(f"Tier {tier!r} no configurado en .env")
+
+    base_url, api_key = _provider_base_and_key(
         provider, settings, model=model
     )
+    headers_str: str | None = None
+    if provider == "openrouter":
+        hdrs: dict[str, str] = {}
+        ref = (getattr(settings, "llm_openrouter_referer", "")
+           or getattr(settings, "openrouter_referer", ""))
+        if ref:
+            hdrs["HTTP-Referer"] = ref
+        title = (getattr(settings, "llm_openrouter_title", "")
+             or getattr(settings, "openrouter_title", ""))
+        if title:
+            hdrs["X-Title"] = title
+        if hdrs:
+            headers_str = ",".join(f"{k}:{v}" for k, v in hdrs.items())
+
+    max_tokens = getattr(settings, "llm_api_max_tokens_output", None)
+    if max_tokens is not None and not isinstance(max_tokens, int):
+        try:
+            max_tokens = int(max_tokens)
+        except (ValueError, TypeError):
+            max_tokens = None
+
+    temp = getattr(settings, "llm_temperature", 0.0)
     return OpenRouterGatewayLLM(
         base_url=base_url,
         api_key=api_key,
         model=model,
-        temperature=settings.llm_temperature,
+        temperature=float(temp) if isinstance(temp, (int, float)) else 0.0,
         timeout=timeout,
         cost_tracker=cost_tracker,
-        extra_headers=headers,
+        extra_headers=headers_str,
+        max_tokens_output=max_tokens,
     )
 
 
 def build_resilient_api_llm(
-    primary: OpenRouterGatewayLLM,
-    fallback: OpenRouterGatewayLLM,
-    max_retries: int = 2,
-    base_backoff: float = 1.0,
+    settings: Settings,
+    cost_tracker: CostTracker | None = None,
+    tiers: list[ModelTier] | None = None,
+    fallback: OpenRouterGatewayLLM | None = None,
+    max_retries: int | None = None,
 ) -> ResilientChatModel:
-    """Construye un ResilientChatModel con reintentos y fallback."""
-    return ResilientChatModel(
-        primary=primary,
-        fallback=fallback,
-        max_retries=max_retries,
-        base_backoff=base_backoff,
+    """Construye un ResilientChatModel a partir de los tiers configurados en Settings."""
+    target_tiers: list[ModelTier] = (
+        ["free", "free_alt", "synth", "paid"] if tiers is None else list(tiers)
     )
+
+    constructed_tiers: list[OpenRouterGatewayLLM] = []
+    for tier in target_tiers:
+        if tier == "free":
+            model_name = getattr(settings, "llm_api_free_model", "")
+            if isinstance(model_name, str) and model_name:
+                t = getattr(settings, "llm_api_timeout_free", 120.0)
+                t_val = float(t) if isinstance(t, (int, float)) else 120.0
+                constructed_tiers.append(
+                    build_api_llm(settings, tier="free", cost_tracker=cost_tracker, timeout=t_val)
+                )
+        elif tier == "free_alt":
+            model_name = getattr(settings, "llm_api_free_alt_model", "")
+            if isinstance(model_name, str) and model_name:
+                constructed_tiers.append(
+                    build_api_llm(settings, tier="free_alt", cost_tracker=cost_tracker)
+                )
+        elif tier == "synth":
+            model_name = getattr(settings, "llm_api_synth_model", "")
+            if isinstance(model_name, str) and model_name:
+                t = getattr(settings, "llm_api_timeout_synth", 120.0)
+                t_val = float(t) if isinstance(t, (int, float)) else 120.0
+                constructed_tiers.append(
+                    build_api_llm(settings, tier="synth", cost_tracker=cost_tracker, timeout=t_val)
+                )
+        elif tier == "paid":
+            model_name = getattr(settings, "llm_api_paid_model", "")
+            if isinstance(model_name, str) and model_name:
+                constructed_tiers.append(
+                    build_api_llm(settings, tier="paid", cost_tracker=cost_tracker)
+                )
+
+    fallback_model = getattr(settings, "llm_api_fallback_model", "")
+    if isinstance(fallback_model, str) and fallback_model:
+        fb_tier = build_api_llm(settings, tier="fallback", cost_tracker=cost_tracker)
+        if not any(t.model == fallback_model for t in constructed_tiers):
+            constructed_tiers.append(fb_tier)
+
+
+    if fallback is not None and not any(t.model == fallback.model for t in constructed_tiers):
+        constructed_tiers.append(fallback)
+
+    return ResilientChatModel(tiers=constructed_tiers)
 
 
 __all__ = [
@@ -144,10 +208,10 @@ __all__ = [
     "OpenRouterGatewayLLM",
     "RateLimitError",
     "ResilientChatModel",
+    "_provider_base_and_key",
     "build_api_llm",
     "build_llm",
     "build_resilient_api_llm",
-    "httpx",
     "is_empty_generation_error",
     "is_rate_limit_error",
     "is_transient_network_error",

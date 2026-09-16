@@ -1,12 +1,14 @@
-# LEGACY: investigar — este archivo supera el límite de 300 líneas (Constitution I, SoC).
-# Split mínimo propuesto: extraer `_load_sector_cache` + lógica Cap 2.1 modular
-# (jugadores_use_case / sector_run_key) a `_benchmarking_jugadores.py` en este mismo paquete.
-# Requiere decisión explícita del humano antes de ejecutar el refactor (Chesterton's Fence).
+"""Caso de uso: Generar Capitulo 2 - Analisis Competitivo (Benchmarking).
+
+Genera el analisis competitivo y benchmarking para la empresa objetivo.
+La seccion 2.1 (Jugadores Clave) se delega a Generate21Jugadores o se ensambla
+directamente desde el Knowledge Base.
+"""
+
 from __future__ import annotations
 
-import json
 import logging
-import re
+from typing import TYPE_CHECKING, Any
 
 from ic.domain.absent_data import build_absent_paragraph, check_retrieval_sufficient
 from ic.domain.chains.chain_02b_entidades import MAX_ENTIDADES, parse_entidades
@@ -14,137 +16,30 @@ from ic.domain.chains.chain_03_benchmarking import format_chunks_as_context
 from ic.domain.kb.relevance import format_referentes_globales
 from ic.domain.kb.seccion21_assembler import assemble_seccion_21
 from ic.domain.kb.seccion21_holes import fill_holes
-from ic.domain.use_cases.generate_21_jugadores import Generate21Jugadores
-from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
-from ic.infrastructure.sources.web_connector import WebConnector
+from ic.domain.use_cases._benchmarking_matrix import (
+    enriquecer_globales_web,
+)
+from ic.domain.use_cases._benchmarking_matrix import (
+    load_sector_cache as _load_sector_cache,
+)
 from ic.shared.protocols import InvokableChain as Runnable
 from ic.shared.text_utils import has_cjk_characters, is_llm_refusal
 from ic.shared.types import CapBenchmarking
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Engine
+
+    from ic.domain.use_cases.generate_21_jugadores import Generate21Jugadores
+    from ic.infrastructure.retrieval.pgvector_store import PGVectorStore
+    from ic.infrastructure.sources.web_connector import WebConnector
 
 logger = logging.getLogger(__name__)
 
 _MIN_CHUNKS = 5
 
 
-def _load_sector_cache(engine, sector_run_key: str):
-    """Carga los tres sub-módulos de 2.1 desde el cache sectorial (SC-005, T037).
-
-    Usa el run_key compuesto `sector_{sector_gics_code}_{sub_gics}` para recuperar
-    resultados de corridas previas del mismo sector. Best-effort: cualquier fallo
-    devuelve (None, None, None) y la corrida continúa sin cache.
-    """
-    try:
-        from sqlalchemy.orm import Session
-
-        from ic.data.models.checkpoint import ensure_checkpoint_table
-        from ic.data.repositories.checkpoint_repo import CheckpointRepository
-        from ic.domain.checkpoint_serde import deserialize_cap
-
-        ensure_checkpoint_table(engine)
-        with Session(engine) as db:
-            repo = CheckpointRepository(db)
-            caps = repo.load_capitulos(sector_run_key)
-
-        def _deserialize(nombre):
-            payload = caps.get(nombre)
-            if payload is None:
-                return None
-            try:
-                return deserialize_cap(payload)
-            except Exception:
-                return None
-
-        globales = _deserialize("cap2_21_globales")
-        regionales = _deserialize("cap2_21_regionales")
-        startups = _deserialize("cap2_21_startups")
-        if any(x is not None for x in (globales, regionales, startups)):
-            logger.info(
-                "Cache sectorial '%s': globales=%s regionales=%s startups=%s",
-                sector_run_key,
-                globales is not None,
-                regionales is not None,
-                startups is not None,
-            )
-        return globales, regionales, startups
-    except Exception:
-        logger.debug("Cache sectorial no disponible para '%s'", sector_run_key, exc_info=True)
-        return None, None, None
-
-
-# Bloque cercado del radar emitido al final de la respuesta del LLM (T16.1).
-# Tolera etiquetas de lenguaje variables: ```radar_json, ```json o ``` a secas (T22.2, DT-027).
-_RADAR_RE = re.compile(r"```(?:radar_json|json)?\s*(.*?)```", re.DOTALL)
-# Coma colgante antes de } o ] (error de formato frecuente del LLM local).
-_TRAILING_COMMA_RE = re.compile(r",(\s*[}\]])")
-
-
-def _find_balanced_object(texto: str, needle: str) -> str | None:
-    """Devuelve el objeto JSON balanceado ({...}) que contiene `needle`, o None.
-
-    Escaneo puro de llaves para tolerar objetos anidados sin fences (T22.2).
-    No fabrica datos: solo delimita un objeto ya presente en el texto.
-    """
-    pos = texto.find(needle)
-    if pos == -1:
-        return None
-    start = texto.rfind("{", 0, pos)
-    if start == -1:
-        return None
-    depth = 0
-    for i in range(start, len(texto)):
-        if texto[i] == "{":
-            depth += 1
-        elif texto[i] == "}":
-            depth -= 1
-            if depth == 0:
-                return texto[start : i + 1]
-    return None
-
-
-def _try_parse_radar(raw_json: str) -> dict | None:
-    """Parsea un objeto JSON del radar, tolerando comas colgantes. Nunca fabrica datos.
-
-    Parseo laxo (cualquier dict): la validación de claves la hace el pipeline aguas
-    abajo (contrato T16.1). Devuelve None solo si no hay JSON parseable.
-    """
-    for candidate in (raw_json, _TRAILING_COMMA_RE.sub(r"\1", raw_json)):
-        try:
-            data = json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(data, dict):
-            return data
-    return None
-
-
-def _extract_radar(texto: str) -> tuple[str, dict | None]:
-    """Extrae el bloque radar_json del texto del LLM y devuelve (texto_limpio, datos).
-
-    Si el bloque no existe o es inválido, devuelve (texto_original, None).
-    Tolera etiquetas de lenguaje del fence, comas colgantes y bloques sin fence (T22.2).
-    El bloque cercado se retira de la prosa aunque el JSON no sea parseable.
-    """
-    m = _RADAR_RE.search(texto)
-    if m:
-        clean = texto[: m.start()].rstrip()
-        data = _try_parse_radar(m.group(1).strip())
-        if data is not None:
-            return clean, data
-        logger.warning(
-            "radar_json no parseable — fallback a placeholder. Raw: %r", m.group(1)[:120]
-        )
-        return clean, None
-    # Fallback sin fence: objeto JSON balanceado que contenga las claves del radar.
-    bare = _find_balanced_object(texto, '"dimensions"')
-    if bare is not None:
-        data = _try_parse_radar(bare)
-        if data is not None:
-            return texto[: texto.find(bare)].rstrip(), data
-    return texto, None
-
-
 def _requiere_reintento(texto: str) -> bool:
-    """El texto no es una redacción válida: negativa del LLM o idioma incorrecto (DT-064/T5)."""
+    """El texto no es una redaccion valida: negativa del LLM o idioma incorrecto."""
     return is_llm_refusal(texto) or has_cjk_characters(texto)
 
 
@@ -164,37 +59,22 @@ class GenerateBenchmarking:
         tiers: dict[str, list[str]] | None = None,
         fichas_kb: dict[str, dict[str, str]] | None = None,
         holes_chain: Runnable | None = None,
-        holefill_max: int = 0,
+        holefill_max: int = 3,
         jugadores_use_case: Generate21Jugadores | None = None,
         sectores_ancla: list[str] | None = None,
         sub_gics: str | None = None,
-        engine=None,
+        engine: Engine | None = None,
         run_key: str | None = None,
     ) -> None:
         self._chain = chain
         self._store = store
         self._web_connector = web_connector
-        # T22.4 (DT-054): cadena de identificación de entidades competidoras. Si es None se
-        # conserva el comportamiento previo (sin búsqueda dirigida por entidad).
         self._entidades_chain = entidades_chain
-        # DT-056/T3: lista canónica de competidores del KB por sector (cierra causas A/E). None o
-        # [] = comportamiento B1 (solo lo que el LLM ancle en la evidencia). Los nombres del KB
-        # provienen de evidencia (candidatos NER consolidados), no se fabrican (RN-001).
         self._kb_competidores = kb_competidores or []
-        # DT-050: jugadores LOCALES del directorio (regionales + startups) para 2.1.2/2.1.3.
-        # `kb_locales` = nombres para la búsqueda dirigida; `jugadores_locales_ctx` = bloque de
-        # contexto estructurado inyectado al prompt. Vacíos → invariante (flag OFF). RN-001: son
-        # datos recuperados del directorio, no fabricados.
         self._kb_locales = kb_locales or []
         self._jugadores_locales_ctx = jugadores_locales_ctx or ""
-        # DT-064/T4: bloque de fichas ya conocidas del KB (pre-fill). "" → invariante.
         self._fichas_conocidas_ctx = fichas_conocidas_ctx or ""
-        # DT-064/T5: cadena de escalada (tier de API superior) ante negativa del LLM tras retry.
-        # None → sin escalada (invariante).
         self._escalation_chain = escalation_chain
-        # DT-066/B2: ensamblaje determinista de la sección 2.1 desde el KB. `seccion21_enabled` lo
-        # decide el llamador (flag ON Y hay sujetos anclados en `tiers`); `self._chain`/escalada se
-        # construyen con `omitir_21=True`. OFF (o sin tiers) → el LLM autora 2.1 hoy (invariante).
         self._seccion21_enabled = seccion21_enabled and bool(tiers)
         self._tiers = tiers or {}
         self._fichas_kb = fichas_kb or {}
@@ -206,12 +86,7 @@ class GenerateBenchmarking:
         self._engine = engine
         self._run_key = run_key
 
-    def _identificar_entidades(self, chunks, sector_gics: str) -> list[str]:
-        """Entidades competidoras a explotar: KB (canónico) + las ancladas en la evidencia.
-
-        La lista del KB lidera (menos alucinación, fichas pre-pobladas); se completa con las que
-        el LLM extrae de la evidencia. Dedup casefold, cota MAX_ENTIDADES (T22.4/DT-056, RN-001).
-        """
+    def _identificar_entidades(self, chunks: list[Any], sector_gics: str) -> list[str]:
         raw = self._entidades_chain.invoke(
             {
                 "sector_gics": sector_gics,
@@ -219,8 +94,6 @@ class GenerateBenchmarking:
             }
         )
         del_llm = parse_entidades(raw)
-        # Fusión priorizando el KB (global + locales del directorio), sin duplicar (casefold),
-        # respetando la cota. Los locales entran a la búsqueda dirigida para poblar 2.1.2/2.1.3.
         fusionadas: list[str] = []
         vistos: set[str] = set()
         for nombre in [*self._kb_competidores, *self._kb_locales, *del_llm]:
@@ -231,17 +104,9 @@ class GenerateBenchmarking:
             fusionadas.append(nombre)
             if len(fusionadas) >= MAX_ENTIDADES:
                 break
-        logger.info(
-            "entidades competidoras: %d (KB=%d, LLM=%d) %s",
-            len(fusionadas),
-            len(self._kb_competidores),
-            len(del_llm),
-            fusionadas,
-        )
         return fusionadas
 
     def _buscar_por_entidad(self, entidades: list[str], sector_gics: str) -> None:
-        """Búsqueda web dirigida por entidad para poblar las fichas de la sección 2.1 (T22.4)."""
         for entidad in entidades:
             query = (
                 f"{entidad} {sector_gics} perfil empresa portafolio productos "
@@ -255,21 +120,15 @@ class GenerateBenchmarking:
                     urls=[r.url for r in results],
                 )
 
-    def _redactar_con_escalada(self, payload: dict) -> str:
-        """Redacta el Cap 2; ante negativa/idioma reintenta 1× y escala a un tier superior (T5).
-
-        El modelo gratuito es estocástico: un reintento con la misma cadena suele bastar. Si la
-        negativa persiste y hay `escalation_chain` (tier de API superior), se escala. La escalada
-        corre SOLO ante negativa confirmada tras retry → coste acotado (≤20 USD/mes, ADR-002).
-        """
+    def _redactar_con_escalada(self, payload: dict[str, Any]) -> str:
         texto = self._chain.invoke(payload)
         if not _requiere_reintento(texto):
             return texto
-        logger.info("Cap 2: respuesta no válida (negativa/idioma). Reintentando con el primario.")
+        logger.info("Cap 2: respuesta no valida. Reintentando con el primario.")
         texto = self._chain.invoke(payload)
         if not _requiere_reintento(texto) or self._escalation_chain is None:
             return texto
-        logger.info("Cap 2: negativa persistente tras retry. Escalando a tier de API superior.")
+        logger.info("Cap 2: negativa persistente tras retry. Escalando a tier superior.")
         return self._escalation_chain.invoke(payload)
 
     def _enriquecer_globales_web(
@@ -279,64 +138,15 @@ class GenerateBenchmarking:
         sector_gics_code: str | None,
         top_n: int = 3,
     ) -> dict[str, dict[str, str]]:
-        """Busca web por los top_n globales con campos vacíos, extrae y persiste al KB.
-
-        Best-effort: nunca rompe la corrida. Devuelve {nombre: {clave: valor}} de los campos
-        nuevos encontrados. La segunda corrida del mismo sector reutiliza lo del KB (0 llamadas).
-        """
-        from ic.data.database import SessionLocal
-        from ic.data.models.entidad import (
-            ESTADO_CANDIDATO,
-            FUENTE_WEB,
-            ensure_entidades_tables,
+        return enriquecer_globales_web(
+            web_connector=self._web_connector,
+            llm=None,
+            engine=self._engine,
+            fichas_kb=self._fichas_kb,
+            globales=globales,
+            sector_gics=sector_gics,
+            sector_gics_code=sector_gics_code,
         )
-        from ic.data.repositories.entidad_repo import EntidadRepository
-        from ic.domain.chains.chain_03b_ficha_fields import parse_ficha_fields
-        from ic.domain.kb.seccion21_holes import _format_campos_faltantes, compute_holes
-        from ic.infrastructure.ner.entity_recognizer import normalize_entity
-
-        resultado: dict[str, dict[str, str]] = {}
-        if self._holes_chain is None or not sector_gics_code:
-            return resultado
-        for nombre in globales[:top_n]:
-            faltantes = compute_holes(self._fichas_kb.get(nombre, {}))
-            if not faltantes:
-                continue
-            try:
-                query = f"{nombre} empresa estrategia portafolio {sector_gics} 2024 2025"
-                results = self._web_connector.search(query, search_depth="advanced")
-                if not results:
-                    continue
-                evidencia = "\n\n".join(r.content[:1500] for r in results[:3])
-                raw = self._holes_chain.invoke(
-                    {
-                        "nombre": nombre,
-                        "sector_gics": sector_gics,
-                        "evidencia_rag": evidencia,
-                        "campos_faltantes": _format_campos_faltantes(faltantes),
-                    }
-                )
-                nuevos = parse_ficha_fields(raw, set(faltantes))
-                if not nuevos:
-                    continue
-                resultado[nombre] = nuevos
-                with SessionLocal() as db:
-                    ensure_entidades_tables(db.get_bind())
-                    repo = EntidadRepository(db)
-                    eid = repo.get_id_by_nombre_sector(normalize_entity(nombre), sector_gics_code)
-                    if eid:
-                        for clave, valor in nuevos.items():
-                            repo.add_atributo(
-                                eid, clave, valor, FUENTE_WEB, estado=ESTADO_CANDIDATO
-                            )
-            except Exception:  # noqa: BLE001
-                logger.warning("web enrichment falló para global %r", nombre, exc_info=True)
-        logger.info(
-            "web enrichment globales: %d/%d con datos nuevos",
-            len(resultado),
-            min(top_n, len(globales)),
-        )
-        return resultado
 
     def execute(
         self,
@@ -344,14 +154,11 @@ class GenerateBenchmarking:
         descripcion_empresa: str,
         sector_gics: str,
         sector_gics_code: str | None = None,
-        empresa_id=None,
+        empresa_id: Any = None,
     ) -> CapBenchmarking:
-        # Queries específicas de perfil de empresa (no overviews de sector) con
-        # search_depth="advanced": Tavily recupera contenido más profundo, necesario
-        # para poblar las fichas de competidor de la sección 2.1 (DT-035).
         queries = [
             f"{sector_gics} principales empresas competidoras Colombia cuota de mercado 2025",
-            f"{sector_gics} líderes globales del sector perfil estratégico portafolio",
+            f"{sector_gics} lideres globales del sector perfil estrategico portafolio",
             f"{sector_gics} referentes regionales LatAm empresas emergentes disruptores",
         ]
         for query in queries:
@@ -370,16 +177,12 @@ class GenerateBenchmarking:
             empresa_id=empresa_id,
         )
 
-        # T22.4 (DT-054): identificar entidades competidoras y lanzar búsquedas dirigidas por
-        # entidad (no solo por sector) para enriquecer las fichas de la sección 2.1. Solo si hay
-        # cadena de entidades y evidencia inicial suficiente para anclar nombres (RN-001).
         if self._entidades_chain is not None and check_retrieval_sufficient(
             chunks, min_chunks=_MIN_CHUNKS
         ):
             entidades = self._identificar_entidades(chunks, sector_gics)
             if entidades:
                 self._buscar_por_entidad(entidades, sector_gics)
-                # Re-recuperar con el índice enriquecido (web por-entidad + EMIS individuales).
                 chunks = self._store.search(
                     retrieval_query,
                     sector_gics=sector_gics_code,
@@ -388,41 +191,32 @@ class GenerateBenchmarking:
 
         if not check_retrieval_sufficient(chunks, min_chunks=_MIN_CHUNKS):
             return CapBenchmarking(
-                texto=build_absent_paragraph("Cap 2 — Análisis Competitivo"),
+                texto=build_absent_paragraph("Cap 2 ? Analisis Competitivo"),
                 n_chunks_usados=0,
                 retrieval_suficiente=False,
                 chunks_usados=[],
             )
 
         context = format_chunks_as_context(chunks)
-        payload = {
+        payload: dict[str, Any] = {
             "descripcion_empresa": descripcion_empresa,
             "sector_gics": sector_gics,
             "retrieval_competidores": context,
             "jugadores_locales": self._jugadores_locales_ctx,
-            # DT-064/T1: sujetos globales anclados (kb_competidores) como actores obligatorios de
-            # 2.1.1. Vacío → invariante (el LLM identifica los globales del RAG del sector).
             "referentes_globales_anclados": format_referentes_globales(self._kb_competidores),
-            # DT-064/T4: campos de ficha ya conocidos del KB (escribir desde hechos).
             "fichas_conocidas": self._fichas_conocidas_ctx,
         }
 
-        # Integración Cap 2.1 modular: cuando jugadores_use_case está inyectado, delega la
-        # generación de la sección 2.1 al orquestador Generate21Jugadores (US1+US2+US3).
-        # Esta ruta tiene prioridad sobre seccion21_enabled (KB assembler).
         seccion_21_md = ""
         if self._jugadores_use_case is not None:
             try:
-                # T037: clave de cache sectorial para reusar sub-módulos de corridas previas
-                # del mismo (sector_gics_code, sub_gics) sin repetir búsquedas web (SC-005).
+                cached_glob = cached_reg = cached_start = None
+                sub_key = self._sub_gics or "any"
                 sector_run_key = (
-                    f"sector_{sector_gics_code}_{self._sub_gics or 'any'}"
-                    if sector_gics_code
-                    else None
+                    f"sector_{sector_gics_code}_{sub_key}" if sector_gics_code else None
                 )
-                cached_globales = cached_regionales = cached_startups = None
                 if self._engine is not None and sector_run_key is not None:
-                    cached_globales, cached_regionales, cached_startups = _load_sector_cache(
+                    cached_glob, cached_reg, cached_start = _load_sector_cache(
                         self._engine, sector_run_key
                     )
                 cap21 = self._jugadores_use_case.execute(
@@ -432,29 +226,23 @@ class GenerateBenchmarking:
                     sector_gics_code=sector_gics_code,
                     sectores_ancla=self._sectores_ancla or [sector_gics_code or sector_gics],
                     empresa_id=empresa_id,
-                    cached_globales=cached_globales,
-                    cached_regionales=cached_regionales,
-                    cached_startups=cached_startups,
+                    cached_globales=cached_glob,
+                    cached_regionales=cached_reg,
+                    cached_startups=cached_start,
                     engine=self._engine,
                     run_key=sector_run_key,
                 )
                 if cap21.retrieval_suficiente:
                     seccion_21_md = cap21.texto
             except Exception as exc:
-                logger.warning("Generate21Jugadores falló, continuando sin 2.1 modular: %s", exc)
+                logger.warning("Generate21Jugadores fallo: %s", exc)
 
-        # DT-066/B2: ensamblar la sección 2.1 desde el KB (hechos deterministas) + hole-filling de
-        # los campos faltantes con la evidencia RAG ya recuperada. El LLM redacta solo la prosa
-        # (2.2/2.4/2.5) recibiendo la 2.1 hecha como contexto. Si no está habilitado, la
-        # 2.1 la escribe el LLM como hasta ahora (invariante).
         if not seccion_21_md and self._seccion21_enabled:
-            # DT-UI03: busca web por los top-3 globales anclados, extrae campos y persiste al KB.
-            # La siguiente corrida del mismo sector reutiliza los datos sin llamadas adicionales.
             globales = self._tiers.get("global", [])
             nuevos_web = self._enriquecer_globales_web(globales, sector_gics, sector_gics_code)
             fichas_para_fill = {n: dict(c) for n, c in self._fichas_kb.items()}
-            for nombre, campos in nuevos_web.items():
-                fichas_para_fill.setdefault(nombre, {}).update(campos)
+            for n, c in nuevos_web.items():
+                fichas_para_fill.setdefault(n, {}).update(c)
             fichas_enr, _ = fill_holes(
                 self._tiers,
                 fichas_para_fill,
@@ -464,9 +252,8 @@ class GenerateBenchmarking:
                 self._holefill_max,
             )
             seccion_21_md = assemble_seccion_21(self._tiers, fichas_enr)
+
         if seccion_21_md:
-            # La 2.1 ya no la genera el LLM: se le pasa como contexto (self._chain se construyó con
-            # omitir_21=True). `fichas_conocidas` deja de usarse (redundante con la 2.1 ensamblada).
             payload["seccion_21_context"] = seccion_21_md
             payload["fichas_conocidas"] = ""
 
@@ -475,20 +262,18 @@ class GenerateBenchmarking:
         if has_cjk_characters(texto_raw):
             return CapBenchmarking(
                 texto=build_absent_paragraph(
-                    "Cap 2 — Análisis Competitivo",
-                    "El modelo generó texto en un idioma incorrecto (no español)",
+                    "Cap 2 ? Analisis Competitivo",
+                    "El modelo genero texto en un idioma incorrecto (no espanol)",
                 ),
                 n_chunks_usados=len(chunks),
                 retrieval_suficiente=False,
                 chunks_usados=chunks,
             )
 
-        # DT-064/T5: si el modelo rehusó redactar (incluso tras retry + escalada), no emitir la
-        # negativa como contenido: párrafo de ausencia (el self-review, si ON, aún puede rescatar).
         if is_llm_refusal(texto_raw):
             return CapBenchmarking(
                 texto=build_absent_paragraph(
-                    "Cap 2 — Análisis Competitivo",
+                    "Cap 2 ? Analisis Competitivo",
                     "El modelo no pudo redactar las fichas de competidores con las fuentes dadas",
                 ),
                 n_chunks_usados=len(chunks),
@@ -496,25 +281,11 @@ class GenerateBenchmarking:
                 chunks_usados=chunks,
             )
 
-        # T16.1: extraer bloque radar_json; si parseable, adjuntar en radar_data
-        texto, radar_data = _extract_radar(texto_raw)
-
-        # DT-066/B2: anteponer la sección 2.1 ensamblada (la prosa del LLM arranca en 2.2). El
-        # markdown emitido es el mismo formato que parsea `parse_fichas_competidores` → la
-        # persistencia T3 y el render docx siguen sin cambios.
-        if seccion_21_md:
-            texto = f"{seccion_21_md}\n\n{texto}"
-        # T22.2 (DT-027): log determinista para medir el hit-rate del radar (N corridas).
-        logger.info(
-            "radar_data: %s (%d competidores)",
-            "PRESENTE" if radar_data else "AUSENTE",
-            len(radar_data.get("competidores", {})) if radar_data else 0,
-        )
-
+        texto = (seccion_21_md + "\n\n" + texto_raw) if seccion_21_md else texto_raw
         return CapBenchmarking(
-            texto=texto,
+            texto=texto.strip(),
             n_chunks_usados=len(chunks),
             retrieval_suficiente=True,
             chunks_usados=chunks,
-            radar_data=radar_data,
+            radar_data=None,
         )

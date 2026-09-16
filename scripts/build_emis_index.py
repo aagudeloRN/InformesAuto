@@ -5,7 +5,8 @@ Genera columna `sectores_adicionales` (separada por `|`) editable a mano para do
 
 Uso:
     uv run python scripts/build_emis_index.py
-    uv run python scripts/build_emis_index.py --dir documentos_sectoriales/FuentesEMIS --out indice_emis.csv
+    uv run python scripts/build_emis_index.py \
+        --dir documentos_sectoriales/FuentesEMIS --out indice_emis.csv
 
 Idempotente: si el CSV ya existe lo REEMPLAZA (ejecutar cada vez que se añadan docs).
 """

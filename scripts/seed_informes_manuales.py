@@ -1,7 +1,8 @@
 """Siembra del KB de competidores desde los 5 informes manuales del cliente (DT-064).
 
 Los informes de `docs/ReportesHumanos/` (NO trackeados) son **verdad de terreno**: su sección 2.1
-trae las fichas de competidor en tablas anchas, por tier (globales/regionales/startups). Este script:
+trae las fichas de competidor en tablas anchas, por tier.
+Este script:
 
   docx → ``iter_docx_blocks`` (wrapper infra) → ``extract_seccion_markdown`` (2.1 → markdown puro) →
   ``parse_fichas_competidores`` → ``merge_fichas_parciales`` (une las dos tablas de cada tier) →
@@ -85,7 +86,7 @@ def _alcance_segmento(tier: str) -> tuple[str, str | None]:
 
 
 def _sub_gics_de(ficha: FichaCompetidor, sector: str) -> str | None:
-    """Sub-código GICS (solo grupo 3020) desde el texto de la ficha; None fuera de 3020 o sin señal."""
+    """Sub-código GICS (grupo 3020) desde texto de ficha; None fuera de 3020 o sin señal."""
     texto = " ".join(ficha.campos.get(k, "") for k in ("portafolio", "resumen_estrategico"))
     return resolve_sub_gics(texto, sector)
 
@@ -93,7 +94,7 @@ def _sub_gics_de(ficha: FichaCompetidor, sector: str) -> str | None:
 def _sembrar_informe(
     repo: EntidadRepository | None, nombre_informe: str, sector: str
 ) -> tuple[list[FichaCompetidor], int]:
-    """Extrae y (si repo no es None) siembra las fichas de un informe. Devuelve (fichas, nº escritas)."""
+    """Extrae y siembra las fichas de un informe. Devuelve (fichas, n_escritas)."""
     ruta = _REPORTES / f"InformeSectoryCompetitivo{nombre_informe}.docx"
     if not ruta.exists():
         logger.warning("No se encontró %s — se omite", ruta)

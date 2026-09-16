@@ -8,7 +8,7 @@ curación humana es futura. NO toca vectores ni reingesta.
 
 Uso:
     uv run python scripts/seed_empresas_colombia.py --dry-run   # conteos/mapeos, sin escribir
-    uv run python scripts/seed_empresas_colombia.py             # aplica (correr en tmux/nohup, ~98k)
+    uv run python scripts/seed_empresas_colombia.py             # aplica (~98k)
     uv run python scripts/seed_empresas_colombia.py --limit 500 # prueba acotada
 """
 
@@ -48,7 +48,9 @@ _HEADER_ROW = 8
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Siembra directorio local EmpresasColombia (DT-050)")
+    parser = argparse.ArgumentParser(
+        description="Siembra directorio local EmpresasColombia (DT-050)"
+    )
     parser.add_argument("--dry-run", action="store_true", help="No escribe; solo reporta")
     parser.add_argument("--limit", type=int, default=None, help="Máx. filas (prueba)")
     args = parser.parse_args()

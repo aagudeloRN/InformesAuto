@@ -2,7 +2,8 @@
 
 Unifica el KB preexistente (competidores globales de DT-062, candidatos NER) en el modelo de
 membresías sectoriales introducido en DT-050: cada entidad con `sector_gics` obtiene su membresía
-(fuente=`backfill`), conservando sub_gics/alcance/estado. Luego `n_sectores` pasa a ser el COUNT real
+(fuente=`backfill`), conservando sub_gics/alcance/estado.
+Luego @n_sectores` pasa a ser el COUNT real
 de membresías (deja de ser un proxy). Idempotente: re-ejecutar no duplica ni degrada.
 
 NOTA (T4, decisión conservadora): NO se reescribe el path del tier GLOBAL

@@ -1,46 +1,39 @@
 # Handoff ? pr?xima sesi?n (arranque en chat limpio)
 
-> Estado al cierre 2026-09-16. Rama `develop` (Spec 005 QA & E2E Integration cerrado).
+> Estado al cierre 2026-09-16. Rama `006-estabilizacion-alineacion-ic` / `spec-driven-experiment` (Spec 006 completado).
 > Copia el bloque "PROMPT DE ARRANQUE" de abajo en un chat nuevo.
 
 ## D?nde quedamos
-- **Spec 005 / Fase 31 CERRADO**:
-  - **DT-037**: LLM gateway modularizado en 4 archivos (`gateway.py`, `gateway_errors.py`, `gateway_models.py`, `gateway_pricing.py`), todos <300L.
-  - **DT-038**: `presentation/app.py` desacoplado al 100% de `data/` a trav?s de `ui_query_services.py` (0 violaciones SoC).
-  - **DT-039**: `generate_informe.py` modularizado en 5 subm?dulos (`_informe_context.py`, `_informe_nodes_n0.py`, `_informe_nodes_n2.py`, `_informe_nodes_n3.py`, `generate_informe.py`), todos <300L.
-  - **DT-040**: Tabla `_PRICING` con modelos Gemini 2.5 y b?squeda cascading con tipo `CallRecord.costo_usd: float | None`.
-  - **DT-041**: Cobertura de tests en `src/ic/domain` alcanzando el **93%** (710 tests unitarios).
-  - **US1?US3 (Integraci?n E2E y Concurrencia)**: Suites creadas en `tests/integration/` (`test_pipeline_e2e.py`, `test_sector_cache.py`, `test_concurrencia.py`).
-  - **US4 (Limpieza)**: Archivo espurio `1` eliminado, metadatos Windows ignorados en `.gitignore`, `FuentesExternas/README.md` creado.
-- **Suite de tests**: 710 unit tests passing (`not integration`), 3 integration tests passing (`integration`). Linter `ruff` limpio en 0 errores.
-
-## Foco recomendado para la siguiente sesi?n
-1. **HITL (F24/F25)**: Flujo de captura y aprobaci?n humana de entidades y datos, apoyado en el desacoplamiento de presentaci?n ya logrado (DT-038).
-2. **Reconciliaci?n EMIS?NER por NIT (DT-050b)**: Deduplicaci?n y consolidaci?n de entidades con NIT compartido.
-3. **Paralelizaci?n de ingesta entre PDFs (`scripts/ingest_batch.py`)**: Acelerar ingesta masiva de documentos sectoriales.
+- **Spec 006 (Estabilizaci?n, Alineaci?n de Inteligencia Competitiva y Deuda Estructural) COMPLETADO**:
+  - **Decisi?n 1 (Visuales Cap 2)**: Eliminaci?n definitiva de `radar_chart.py`, tests de radar y scripts de extracci?n. El cap?tulo 2 se estandariza en prosa estructurada con mini-fichas y matriz comparativa tabular enriquecida.
+  - **Decisi?n 2 (Gateway & LLM Tiers - ADR-017)**: Google Gemini API free tier (`gemini-2.5-flash`: 15 RPM / 1M TPM / 1500 RPD) como tier primario y anal?tico de s?ntesis + fallback resiliente a OpenRouter free tier + embeddings locales Ollama (`bge-m3`).
+  - **Decisi?n 3 (HITL Curation)**: Soporte de validaci?n de competidores previo a redacci?n final para descartar empresas no pertinentes.
+  - **ADR-016 y ADR-017**: Creados y documentados formalmente en `docs/architecture/`.
+  - **Higiene T?cnica y Regla < 300 L?neas (Constituci?n I)**:
+    - `src/ic/domain/use_cases/generate_benchmarking.py` (291L) + `_benchmarking_matrix.py` (125L).
+    - `src/ic/data/repositories/_entidad_queries.py` (255L) + `_entidad_locales.py` (137L).
+    - `src/ic/domain/use_cases/generate_n1.py` (217L) + `_n1_cap2_helpers.py` (190L) + `_n1_chapter_builders.py` (136L).
+    - `src/ic/shared/constants/ciiu_gics.py` (175L) + `_ciiu_tables.py` (172L).
+    - `src/ic/presentation/app.py` (35L) + `views/` (`view_generar.py`, `view_historial.py`, `view_repositorio.py`, `view_services.py`).
+  - **Calidad y Tests**: 100% de los archivos de `src/` estrictamente `< 300 l?neas`. Linter `uv run ruff check .` con 0 errores. Suite de tests unitarios pasando (698 passed, 0 errors).
 
 ---
 
 ## PROMPT DE ARRANQUE (copiar en chat limpio)
 
 ```
-ROL: Claude Code / Antigravity, ingeniero senior de InformesAuto (rama develop).
+ROL: Claude Code / Antigravity, ingeniero senior de InformesAuto.
 Proyecto en /home/aagudelo/Test/InformesAuto. Localhost/dev (WSL2).
 
-CONTEXTO (sesi?n previa 2026-09-16, Spec 005 completado):
-- Spec 005 (QA, Integraci?n E2E y Deuda Estructural) cerrado:
-  * DT-037/039: Gateway (4 m?dulos) y GenerateInforme (5 m?dulos) modularizados <300L.
-  * DT-038: Capa presentation/app.py 100% desacoplada de data/ v?a domain/use_cases/ui_query_services.py.
-  * DT-040: CostTracker con soporte cascading para modelos Gemini 2.5 y costo_usd: float | None.
-  * DT-041: Cobertura de pruebas unitarias en src/ic/domain al 93% (710 passed).
-  * US1-US3: Tests de integraci?n E2E en tests/integration/ (pipeline, sector cache hit, concurrencia en Cap 2.1).
-- Estado de calidad: ruff check limpio, 710 unit tests passing, 3 integration tests passing.
+CONTEXTO (sesi?n previa 2026-09-16, Spec 006 completado):
+- Spec 006 (Estabilizaci?n, Alineaci?n de Inteligencia Competitiva y Refactorizaci?n <300L) cerrado:
+  * Eliminaci?n completa de radar chart; estandarizaci?n en prosa y tabla matricial.
+  * ADR-016 (Modelo KB Entidades y Membres?as GICS) y ADR-017 (Gateway Multi-Provider Resiliente) documentados.
+  * Todos los m?dulos de src/ estrictamente < 300 l?neas (Constitution I).
+  * UI Streamlit modularizada en src/ic/presentation/views/.
+  * 0 errores de ruff, suite completa de tests unitarios verde (698 passed).
 
-TAREA SUGERIDA:
-Continuar con el roadmap hacia HITL (F24/F25) o paralelizaci?n de ingesta por lotes de PDFs (scripts/ingest_batch.py).
-
-PROCESO OBLIGATORIO:
-- Seguir las reglas de CLAUDE.md y la Constituci?n del proyecto (.specify/memory/constitution.md).
-- Plan Mode para tareas no triviales.
-- Cobertura de tests >=80% en domain/ y archivos <300 l?neas.
+SIGUIENTES PASOS:
+1. Reconciliaci?n de entidades EMIS-NER por NIT (DT-050b) / enriquecimiento avanzado del KB.
+2. Ingesta por lotes optimizada de documentos sectoriales.
 ```

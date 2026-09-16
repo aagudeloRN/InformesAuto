@@ -2,7 +2,7 @@
 
 Lee ``documentos_sectoriales/FuentesExternas/startia_clean.xlsx`` (388 startups, header fila 1),
 mapea cada Vertical a su grupo GICS (crosswalk) y hace upsert por NIT con ``segmento=startup``,
-``alcance=local``, ``estado=candidato``, ``fuente=db_externa`` + una membresía por vertical. Alimenta
+``alcance=local``, ``estado=candidato``, ``fuente=db_externa`` + membresía por vertical. Alimenta
 el tier 2.1.3. RN-001: candidato (curación futura). NO reingesta vectores.
 
 Uso:
