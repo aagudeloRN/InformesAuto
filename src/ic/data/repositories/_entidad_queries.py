@@ -62,9 +62,7 @@ def _clave_exclusion(nombre: str) -> str:
     ``normalize_entity`` (minúsculas, sin sufijos societarios ni puntuación) **más** sin acentos,
     para que "ERCO ENERGÍA S.A.S." empate con "ERCO ENERGIA". Puro y determinista."""
     base = normalize_entity(nombre)
-    return "".join(
-        c for c in unicodedata.normalize("NFD", base) if unicodedata.category(c) != "Mn"
-    )
+    return "".join(c for c in unicodedata.normalize("NFD", base) if unicodedata.category(c) != "Mn")
 
 
 def upsert_entidad(db: Session, fila: EntidadRow) -> int:
@@ -224,9 +222,7 @@ def list_competidores_by_sector(
         "WHERE e.sector_gics = ANY(:sectores) AND e.estado <> :descartado "
         "  AND e.tipo IN ('competidor', 'empresa')"
     )
-    rows = db.execute(
-        sql, {"sectores": sectores, "descartado": ESTADO_DESCARTADO}
-    ).fetchall()
+    rows = db.execute(sql, {"sectores": sectores, "descartado": ESTADO_DESCARTADO}).fetchall()
     # DT-UI04a + DT-UI04f: excluir la empresa analizada por nombre canónico Y aliases.
     norm_excl = _clave_exclusion(exclude_nombre) if exclude_nombre else None
 
@@ -310,8 +306,7 @@ def list_locales_by_sector(
     elif solo_establecidas:
         cond_seg = " AND e.segmento IS NULL"
     tamano_num = (
-        "NULLIF(regexp_replace(split_part(a_ing.valor, ',', 1), '[^0-9]', '', 'g'), '')"
-        "::bigint"
+        "NULLIF(regexp_replace(split_part(a_ing.valor, ',', 1), '[^0-9]', '', 'g'), '')::bigint"
     )
     prefetch = max(limit * 10, 40) * len(sectores)
     sql = text(

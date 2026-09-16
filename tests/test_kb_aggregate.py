@@ -17,8 +17,13 @@ from ic.domain.kb.aggregate import (
 
 
 def _m(norm, texto, sector, chunk, doc=None):
-    return MencionCruda(entidad_normalizada=norm, entidad_texto=texto, sector=sector,
-                        chunk_id=chunk, documento_id=doc)
+    return MencionCruda(
+        entidad_normalizada=norm,
+        entidad_texto=texto,
+        sector=sector,
+        chunk_id=chunk,
+        documento_id=doc,
+    )
 
 
 def test_consolida_menciones_y_cuenta_chunks_sectores():
@@ -68,8 +73,9 @@ def test_publisher_umbral_configurable():
 
 def test_ruido_fragmento_titulo_de_informe():
     # "colombia construction equipment market report": largo + token de título → ruido.
-    filas = [_m("colombia construction equipment market report", "…", "2010", f"c{i}")
-             for i in range(3)]
+    filas = [
+        _m("colombia construction equipment market report", "…", "2010", f"c{i}") for i in range(3)
+    ]
     (c,) = aggregate_menciones(filas)
     assert c.signal == SIGNAL_RUIDO
 
@@ -84,10 +90,14 @@ def test_ruido_acronimo_corto():
 def test_publisher_por_token_de_marca_aunque_pocos_sectores():
     # Casas de análisis concentradas en pocos sectores: la dispersión no basta, el token sí.
     filas = (
-        [_m("euromonitor international", "Euromonitor International", "2550", f"e{i}")
-         for i in range(7)]
-        + [_m("international energy agency", "International Energy Agency", "1010", f"a{i}")
-           for i in range(5)]
+        [
+            _m("euromonitor international", "Euromonitor International", "2550", f"e{i}")
+            for i in range(7)
+        ]
+        + [
+            _m("international energy agency", "International Energy Agency", "1010", f"a{i}")
+            for i in range(5)
+        ]
         + [_m("mapfre economics", "Mapfre Economics", "4030", "m1")]
     )
     señales = {c.nombre_normalizado: c.signal for c in aggregate_menciones(filas)}

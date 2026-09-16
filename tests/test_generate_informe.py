@@ -25,6 +25,7 @@ def test_informe_params_with_ciiu():
 
 def test_generate_informe_accepts_settings(monkeypatch):
     """GenerateInforme se instancia correctamente con un settings mock."""
+
     class FakeSettings:
         ollama_base_url = "http://127.0.0.1:11434"
         database_url = "postgresql://user:pass@localhost/db"
@@ -98,5 +99,6 @@ def test_generate_informe_e2e_noel(tmp_path):
 
     assert result.ruta_docx.endswith(".docx")
     from pathlib import Path
+
     assert Path(result.ruta_docx).exists()
     assert result.tiempo_total_s > 0

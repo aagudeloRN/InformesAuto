@@ -63,9 +63,11 @@ _TIERS = {TIER_GLOBAL: ["Nestlé", "Danone"], TIER_REGIONAL: ["Colombina"]}
 
 def test_fill_holes_rellena_solo_lo_nuevo_sin_pisar_kb():
     fichas = {"Nestlé": {"pais_origen": "Suiza"}}  # tiene país; le faltan los demás
-    chain = _FakeChain({
-        "Nestlé": '{"pais_origen": "OTRO PAÍS", "portafolio": "Galletas y café."}',
-    })
+    chain = _FakeChain(
+        {
+            "Nestlé": '{"pais_origen": "OTRO PAÍS", "portafolio": "Galletas y café."}',
+        }
+    )
     enr, rell = fill_holes(_TIERS, fichas, chain, "3020", "evidencia", max_competidores=5)
     # No pisa el país del KB…
     assert enr["Nestlé"]["pais_origen"] == "Suiza"

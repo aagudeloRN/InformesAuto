@@ -69,8 +69,10 @@ def test_todos_los_tiers_vacios_degradan_a_string_vacio_sin_crashear():
 
 def test_provider_resolver_gemini_vs_openrouter():
     s = Settings(
-        openrouter_base_url="https://or", openrouter_api_key="ORK",
-        gemini_base_url="https://gemini", gemini_api_key="GK",
+        openrouter_base_url="https://or",
+        openrouter_api_key="ORK",
+        gemini_base_url="https://gemini",
+        gemini_api_key="GK",
     )
     assert _provider_base_and_key(s, "openrouter") == ("https://or", "ORK")
     assert _provider_base_and_key(s, "gemini") == ("https://gemini", "GK")
@@ -80,8 +82,10 @@ def test_provider_resolver_gemini_vs_openrouter():
 
 def test_build_api_llm_synth_usa_gemini_y_max_tokens():
     s = Settings(
-        llm_api_synth_model="gemini-2.5-flash", llm_api_synth_provider="gemini",
-        gemini_base_url="https://gemini", gemini_api_key="GK",
+        llm_api_synth_model="gemini-2.5-flash",
+        llm_api_synth_provider="gemini",
+        gemini_base_url="https://gemini",
+        gemini_api_key="GK",
         llm_api_max_tokens_output=32000,
     )
     m = build_api_llm(s, tier="synth")

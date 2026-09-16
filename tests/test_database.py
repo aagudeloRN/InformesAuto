@@ -34,7 +34,5 @@ def test_tables_exist():
 
 def test_pgvector_extension():
     with engine.connect() as conn:
-        result = conn.execute(
-            text("SELECT extname FROM pg_extension WHERE extname = 'vector'")
-        )
+        result = conn.execute(text("SELECT extname FROM pg_extension WHERE extname = 'vector'"))
         assert result.scalar() == "vector", "Extensión pgvector no instalada"

@@ -23,11 +23,13 @@ class GenerateResumenEjecutivo:
         ]
         contexto = "\n\n---\n\n".join(partes)
 
-        texto = self._chain.invoke({
-            "descripcion_empresa": descripcion_empresa,
-            "sector_gics": sector_gics,
-            "textos_capitulos": contexto,
-        })
+        texto = self._chain.invoke(
+            {
+                "descripcion_empresa": descripcion_empresa,
+                "sector_gics": sector_gics,
+                "textos_capitulos": contexto,
+            }
+        )
         texto = strip_preamble(texto)
 
         if has_cjk_characters(texto):

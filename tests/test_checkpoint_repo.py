@@ -20,11 +20,17 @@ from ic.shared.types import CapBenchmarking, ChunkResult, DescripcionEmpresa
 
 def _cap_benchmarking():
     ch = ChunkResult(
-        chunk_texto="frag", fuente_tipo="web", fuente_url="http://x",
-        score=0.91, metadatos={"sector": "3020"}, chunk_id="c1",
+        chunk_texto="frag",
+        fuente_tipo="web",
+        fuente_url="http://x",
+        score=0.91,
+        metadatos={"sector": "3020"},
+        chunk_id="c1",
     )
     return CapBenchmarking(
-        texto="Cap 2 texto", n_chunks_usados=1, retrieval_suficiente=True,
+        texto="Cap 2 texto",
+        n_chunks_usados=1,
+        retrieval_suficiente=True,
         chunks_usados=[ch],
         radar_data={"dimensions": ["a"], "competidores": {"X": [1, 2, 3, 4, 5]}},
     )

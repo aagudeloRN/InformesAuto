@@ -60,26 +60,34 @@ class NurtureKB:
         """
         if not nombre or not nombre.strip():
             return None
-        entidad_id = self._repo.upsert_entidad(EntidadRow(
-            nombre=nombre.strip(),
-            nombre_normalizado=_normalizar(nombre),
-            tipo=TIPO_EMPRESA,
-            sector_gics=sector_gics or None,
-            alcance=alcance,
-            estado=ESTADO_VERIFICADO,  # identidad pedida por el usuario (prioridad usuario)
-            aliases=[nombre.strip()],
-        ))
+        entidad_id = self._repo.upsert_entidad(
+            EntidadRow(
+                nombre=nombre.strip(),
+                nombre_normalizado=_normalizar(nombre),
+                tipo=TIPO_EMPRESA,
+                sector_gics=sector_gics or None,
+                alcance=alcance,
+                estado=ESTADO_VERIFICADO,  # identidad pedida por el usuario (prioridad usuario)
+                aliases=[nombre.strip()],
+            )
+        )
         if descripcion and descripcion.strip():
             # Campo enriquecido: candidato con procedencia (web/LLM), no hecho verificado.
             self._repo.add_atributo(
-                entidad_id, "descripcion", descripcion.strip()[:2000],
-                fuente_descripcion, estado=ESTADO_CANDIDATO,
+                entidad_id,
+                "descripcion",
+                descripcion.strip()[:2000],
+                fuente_descripcion,
+                estado=ESTADO_CANDIDATO,
             )
         if productos and productos.strip():
             # Perfil de producto (descriptor limpio para el re-rank por solape del anclaje).
             self._repo.add_atributo(
-                entidad_id, "productos_perfil", productos.strip()[:2000],
-                fuente_descripcion, estado=ESTADO_CANDIDATO,
+                entidad_id,
+                "productos_perfil",
+                productos.strip()[:2000],
+                fuente_descripcion,
+                estado=ESTADO_CANDIDATO,
             )
         logger.info("KB nutrido con empresa principal '%s' (id=%s)", nombre, entidad_id)
         return entidad_id

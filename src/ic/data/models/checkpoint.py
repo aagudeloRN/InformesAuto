@@ -21,9 +21,7 @@ class CheckpointCapitulo(Base):
     run_key: Mapped[str] = mapped_column(Text, primary_key=True)
     cap_nombre: Mapped[str] = mapped_column(Text, primary_key=True)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 def ensure_checkpoint_table(engine) -> None:
@@ -32,12 +30,14 @@ def ensure_checkpoint_table(engine) -> None:
 
     schema = get_settings().db_schema
     with engine.begin() as conn:
-        conn.execute(text(
-            f"CREATE TABLE IF NOT EXISTS {schema}.checkpoint_capitulos ("
-            " run_key TEXT NOT NULL,"
-            " cap_nombre TEXT NOT NULL,"
-            " payload JSONB NOT NULL,"
-            " created_at TIMESTAMPTZ NOT NULL DEFAULT now(),"
-            " PRIMARY KEY (run_key, cap_nombre)"
-            ")"
-        ))
+        conn.execute(
+            text(
+                f"CREATE TABLE IF NOT EXISTS {schema}.checkpoint_capitulos ("
+                " run_key TEXT NOT NULL,"
+                " cap_nombre TEXT NOT NULL,"
+                " payload JSONB NOT NULL,"
+                " created_at TIMESTAMPTZ NOT NULL DEFAULT now(),"
+                " PRIMARY KEY (run_key, cap_nombre)"
+                ")"
+            )
+        )

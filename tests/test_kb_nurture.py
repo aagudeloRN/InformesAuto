@@ -77,8 +77,10 @@ def test_guarda_alcance_local_y_productos_perfil():
     # para reusarla como competidor regional rankeado por solape en informes futuros.
     repo = _RepoFake()
     NurtureKB(repo).execute(
-        nombre="Alpina", sector_gics="3020",
-        descripcion="Empresa láctea.", alcance="local",
+        nombre="Alpina",
+        sector_gics="3020",
+        descripcion="Empresa láctea.",
+        alcance="local",
         productos="Produce lácteos: leche, yogurt, quesos, arequipe.",
     )
     (_, fila) = repo.entidades[0]

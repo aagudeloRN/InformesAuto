@@ -49,15 +49,21 @@ class TestParseEntidades:
 
 def _chunk(texto: str, url: str = "https://e.com/1") -> ChunkResult:
     return ChunkResult(
-        chunk_texto=texto, fuente_tipo="pdf", fuente_url=url, score=0.9,
+        chunk_texto=texto,
+        fuente_tipo="pdf",
+        fuente_url=url,
+        score=0.9,
         metadatos={"titulo": "Doc", "año": "2025", "autor": "Autor", "sector_gics": "3020"},
     )
 
 
 def _web(url: str = "https://e.com/perfil") -> WebResult:
     return WebResult(
-        url=url, title="Perfil", content="contenido del perfil de la empresa",
-        snippet="perfil", metadatos={"titulo": "Perfil", "año": "2025", "autor": None},
+        url=url,
+        title="Perfil",
+        content="contenido del perfil de la empresa",
+        snippet="perfil",
+        metadatos={"titulo": "Perfil", "año": "2025", "autor": None},
     )
 
 
@@ -79,16 +85,20 @@ class TestBusquedaDirigida:
         chain.invoke.return_value = "## 2.1. Jugadores Clave\ntexto"
 
         GenerateBenchmarking(
-            chain=chain, store=store, web_connector=web, entidades_chain=entidades_chain,
+            chain=chain,
+            store=store,
+            web_connector=web,
+            entidades_chain=entidades_chain,
         ).execute(
-            nombre_empresa="Alpina", descripcion_empresa="láctea",
-            sector_gics="Alimentos", sector_gics_code="3020",
+            nombre_empresa="Alpina",
+            descripcion_empresa="láctea",
+            sector_gics="Alimentos",
+            sector_gics_code="3020",
         )
 
         # Las 3 queries de sector iniciales + 1 dirigida por cada entidad identificada.
         dirigidas = [
-            c for c in web.search.call_args_list
-            if "perfil empresa portafolio" in c.args[0]
+            c for c in web.search.call_args_list if "perfil empresa portafolio" in c.args[0]
         ]
         assert len(dirigidas) == 2
         assert any("Colanta" in c.args[0] for c in dirigidas)
@@ -104,15 +114,18 @@ class TestBusquedaDirigida:
         chain.invoke.return_value = "texto"
 
         GenerateBenchmarking(
-            chain=chain, store=store, web_connector=web,  # entidades_chain=None
+            chain=chain,
+            store=store,
+            web_connector=web,  # entidades_chain=None
         ).execute(
-            nombre_empresa="Alpina", descripcion_empresa="láctea",
-            sector_gics="Alimentos", sector_gics_code="3020",
+            nombre_empresa="Alpina",
+            descripcion_empresa="láctea",
+            sector_gics="Alimentos",
+            sector_gics_code="3020",
         )
 
         dirigidas = [
-            c for c in web.search.call_args_list
-            if "perfil empresa portafolio" in c.args[0]
+            c for c in web.search.call_args_list if "perfil empresa portafolio" in c.args[0]
         ]
         assert dirigidas == []
         assert store.search.call_count == 1  # sin re-retrieval
@@ -127,10 +140,15 @@ class TestBusquedaDirigida:
         chain.invoke.return_value = "texto"
 
         GenerateBenchmarking(
-            chain=chain, store=store, web_connector=web, entidades_chain=entidades_chain,
+            chain=chain,
+            store=store,
+            web_connector=web,
+            entidades_chain=entidades_chain,
         ).execute(
-            nombre_empresa="Alpina", descripcion_empresa="láctea",
-            sector_gics="Alimentos", sector_gics_code="3020",
+            nombre_empresa="Alpina",
+            descripcion_empresa="láctea",
+            sector_gics="Alimentos",
+            sector_gics_code="3020",
         )
 
         assert store.search.call_count == 1  # sin entidades → sin re-retrieval
@@ -148,15 +166,19 @@ class TestAnclajeKB:
         chain = MagicMock()
         chain.invoke.return_value = "texto"
         GenerateBenchmarking(
-            chain=chain, store=store, web_connector=web, entidades_chain=entidades_chain,
+            chain=chain,
+            store=store,
+            web_connector=web,
+            entidades_chain=entidades_chain,
             kb_competidores=kb_competidores,
         ).execute(
-            nombre_empresa="Alpina", descripcion_empresa="láctea",
-            sector_gics="Alimentos", sector_gics_code="3020",
+            nombre_empresa="Alpina",
+            descripcion_empresa="láctea",
+            sector_gics="Alimentos",
+            sector_gics_code="3020",
         )
         return [
-            c.args[0] for c in web.search.call_args_list
-            if "perfil empresa portafolio" in c.args[0]
+            c.args[0] for c in web.search.call_args_list if "perfil empresa portafolio" in c.args[0]
         ]
 
     def test_kb_competidores_lideran_la_busqueda_dirigida(self):
@@ -188,13 +210,40 @@ class TestLocalRowVentasOrdering:
     def test_ventas_cop_ordena_primero(self):
         """list_locales_by_sector pone primero la entidad con ventas sobre la grande sin ventas."""
         from ic.data.repositories._entidad_queries import list_locales_by_sector
-        # r: nombre, ciudad, vertical, ing_valor, segmento, verificado, tam, desc, prod, ventas, menciones
-        row_con_ventas  = ("PequenaConVentas", None, None, None, None, False, 100, None, None, 1_000_000.0, 0)
-        row_sin_ventas  = ("GrandeSinVentas",  None, None, None, None, False, 99_999_999, None, None, None, 0)
+
+        # r: nombre, ciudad, vertical, ing_valor, segmento, verificado, tam, desc, prod, ventas,
+        # menciones
+        row_con_ventas = (
+            "PequenaConVentas",
+            None,
+            None,
+            None,
+            None,
+            False,
+            100,
+            None,
+            None,
+            1_000_000.0,
+            0,
+        )
+        row_sin_ventas = (
+            "GrandeSinVentas",
+            None,
+            None,
+            None,
+            None,
+            False,
+            99_999_999,
+            None,
+            None,
+            None,
+            0,
+        )
 
         class _FakeDB:
             def execute(self, *a, **kw):
                 return self
+
             def fetchall(self):
                 return [row_sin_ventas, row_con_ventas]
 
@@ -204,12 +253,38 @@ class TestLocalRowVentasOrdering:
     def test_ventas_cop_none_fallback_a_menciones(self):
         """Cuando ventas=None en todas, n_menciones decide el orden en list_locales_by_sector."""
         from ic.data.repositories._entidad_queries import list_locales_by_sector
-        row_mas_menciones   = ("SinVentasMasMenciones",   None, None, None, None, False, 0, None, None, None, 10)
-        row_menos_menciones = ("SinVentasMenosMenciones", None, None, None, None, False, 0, None, None, None, 2)
+
+        row_mas_menciones = (
+            "SinVentasMasMenciones",
+            None,
+            None,
+            None,
+            None,
+            False,
+            0,
+            None,
+            None,
+            None,
+            10,
+        )
+        row_menos_menciones = (
+            "SinVentasMenosMenciones",
+            None,
+            None,
+            None,
+            None,
+            False,
+            0,
+            None,
+            None,
+            None,
+            2,
+        )
 
         class _FakeDB:
             def execute(self, *a, **kw):
                 return self
+
             def fetchall(self):
                 return [row_menos_menciones, row_mas_menciones]
 

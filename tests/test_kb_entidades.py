@@ -158,9 +158,7 @@ def test_upsert_no_degrada_estado_y_fusiona_aliases():
     # El contrato de no-degradación y unión vive en el SQL (CASE + jsonb_agg).
     sess = _FakeSession()
     EntidadRepository(sess).upsert_entidad(
-        EntidadRow(
-            nombre="Nutresa", nombre_normalizado="nutresa", estado=ESTADO_VERIFICADO
-        )
+        EntidadRow(nombre="Nutresa", nombre_normalizado="nutresa", estado=ESTADO_VERIFICADO)
     )
     sql = sess.sqls[-1]
     assert "CASE WHEN" in sql and "'verificado'" in sql  # no baja de verificado
@@ -197,24 +195,40 @@ def test_add_atributo_idempotente_por_clave_fuente():
 # --- Consulta de anclaje ---
 
 
-def _row(
-    nombre, nombre_norm, estado, n_chunks, alcance=None, descriptor="", aliases=None
-):
+def _row(nombre, nombre_norm, estado, n_chunks, alcance=None, descriptor="", aliases=None):
     """Tupla en el orden del SELECT del repo (DT-063/DT-UI04f):
     (nombre, norm, alcance, estado, n_chunks, productos_perfil, aliases)."""
     return (nombre, nombre_norm, alcance, estado, n_chunks, descriptor, aliases)
 
 
 def _local_row(
-    nombre, desc="", tam=0, ciudad=None, vertical=None, segmento=None, verificado=True,
-    ventas_cop=None, n_menciones=0,
+    nombre,
+    desc="",
+    tam=0,
+    ciudad=None,
+    vertical=None,
+    segmento=None,
+    verificado=True,
+    ventas_cop=None,
+    n_menciones=0,
 ):
     """Tupla en el orden del SELECT de list_locales_by_sector:
     (nombre, ciudad, vertical, ingreso, segmento, verificado, tam, descripcion,
      prod_perfil, ventas_cop, n_menciones).
     """
-    return (nombre, ciudad, vertical, None, segmento, verificado, tam, None, desc,
-            ventas_cop, n_menciones)
+    return (
+        nombre,
+        ciudad,
+        vertical,
+        None,
+        segmento,
+        verificado,
+        tam,
+        None,
+        desc,
+        ventas_cop,
+        n_menciones,
+    )
 
 
 def test_list_competidores_sin_productos_ordena_por_evidencia():
@@ -263,9 +277,7 @@ def test_list_competidores_filtra_por_solape_de_producto():
     nombres = EntidadRepository(sess).list_competidores_by_sector(
         "3020", productos_terms={"lacteos", "leche", "yogurt"}
     )
-    assert nombres == [
-        "Colanta"
-    ]  # solape lácteo; bebida (sin solape) y medio (ruido) fuera
+    assert nombres == ["Colanta"]  # solape lácteo; bebida (sin solape) y medio (ruido) fuera
 
 
 def test_list_competidores_alcance_global_excluye_locales():
@@ -349,9 +361,7 @@ def test_list_locales_excluye_empresa_analizada():
 def test_list_locales_multisector_usa_any_y_pasa_lista():
     # DT-UI04b: con varios sectores el JOIN usa ANY(:sectores) y recibe la lista (grupo del LLM +
     # grupo canónico del CIIU); así una eléctrica en 1010 alcanza a sus pares curados en 5510.
-    sess = _FakeSession(
-        select_rows=[_local_row("Celsia", desc="energía solar", tam=800)]
-    )
+    sess = _FakeSession(select_rows=[_local_row("Celsia", desc="energía solar", tam=800)])
     locales = EntidadRepository(sess).list_locales_by_sector(
         ["1010", "5510"], productos_terms={"energia", "solar"}
     )
@@ -366,9 +376,7 @@ def test_list_locales_multisector_usa_any_y_pasa_lista():
 def test_list_locales_acepta_str_una_lista():
     # Backward-compat: un str se normaliza a lista de un elemento (comportamiento previo intacto).
     sess = _FakeSession(select_rows=[_local_row("Colanta", desc="lácteos", tam=500)])
-    locales = EntidadRepository(sess).list_locales_by_sector(
-        "3020", productos_terms={"lacteos"}
-    )
+    locales = EntidadRepository(sess).list_locales_by_sector("3020", productos_terms={"lacteos"})
     assert [r.nombre for r in locales] == ["Colanta"]
     assert sess.params[-1]["sectores"] == ["3020"]
 

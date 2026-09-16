@@ -16,19 +16,19 @@ SYSTEM_PROMPT_06 = (
     "estratégica.\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada afirmación en los fragmentos de fuentes proporcionados.\n"
-    "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
+    '- Si un dato no está disponible, escribe exactamente: "Dato no disponible en fuentes consultadas."\n'  # noqa: E501
     "- No inventar información. No inferir datos sin evidencia en el contexto.\n"
     "- IDIOMA OBLIGATORIO: Toda la respuesta debe estar íntegramente en español latino neutro. "
     "Está prohibido usar chino, inglés u otro idioma.\n\n"
     "REGLAS DE ESTILO:\n"
     "- Tono ejecutivo y profesional, pero PROPOSITIVO (no imperativo): este es un documento de "
     "RECOMENDACIÓN y quien decide qué se hace es el lector (tomador de decisión), no el informe. "
-    "Presenta cada acción como una oportunidad o alternativa a evaluar (\"una oportunidad es…\", "
-    "\"la empresa podría…\", \"convendría explorar…\", \"se abre la posibilidad de…\", "
-    "\"un camino posible es…\"). PROHIBIDO el modo imperativo y las construcciones de obligación "
-    "dirigidas a la empresa: \"debe\", \"tiene que\", \"hay que\", \"debería\" en tono de mandato, "
-    "\"implemente\", \"migre\", \"desarrolle\".\n"
-    "- Evita muletillas: \"quizás\", \"en resumen\", \"por lo tanto\", \"cabe destacar\".\n"
+    'Presenta cada acción como una oportunidad o alternativa a evaluar ("una oportunidad es…", '
+    '"la empresa podría…", "convendría explorar…", "se abre la posibilidad de…", '
+    '"un camino posible es…"). PROHIBIDO el modo imperativo y las construcciones de obligación '
+    'dirigidas a la empresa: "debe", "tiene que", "hay que", "debería" en tono de mandato, '
+    '"implemente", "migre", "desarrolle".\n'
+    '- Evita muletillas: "quizás", "en resumen", "por lo tanto", "cabe destacar".\n'
     "- Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo evidencia cuantificable.\n"  # noqa: E501
     "- Cada sección: texto corrido (storytelling), sin viñetas.\n"
     "- Varía el ritmo: alterna frases cortas (≤12 palabras) con frases más largas.\n"
@@ -37,7 +37,7 @@ SYSTEM_PROMPT_06 = (
 )
 
 USER_PROMPT_06 = (
-    "Genera el \"Capítulo 5. Convergencia Empresarial en las Áreas Estratégicas del Distrito\" "
+    'Genera el "Capítulo 5. Convergencia Empresarial en las Áreas Estratégicas del Distrito" '
     "para el informe de inteligencia competitiva de la empresa descrita a continuación.\n\n"
     "DESCRIPCIÓN DE LA EMPRESA:\n{descripcion_empresa}\n\n"
     "CLASIFICACIÓN SECTORIAL:\n{sector_gics}\n\n"
@@ -46,9 +46,9 @@ USER_PROMPT_06 = (
     "CONTEXTO TERRITORIAL Y ÁREAS ESTRATÉGICAS DEL DISTRITO:\n"
     "{retrieval_convergencia_territorial}\n\n"
     "Inicia con el siguiente párrafo introductorio (transcríbelo exactamente):\n"
-    "\"La convergencia empresarial analiza cómo las estrategias de la empresa se alinean con las "
+    '"La convergencia empresarial analiza cómo las estrategias de la empresa se alinean con las '
     "prioridades del territorio y las tendencias del sector, identificando puntos de intersección que "  # noqa: E501
-    "generan ventajas competitivas sostenibles y contribuyen al desarrollo regional.\"\n\n"
+    'generan ventajas competitivas sostenibles y contribuyen al desarrollo regional."\n\n'
     "## 5.1 Área Estratégica: Sostenibilidad Ambiental\n\n"
     "Identifica oportunidades concretas para la empresa en sostenibilidad ambiental derivadas del "  # noqa: E501
     "contexto territorial y sectorial. Explica el por qué de cada oportunidad. Propone 3 acciones "  # noqa: E501
@@ -73,10 +73,12 @@ USER_PROMPT_06 = (
 
 
 def build_chain_06(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_06),
-        ("human", USER_PROMPT_06),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_06),
+            ("human", USER_PROMPT_06),
+        ]
+    )
     return prompt | llm | StrOutputParser()
 
 
@@ -98,18 +100,20 @@ _SYNTH_USER = (
     "Integra los siguientes análisis en el Capítulo 5. Convergencia Empresarial en las Áreas "
     "Estratégicas del Distrito, respetando EXACTAMENTE las 4 áreas (5.1 a 5.4) y sin crear "
     "subsecciones adicionales.\n\n"
-    "Inicia con: \"La convergencia empresarial analiza cómo las estrategias de la empresa se "
+    'Inicia con: "La convergencia empresarial analiza cómo las estrategias de la empresa se '
     "alinean con las prioridades del territorio y las tendencias del sector, identificando puntos "  # noqa: E501
     "de intersección que generan ventajas competitivas sostenibles y contribuyen al desarrollo "
-    "regional.\"\n\n"
+    'regional."\n\n'
     "{partes}"
 )
 
 
 def build_chain_06_synth(llm: object) -> Runnable:
     """Síntesis integradora: recibe {partes} (output de 3 ejes) y produce Cap 5 final."""
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", _SYNTH_SYSTEM),
-        ("human", _SYNTH_USER),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _SYNTH_SYSTEM),
+            ("human", _SYNTH_USER),
+        ]
+    )
     return prompt | llm | StrOutputParser()

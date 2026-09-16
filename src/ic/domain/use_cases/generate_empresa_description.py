@@ -39,11 +39,13 @@ class GenerateEmpresaDescription:
                 ),
             )
 
-        texto = self._chain.invoke({
-            "nombre_empresa": nombre_empresa,
-            "actividad_ciiu": ciiu,
-            "web_context": web_context,
-        })
+        texto = self._chain.invoke(
+            {
+                "nombre_empresa": nombre_empresa,
+                "actividad_ciiu": ciiu,
+                "web_context": web_context,
+            }
+        )
 
         if has_cjk_characters(texto):
             return DescripcionEmpresa(

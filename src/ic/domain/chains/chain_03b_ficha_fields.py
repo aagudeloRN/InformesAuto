@@ -82,8 +82,10 @@ def parse_ficha_fields(raw: str, claves_validas: set[str]) -> dict[str, str]:
 
 
 def build_chain_ficha_fields(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_03B),
-        ("human", USER_PROMPT_03B),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_03B),
+            ("human", USER_PROMPT_03B),
+        ]
+    )
     return prompt | llm | StrOutputParser()

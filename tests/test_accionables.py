@@ -79,7 +79,9 @@ class TestGenerateAccionables:
 
         uc = GenerateAccionables(mock_chain, mock_store)
         uc.execute(
-            "Noel", "Empresa.", "Alimentos",
+            "Noel",
+            "Empresa.",
+            "Alimentos",
             hallazgos_caps_previos="## Cap 2\nAlpina lidera el sector lácteo.",
         )
 

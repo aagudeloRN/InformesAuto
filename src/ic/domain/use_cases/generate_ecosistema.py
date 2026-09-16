@@ -60,7 +60,9 @@ class GenerateEcosistema:
         for subsec in SUBSECCIONES:
             _sid, _titulo, _desc, query = subsec
             sub_chunks = self._store.search(
-                f"{sector_query} {query}", sector_gics=sector_gics_code, empresa_id=empresa_id,
+                f"{sector_query} {query}",
+                sector_gics=sector_gics_code,
+                empresa_id=empresa_id,
             )
             if not check_retrieval_sufficient(sub_chunks, min_chunks=_MIN_CHUNKS):
                 continue
@@ -82,13 +84,15 @@ class GenerateEcosistema:
         context = format_chunks_as_context(chunks_usados)
         web_context = format_academic_sources(all_web_results)
 
-        texto = self._chain.invoke({
-            "descripcion_empresa": descripcion_empresa,
-            "sector_gics": sector_gics,
-            "retrieval_sector": context,
-            "fuentes_web": web_context,
-            "secciones_solicitadas": build_secciones_solicitadas(activas),
-        })
+        texto = self._chain.invoke(
+            {
+                "descripcion_empresa": descripcion_empresa,
+                "sector_gics": sector_gics,
+                "retrieval_sector": context,
+                "fuentes_web": web_context,
+                "secciones_solicitadas": build_secciones_solicitadas(activas),
+            }
+        )
         texto = strip_preamble(texto)
 
         if has_cjk_characters(texto):

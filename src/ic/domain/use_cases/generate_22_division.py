@@ -40,8 +40,9 @@ _CUADRANTE_KEYS = [k.value for k in CuadranteKey]
 # Helpers puros
 # ---------------------------------------------------------------------------
 
+
 def _build_closed_list(cap21: Cap21Jugadores) -> list[str]:
-    """Extrae todos los nombres de empresa de Cap 2.1 en orden tier (global > regional > startup)."""
+    """Extrae nombres de empresa de Cap 2.1 en orden tier (global > regional > startup)."""
     names: list[str] = []
     if cap21.globales:
         names.extend(cap21.globales.candidatos)
@@ -122,30 +123,32 @@ def _build_clasificaciones(
     """Construye la lista de clasificaciones; marca dato_no_disponible si el LLM lo indica."""
     sintesis_text = ""
     if parsed_validated:
-        sintesis_text = " ".join([
-            parsed_validated.get("sintesis_incumbente", ""),
-            parsed_validated.get("sintesis_entrante", ""),
-        ])
+        sintesis_text = " ".join(
+            [
+                parsed_validated.get("sintesis_incumbente", ""),
+                parsed_validated.get("sintesis_entrante", ""),
+            ]
+        )
 
     clases: list[ClasificacionCompetidor] = []
     for clave in _CUADRANTE_KEYS:
         cuadrante_key = CuadranteKey(clave)
         for nombre in cuadrantes.get(clave, []):
-            dato_nd = (
-                _DATO_NO_DISPONIBLE_MARKER in sintesis_text
-                and nombre in sintesis_text
+            dato_nd = _DATO_NO_DISPONIBLE_MARKER in sintesis_text and nombre in sintesis_text
+            clases.append(
+                ClasificacionCompetidor(
+                    nombre=nombre,
+                    cuadrante=cuadrante_key,
+                    dato_no_disponible=dato_nd,
+                )
             )
-            clases.append(ClasificacionCompetidor(
-                nombre=nombre,
-                cuadrante=cuadrante_key,
-                dato_no_disponible=dato_nd,
-            ))
     return clases
 
 
 # ---------------------------------------------------------------------------
 # Use case
 # ---------------------------------------------------------------------------
+
 
 class Generate22Division:
     """Orquestador de Cap 2.2: valida input → llama LLM → valida output → persiste."""
@@ -165,9 +168,7 @@ class Generate22Division:
         # --- Guard: Cap 2.1 vacío o retrieval insuficiente ---
         closed_list = _build_closed_list(cap21)
         if not cap21.retrieval_suficiente or not closed_list:
-            logger.info(
-                "Cap 2.2: Cap 2.1 vacío o retrieval insuficiente — párrafo de ausencia"
-            )
+            logger.info("Cap 2.2: Cap 2.1 vacío o retrieval insuficiente — párrafo de ausencia")
             return Cap22Division(
                 texto=absent_paragraph(),
                 clasificaciones=[],
@@ -180,28 +181,31 @@ class Generate22Division:
         fichas_context = _build_fichas_context(cap21)
         empresa_sector = (
             f"{empresa.nombre_empresa} — {empresa.texto[:300]}"
-            if empresa.texto else empresa.nombre_empresa
+            if empresa.texto
+            else empresa.nombre_empresa
         )
         feedback_str = feedback.strip() if feedback else ""
 
         # --- Invocar LLM con retry en JSON malformado ---
         parsed: dict | None = None
         for attempt in range(_MAX_RETRIES):
-            raw = self._chain.invoke({
-                "closed_list_str": closed_list_str,
-                "fichas_context": fichas_context,
-                "empresa_sector": empresa_sector,
-                "feedback": feedback_str,
-            })
+            raw = self._chain.invoke(
+                {
+                    "closed_list_str": closed_list_str,
+                    "fichas_context": fichas_context,
+                    "empresa_sector": empresa_sector,
+                    "feedback": feedback_str,
+                }
+            )
             parsed = _parse_llm_json(raw)
             if parsed is not None:
                 break
-            logger.warning(
-                "Cap 2.2: JSON malformado en intento %d/%d", attempt + 1, _MAX_RETRIES
-            )
+            logger.warning("Cap 2.2: JSON malformado en intento %d/%d", attempt + 1, _MAX_RETRIES)
 
         if parsed is None:
-            logger.error("Cap 2.2: JSON malformado tras %d intentos — párrafo de ausencia", _MAX_RETRIES)
+            logger.error(
+                "Cap 2.2: JSON malformado tras %d intentos — párrafo de ausencia", _MAX_RETRIES
+            )
             return Cap22Division(
                 texto=absent_paragraph(),
                 clasificaciones=[],
@@ -225,7 +229,9 @@ class Generate22Division:
             except (CoverageError, DuplicateError) as exc:
                 logger.warning(
                     "Cap 2.2: error de ensamblaje (intento %d/%d): %s",
-                    attempt + 1, _MAX_RETRIES, exc,
+                    attempt + 1,
+                    _MAX_RETRIES,
+                    exc,
                 )
                 # en el segundo intento no hay más reintentos de LLM disponibles
                 if attempt + 1 >= _MAX_RETRIES:

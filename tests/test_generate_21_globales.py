@@ -47,6 +47,7 @@ class _FakeWebConnector:
     def search(self, query: str, max_results: int = 3):
         self.search_calls.append(query)
         from ic.shared.types import WebResult
+
         return [
             WebResult(url=f"http://ex.com/{i}", title="T", content="contenido", snippet="s")
             for i in range(self._results_per_query)

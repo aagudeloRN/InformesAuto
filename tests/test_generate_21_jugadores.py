@@ -7,7 +7,13 @@ Fast (sin DB ni red): inyecta stubs de gen_globales, gen_regionales, gen_startup
 from __future__ import annotations
 
 from ic.domain.use_cases.generate_21_jugadores import Generate21Jugadores
-from ic.shared.types import Cap21Globales, Cap21Jugadores, Cap21Regionales, Cap21Startups, ChunkResult
+from ic.shared.types import (
+    Cap21Globales,
+    Cap21Jugadores,
+    Cap21Regionales,
+    Cap21Startups,
+    ChunkResult,
+)
 
 
 def _chunk() -> ChunkResult:
@@ -24,7 +30,9 @@ def _globales(texto: str = "### Referentes Globales\n\nNestlé, Danone.") -> Cap
     )
 
 
-def _regionales(texto: str = "### Referentes Regionales LatAm/Colombia\n\nNutresa.") -> Cap21Regionales:
+def _regionales(
+    texto: str = "### Referentes Regionales LatAm/Colombia\n\nNutresa.",
+) -> Cap21Regionales:
     return Cap21Regionales(
         texto=texto,
         empresas_emis=["Nutresa"],
@@ -178,7 +186,9 @@ def test_subseccion_ausente_excluida_del_texto_ensamblado():
     # Caso B: Startups ausentes — 2.1.3 no debe aparecer; 2.1.1 y 2.1.2 sí
     orch_b, _, _, _ = _make_orchestrator(
         globales_result=_globales("### 2.1.1. Referentes Globales\n\nNestlé."),
-        regionales_result=_regionales("### 2.1.2. Referentes Regionales LatAm/Colombia\n\nNutresa."),
+        regionales_result=_regionales(
+            "### 2.1.2. Referentes Regionales LatAm/Colombia\n\nNutresa."
+        ),
         startups_result=_ausente_startups(),
     )
     res_b = orch_b.execute(**_EXECUTE_KWARGS)

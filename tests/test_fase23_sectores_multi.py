@@ -60,7 +60,7 @@ def test_backfill_sectores_sql_scope_y_guarda():
     sess = _StatefulSession(None)
     EmbeddingRepository(sess).backfill_sectores("Doc X", ["3020", "2510"])
     sql = sess.sqls[-1]
-    assert "metadatos->>'titulo' = :titulo" in sql          # acotado al documento
+    assert "metadatos->>'titulo' = :titulo" in sql  # acotado al documento
     assert "IS DISTINCT FROM CAST(:sectores AS jsonb)" in sql  # idempotencia
     assert "jsonb_build_object('sectores'" in sql
 

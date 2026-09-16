@@ -37,10 +37,10 @@ def test_parse_mentions_solo_org_y_deduplica():
     # no del filtro NER crudo; incluir PER inundaría el sustrato de ejecutivos/analistas.
     spans = [
         ("Alpina S.A.S.", "ORG"),
-        ("ALPINA sas", "ORG"),      # mismo normalizado → dedup
-        ("Bogotá", "LOC"),           # descartado (lugar)
-        ("María Restrepo", "PER"),   # descartado (persona: analista/ejecutivo, no empresa)
-        ("Colanta", "MISC"),         # MISC descartado (ruido en este corpus)
+        ("ALPINA sas", "ORG"),  # mismo normalizado → dedup
+        ("Bogotá", "LOC"),  # descartado (lugar)
+        ("María Restrepo", "PER"),  # descartado (persona: analista/ejecutivo, no empresa)
+        ("Colanta", "MISC"),  # MISC descartado (ruido en este corpus)
     ]
     ms = parse_mentions(spans)
     norms = sorted(m.normalizada for m in ms)
@@ -50,17 +50,21 @@ def test_parse_mentions_solo_org_y_deduplica():
 
 def test_parse_mentions_descarta_boilerplate_y_corto():
     # Boilerplate etiquetado ORG por spaCy pero que NO es empresa; y 'S.A.' → '' tras normalizar.
-    spans = [("ISI Markets", "ORG"), ("the", "ORG"),
-             ("All Rights Reserved", "ORG"), ("S.A.", "ORG")]
+    spans = [
+        ("ISI Markets", "ORG"),
+        ("the", "ORG"),
+        ("All Rights Reserved", "ORG"),
+        ("S.A.", "ORG"),
+    ]
     assert parse_mentions(spans) == []
 
 
 def test_parse_mentions_descarta_ocr_y_anios():
     # Artefactos: OCR con letras espaciadas y nombres con año no son empresas.
     spans = [
-        ("country comparisons p a g e", "ORG"),   # OCR spacing
-        ("World Energy Outlook 2025", "ORG"),      # contiene año
-        ("Grupo Nutresa", "ORG"),                  # empresa real → se conserva
+        ("country comparisons p a g e", "ORG"),  # OCR spacing
+        ("World Energy Outlook 2025", "ORG"),  # contiene año
+        ("Grupo Nutresa", "ORG"),  # empresa real → se conserva
     ]
     ms = parse_mentions(spans)
     assert [m.normalizada for m in ms] == ["grupo nutresa"]
@@ -149,8 +153,13 @@ class _DedupSession:
 
 def _fila(norm, chunk="11111111-1111-1111-1111-111111111111"):
     return MencionRow(
-        entidad_normalizada=norm, entidad_texto=norm.title(), tipo="ORG",
-        chunk_id=chunk, documento_id=None, sector="3020", fuente_tipo="informe_emis",
+        entidad_normalizada=norm,
+        entidad_texto=norm.title(),
+        tipo="ORG",
+        chunk_id=chunk,
+        documento_id=None,
+        sector="3020",
+        fuente_tipo="informe_emis",
     )
 
 

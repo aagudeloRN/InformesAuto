@@ -92,8 +92,10 @@ def parse_pares_globales(raw: str) -> list[str]:
 
 
 def build_chain_pares_globales(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_02C),
-        ("human", USER_PROMPT_02C),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_02C),
+            ("human", USER_PROMPT_02C),
+        ]
+    )
     return prompt | llm | StrOutputParser()

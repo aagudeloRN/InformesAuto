@@ -16,7 +16,7 @@ SYSTEM_PROMPT_08 = (
     "- IDIOMA OBLIGATORIO: Toda la respuesta en español latino neutro.\n\n"
     "REGLAS DE ESTILO:\n"
     "- Tono C-Level: directo, orientado a la acción, sin ambigüedades.\n"
-    "- Prohibido: \"podría\", \"quizás\", \"en resumen\", \"por lo tanto\", \"cabe destacar\".\n"
+    '- Prohibido: "podría", "quizás", "en resumen", "por lo tanto", "cabe destacar".\n'
     "- Sin adjetivos vacíos.\n"
     "- Texto corrido, sin viñetas ni listas.\n"
     "- Extensión: entre 400 y 600 palabras (una página ejecutiva).\n"
@@ -24,7 +24,7 @@ SYSTEM_PROMPT_08 = (
 )
 
 USER_PROMPT_08 = (
-    "Genera el \"Resumen Ejecutivo\" para el informe de inteligencia competitiva de la empresa "
+    'Genera el "Resumen Ejecutivo" para el informe de inteligencia competitiva de la empresa '
     "descrita a continuación, basándote exclusivamente en los capítulos del informe.\n\n"
     "EMPRESA:\n{descripcion_empresa}\n\n"
     "CLASIFICACIÓN SECTORIAL:\n{sector_gics}\n\n"
@@ -44,8 +44,10 @@ USER_PROMPT_08 = (
 
 
 def build_chain_08(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_08),
-        ("human", USER_PROMPT_08),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_08),
+            ("human", USER_PROMPT_08),
+        ]
+    )
     return prompt | llm | StrOutputParser()

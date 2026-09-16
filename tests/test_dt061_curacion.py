@@ -25,12 +25,14 @@ _SUBS_VALIDOS = {SUB_GICS_302010_BEVERAGES, SUB_GICS_302020_FOOD, SUB_GICS_30203
 
 def test_descartar_ruido_marca_solo_ruido_y_no_degrada_verificado():
     # Filas candidatas (id, nombre_normalizado); solo las de ruido deben marcarse.
-    sess = _FakeSession(select_rows=[
-        (1, "colanta"),
-        (2, "beverage industry news"),  # medio → ruido
-        (3, "profitmargin"),            # métrica → ruido
-        (4, "nestlé"),
-    ])
+    sess = _FakeSession(
+        select_rows=[
+            (1, "colanta"),
+            (2, "beverage industry news"),  # medio → ruido
+            (3, "profitmargin"),  # métrica → ruido
+            (4, "nestlé"),
+        ]
+    )
     marcados = EntidadRepository(sess).descartar_ruido_competidores()
     assert marcados == ["beverage industry news", "profitmargin"]
     # El SELECT excluye ya-descartados y verificados (idempotencia + no-degradación).

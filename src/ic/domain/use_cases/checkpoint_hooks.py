@@ -32,7 +32,9 @@ def load(ctx: _PipelineContext) -> None:
         if ctx.checkpoint:
             logger.info(
                 "Resume: %d capítulos recuperados del checkpoint (%s): %s",
-                len(ctx.checkpoint), ctx.run_key, ", ".join(sorted(ctx.checkpoint)),
+                len(ctx.checkpoint),
+                ctx.run_key,
+                ", ".join(sorted(ctx.checkpoint)),
             )
         else:
             logger.info("Resume: sin checkpoint previo para %s — corrida completa", ctx.run_key)
@@ -48,6 +50,7 @@ def restore(ctx: _PipelineContext, nombre: str):
         return None
     try:
         from ic.domain.checkpoint_serde import deserialize_cap
+
         return deserialize_cap(payload)
     except Exception:
         logger.warning("Checkpoint de '%s' corrupto — se recomputa", nombre, exc_info=True)

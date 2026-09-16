@@ -21,10 +21,12 @@ class Settings(BaseSettings):
     # OpenRouter (escalado API)
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_api_key: str = ""
-    llm_api_free_model: str = ""      # tier free primario (Nemotron Super 120B)
-    llm_api_free_alt_model: str = ""  # tier free alternativo (ej: meta-llama/llama-3.3-70b-instruct:free)  # noqa: E501
-    llm_api_synth_model: str = ""     # tier síntesis (Gemini 2.5 Flash — Google directo)
-    llm_api_paid_model: str = ""      # respaldo pago (Gemma 3/4)
+    llm_api_free_model: str = ""  # tier free primario (Nemotron Super 120B)
+    llm_api_free_alt_model: str = (
+        ""  # tier free alternativo (ej: meta-llama/llama-3.3-70b-instruct:free)  # noqa: E501
+    )
+    llm_api_synth_model: str = ""  # tier síntesis (Gemini 2.5 Flash — Google directo)
+    llm_api_paid_model: str = ""  # respaldo pago (Gemma 3/4)
 
     # Proveedor por tier (2026-08-03): enruta un tier a otra API OpenAI-compat sin tocar código
     # (ADR-002). "openrouter" (default) o "gemini". El resolver mapea provider→(base_url, key).
@@ -36,7 +38,7 @@ class Settings(BaseSettings):
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     gemini_api_key: str = ""
     # Fallback universal anexado al final de la cadena resiliente (auto-router free de OpenRouter).
-    llm_api_fallback_model: str = ""       # .env → "openrouter/free"
+    llm_api_fallback_model: str = ""  # .env → "openrouter/free"
     llm_api_fallback_provider: str = "openrouter"
     # Red de seguridad de tokens de salida para la API (alta; no trunca síntesis legítimas).
     llm_api_max_tokens_output: int = 32000
@@ -120,9 +122,9 @@ class Settings(BaseSettings):
     llm_api_timeout_paid: int = 120
 
     # Gate de latencia/costo (Fase 15, T15.4)
-    eval_gate_max_latency_ms: float = 3000.0   # ms por consulta embed+SQL
+    eval_gate_max_latency_ms: float = 3000.0  # ms por consulta embed+SQL
     eval_gate_max_latency_sql_ms: float = 50.0  # ms SQL puro
-    eval_gate_max_cost_usd: float = 0.0         # harness no gasta API
+    eval_gate_max_cost_usd: float = 0.0  # harness no gasta API
 
     # Fuentes automáticas (ADR-003)
     openalex_email: str = ""
@@ -140,7 +142,7 @@ class Settings(BaseSettings):
     # evaluador reusa el LLM resiliente ya construido (sin nombre de modelo en código, ADR-002).
     selfreview_enabled: bool = False
     selfreview_min_total: int = 11  # gate de la rúbrica (>=11/15 y sin dimensión en 0)
-    selfreview_max_iter: int = 3    # tope de iteraciones de revisión por capítulo
+    selfreview_max_iter: int = 3  # tope de iteraciones de revisión por capítulo
 
     # Descubrimiento LLM de competidores globales (DT-062) — el LLM recomienda actores de clase
     # mundial, corroborados por web dirigida (RN-001), sembrados alcance=global. Flag maestro

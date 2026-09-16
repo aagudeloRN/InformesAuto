@@ -56,12 +56,14 @@ select = ["E", "F", "I", "UP"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = "-m 'not integration'"
 env = [
     "OPENBLAS_NUM_THREADS=1",
     "OMP_NUM_THREADS=1",
 ]
 markers = [
     "slow: tests que invocan Ollama real o red externa (excluir con -m 'not slow')",
+    "integration: tests E2E que requieren PostgreSQL y/o LLM real (excluir con -m 'not integration')",
 ]
 
 [tool.uv.sources]

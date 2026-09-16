@@ -12,9 +12,9 @@ class EmpresaRepository:
 
     def upsert_by_name(self, nombre: str) -> Empresa:
         """Busca empresa por nombre exacto; crea si no existe. Idempotente."""
-        existing = (
-            self._db.execute(select(Empresa).where(Empresa.nombre == nombre)).scalar_one_or_none()
-        )
+        existing = self._db.execute(
+            select(Empresa).where(Empresa.nombre == nombre)
+        ).scalar_one_or_none()
         if existing:
             return existing
         empresa = Empresa(nombre=nombre)

@@ -31,9 +31,7 @@ _SAMPLE_WORK = {
     "publication_year": 2023,
     "cited_by_count": 42,
     "authorships": [{"author": {"display_name": "García Ramírez Juan"}}],
-    "primary_location": {
-        "source": {"display_name": "Journal of Food Science"}
-    },
+    "primary_location": {"source": {"display_name": "Journal of Food Science"}},
     "abstract_inverted_index": {
         "Food": [0],
         "trends": [1],
@@ -52,6 +50,7 @@ def _mock_response(works: list[dict], status: int = 200) -> MagicMock:
     }
     if status >= 400:
         import httpx
+
         resp.raise_for_status.side_effect = httpx.HTTPStatusError(
             "error", request=MagicMock(), response=resp
         )
@@ -92,6 +91,7 @@ class TestOpenAlexConnector:
     def test_search_empty_on_network_error(self):
         """Si hay error de red, retorna lista vacía."""
         import httpx
+
         connector = OpenAlexConnector(_make_settings())
         with patch("httpx.get", side_effect=httpx.RequestError("timeout")):
             results = connector.search("cualquier cosa")

@@ -61,7 +61,9 @@ def _run_ingest(tipo, sector_gics="3020"):
         mock_session.return_value.__exit__.return_value = False
 
         mod.PdfIngestor(settings).ingest_batched(
-            pdf_path="/fake/emis.pdf", sector_gics=sector_gics, tipo=tipo,
+            pdf_path="/fake/emis.pdf",
+            sector_gics=sector_gics,
+            tipo=tipo,
         )
     return capturado
 

@@ -43,13 +43,15 @@ class GenerateAccionables:
 
         context = format_chunks_as_context(chunks)
 
-        texto = self._chain.invoke({
-            "descripcion_empresa": descripcion_empresa,
-            "sector_gics": sector_gics,
-            "retrieval_cruzado": context,
-            "hallazgos_caps_previos": hallazgos_caps_previos
-            or "No se proporcionaron resúmenes de capítulos previos.",
-        })
+        texto = self._chain.invoke(
+            {
+                "descripcion_empresa": descripcion_empresa,
+                "sector_gics": sector_gics,
+                "retrieval_cruzado": context,
+                "hallazgos_caps_previos": hallazgos_caps_previos
+                or "No se proporcionaron resúmenes de capítulos previos.",
+            }
+        )
         texto = strip_preamble(texto)
 
         if has_cjk_characters(texto):

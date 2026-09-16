@@ -15,10 +15,15 @@ from ic.shared.types import (
 _CJK_TEXT = "这是中文文本，包含多个汉字字符用于测试。系统应该拒绝这段文字。"
 _ES_TEXT = "Este es un texto en español latino neutro que el sistema debe aceptar."
 
+
 def _make_chunks(n: int = 6) -> list[ChunkResult]:
     return [
-        ChunkResult(chunk_texto=f"Texto único del chunk número {i}.", fuente_tipo="web",
-                    fuente_url=f"https://fuente{i}.com", score=0.9)
+        ChunkResult(
+            chunk_texto=f"Texto único del chunk número {i}.",
+            fuente_tipo="web",
+            fuente_url=f"https://fuente{i}.com",
+            score=0.9,
+        )
         for i in range(n)
     ]
 
@@ -51,6 +56,7 @@ def _make_web() -> MagicMock:
 class TestBenchmarkingCJK:
     def _uc(self, texto: str) -> CapBenchmarking:
         from ic.domain.use_cases.generate_benchmarking import GenerateBenchmarking
+
         return GenerateBenchmarking(
             chain=_make_chain(texto),
             store=_make_store(),
@@ -74,6 +80,7 @@ class TestBenchmarkingCJK:
 class TestTendenciasCJK:
     def _uc(self, texto: str) -> CapTendencias:
         from ic.domain.use_cases.generate_tendencias import GenerateTendencias
+
         openalex = MagicMock()
         openalex.search.return_value = []
         return GenerateTendencias(
@@ -100,6 +107,7 @@ class TestTendenciasCJK:
 class TestEcosistemaCJK:
     def _uc(self, texto: str) -> CapEcosistema:
         from ic.domain.use_cases.generate_ecosistema import GenerateEcosistema
+
         return GenerateEcosistema(
             chain=_make_chain(texto),
             store=_make_store(),
@@ -123,6 +131,7 @@ class TestEcosistemaCJK:
 class TestConvergenciaCJK:
     def _uc_monolitica(self, texto: str) -> CapConvergencia:
         from ic.domain.use_cases.generate_convergencia import GenerateConvergencia
+
         return GenerateConvergencia(
             chain=_make_chain(texto),
             store=_make_store(),
@@ -132,6 +141,7 @@ class TestConvergenciaCJK:
 
     def _uc_dividida(self, texto_final: str) -> CapConvergencia:
         from ic.domain.use_cases.generate_convergencia import GenerateConvergencia
+
         chain_synth = _make_chain(texto_final)
         chain_eje = _make_chain("Análisis del eje.")
         return GenerateConvergencia(
@@ -164,6 +174,7 @@ class TestConvergenciaCJK:
 class TestAccionablesCJK:
     def _uc(self, texto: str) -> CapAccionables:
         from ic.domain.use_cases.generate_accionables import GenerateAccionables
+
         return GenerateAccionables(
             chain=_make_chain(texto),
             store=_make_store(_DUMMY_CHUNKS),
@@ -185,6 +196,7 @@ class TestAccionablesCJK:
 class TestResumenEjecutivoCJK:
     def _uc(self, texto: str) -> ResumenEjecutivo:
         from ic.domain.use_cases.generate_resumen_ejecutivo import GenerateResumenEjecutivo
+
         return GenerateResumenEjecutivo(
             chain=_make_chain(texto),
         ).execute(

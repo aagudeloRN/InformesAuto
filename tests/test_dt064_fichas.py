@@ -209,9 +209,7 @@ def test_list_ficha_atributos_mapea_filas_a_dict():
         ("Danone", None, "pais_origen", "Francia"),
     ]
     sess = _FakeSession(rows=rows)
-    fichas = EntidadRepository(sess).list_ficha_atributos_by_sector(
-        "3020", ["Nestlé", "Danone"]
-    )
+    fichas = EntidadRepository(sess).list_ficha_atributos_by_sector("3020", ["Nestlé", "Danone"])
     assert fichas["Nestlé"] == {"pais_origen": "Suiza", "portafolio": "Galletas."}
     assert fichas["Danone"] == {"pais_origen": "Francia"}
     # restringe por sector/nombres y consulta claves de ficha + alias de fuentes locales
@@ -230,14 +228,10 @@ def test_list_ficha_atributos_alias_local_y_ciudad():
     f = EntidadRepository(_FakeSession(rows=rows)).list_ficha_atributos_by_sector(
         "4510", ["StartCo"]
     )["StartCo"]
-    assert (
-        f["resumen_estrategico"] == "Plataforma SaaS de logística."
-    )  # descripcion → resumen
+    assert f["resumen_estrategico"] == "Plataforma SaaS de logística."  # descripcion → resumen
     assert f["portafolio"] == "LOGTECH"  # verticales → portafolio
     assert f["factor_diferencial"] == "IA, cloud"  # tecnologias → factor_diferencial
-    assert (
-        f["presencia_geografica"] == "Medellín"
-    )  # columna ciudad → presencia_geografica
+    assert f["presencia_geografica"] == "Medellín"  # columna ciudad → presencia_geografica
     assert "pais_origen" not in f  # la columna región NO alimenta pais_origen
 
 

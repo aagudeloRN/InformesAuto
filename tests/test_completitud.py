@@ -37,11 +37,13 @@ def test_capitulo_completo_puntua_mas_que_degradado():
 def test_frases_de_ausencia_no_inflan_el_score():
     con_datos = CapTendencias(
         texto="## Tendencias\nCrecimiento del 27% en RTD saludable.",
-        n_chunks_usados=1, retrieval_suficiente=True,
+        n_chunks_usados=1,
+        retrieval_suficiente=True,
     )
     sin_datos = CapTendencias(
         texto="## Tendencias\nDatos no disponibles en las fuentes consultadas.",
-        n_chunks_usados=0, retrieval_suficiente=False,
+        n_chunks_usados=0,
+        retrieval_suficiente=False,
     )
     assert score_capitulo(con_datos) > score_capitulo(sin_datos)
 
@@ -49,7 +51,9 @@ def test_frases_de_ausencia_no_inflan_el_score():
 def test_bonus_por_productos_servicios():
     base = DescripcionEmpresa("X", None, "## Descripción\nTexto base de la empresa.")
     con_prod = DescripcionEmpresa(
-        "X", None, "## Descripción\nTexto base de la empresa.",
+        "X",
+        None,
+        "## Descripción\nTexto base de la empresa.",
         productos_servicios="Lácteos, yogures",
     )
     assert score_capitulo(con_prod) > score_capitulo(base)

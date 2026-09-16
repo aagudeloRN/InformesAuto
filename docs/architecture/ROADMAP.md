@@ -190,20 +190,23 @@ web más específicas por empresa+sector en el paso de retrieval de benchmarking
 - **HITL (F24/F25):** captura/aprobación humana; depende de **DT-050b** (reconciliación EMIS↔NER por NIT).
 - **Estilo/documento (F26):** coherencia, Cap 5/6, numeración, estilo.
 
-## Deuda estructural (auditoría externa 2026-08-03 — `auditoria_arquitectura.md`)
-Abierta desde F19, **agravada esta línea de trabajo**:
+## Deuda estructural y Estado de Calidad
+
+### Deudas Saldadas en Spec 005 (Fase 31 ? QA, Integraci?n E2E y Deuda Estructural)
+| DT | Deuda | Resoluci?n (Spec 005) | Estado |
+|----|-------|------------------------|:------:|
+| **DT-037** | `gateway.py` >300L | Refactorizado en 4 subm?dulos (`gateway.py`, `gateway_errors.py`, `gateway_models.py`, `gateway_pricing.py`), todos <300L | **CERRADA** |
+| **DT-038** | `presentation/app.py` acoplado a `data/` | Desacoplado mediante `ui_query_services.py` (0 violaciones SoC) | **CERRADA** |
+| **DT-039** | `generate_informe.py` 576L | Refactorizado en 5 subm?dulos (`_informe_context.py`, `_informe_nodes_n0.py`, `_informe_nodes_n2.py`, `_informe_nodes_n3.py`, `generate_informe.py`), todos <300L | **CERRADA** |
+| **DT-040** | `_PRICING` y tracking de Gemini | Modelos Gemini 2.5 + lookup cascading (`CallRecord.costo_usd: float | None`) | **CERRADA** |
+| **DT-041** | Cobertura `domain/` <80% | Cobertura total de `src/ic/domain` elevada al **93%** (710 tests unitarios) | **CERRADA** |
+
+### Deudas Pendientes / Pr?ximos Frentes
 | DT | Deuda | Nota |
 |----|-------|------|
-| DT-037 | `gateway.py` >300L → paquete `infrastructure/llm/` | +200L esta sesión (guard/Gemini/fallback) |
-| DT-038 | `presentation/app.py` accede a `data/` directo | 🔴 crítico; **prereq de HITL** |
-| DT-039 | `generate_informe.py` 576L → extraer `generate_n3.py` | sigue creciendo |
-| DT-040 | `_PRICING` hardcodea IDs; hook con puntos ciegos | Gemini sin trackear → **costo $0** |
-| DT-041 | cobertura `domain/` 69% < 80% | re-medir (P0) |
-| DT-050b | reconciliación EMIS↔NER por NIT + HITL | duplicados inertes hoy (ERCO×2, ENERGY MASTER×2); paliados por dedup en el anclaje |
-| DT-UI04a+ | exclusión focal por **aliases**, no solo nombre normalizado | "HOLADR." no se excluye vs "HOLA DOCTOR S.A.S." |
-| DT-UI04b+ | anclaje **global** (2.1.1) y fichas siguen single-sector | extender `sectores_ancla_local` a `list_competidores_by_sector`/fichas |
-
-**Triaje sugerido:** DT-037/039/040 (agravados aquí) antes de más features; DT-038 antes de HITL.
+| **DT-050b** | Reconciliaci?n EMIS?NER por NIT + HITL | Duplicados inertes hoy; paliados por dedup en el anclaje |
+| **DT-UI04a+** | Exclusi?n focal por aliases en casos extremos | "HOLADR." vs "HOLA DOCTOR S.A.S." |
+| **DT-UI04b+** | Anclaje global multi-sector y fichas | Extensi?n de `sectores_ancla_local` |
 
 ## Documentación — cómo continuar (plan explícito)
 

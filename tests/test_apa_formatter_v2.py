@@ -170,10 +170,20 @@ class TestBuildReferencesSection:
 
     def test_orden_alfabetico(self):
         chunks = [
-            _chunk(texto="Z", fuente_nombre="Zebra Corp", año="2024", fuente_tipo="web",
-                   url="https://z.com"),
-            _chunk(texto="A", fuente_nombre="Alfa Corp", año="2024", fuente_tipo="web",
-                   url="https://a.com"),
+            _chunk(
+                texto="Z",
+                fuente_nombre="Zebra Corp",
+                año="2024",
+                fuente_tipo="web",
+                url="https://z.com",
+            ),
+            _chunk(
+                texto="A",
+                fuente_nombre="Alfa Corp",
+                año="2024",
+                fuente_tipo="web",
+                url="https://a.com",
+            ),
         ]
         refs = build_references_section(chunks)
         assert refs[0].autor.lower() < refs[1].autor.lower()
@@ -250,8 +260,13 @@ class TestFindOrphanCitations:
 class TestStripOrphanCitations:
     def _ref(self, autor: str, año: str = "2024") -> Referencia:
         return Referencia(
-            clave=f"{autor}{año}", autor=autor, año=año, titulo="Título",
-            fuente="Fuente", url=None, apa_string=f"{autor}. ({año}).",
+            clave=f"{autor}{año}",
+            autor=autor,
+            año=año,
+            titulo="Título",
+            fuente="Fuente",
+            url=None,
+            apa_string=f"{autor}. ({año}).",
         )
 
     def test_suprime_huerfana_y_conserva_valida(self):
@@ -293,8 +308,11 @@ class TestStripOrphanCitations:
 class TestChunksToRefsContract:
     def _pdf_chunk(self, url: str, titulo: str, autor: str) -> ChunkResult:
         return ChunkResult(
-            chunk_texto=f"Contenido de {titulo}.", fuente_tipo="pdf", fuente_url=url,
-            score=0.8, metadatos={"titulo": titulo, "autor": autor, "año": "2024"},
+            chunk_texto=f"Contenido de {titulo}.",
+            fuente_tipo="pdf",
+            fuente_url=url,
+            score=0.8,
+            metadatos={"titulo": titulo, "autor": autor, "año": "2024"},
         )
 
     def test_n_docs_distintos_producen_n_referencias(self):
@@ -323,8 +341,13 @@ class TestChunksToRefsContract:
 class TestFormatChunksWithMeta:
     def test_incluye_autor_y_año(self):
         chunks = [
-            _chunk(texto="Texto del chunk.", autor="García, J.", año="2024",
-                   url="https://ejemplo.com", fuente_tipo="web"),
+            _chunk(
+                texto="Texto del chunk.",
+                autor="García, J.",
+                año="2024",
+                url="https://ejemplo.com",
+                fuente_tipo="web",
+            ),
         ]
         resultado = format_chunks_with_meta(chunks)
         assert "[1]" in resultado
@@ -333,8 +356,9 @@ class TestFormatChunksWithMeta:
 
     def test_sin_autor_usa_fuente_nombre(self):
         chunks = [
-            _chunk(texto="Texto.", fuente_nombre="Sitio Web", año="2023",
-                   url=None, fuente_tipo="web"),
+            _chunk(
+                texto="Texto.", fuente_nombre="Sitio Web", año="2023", url=None, fuente_tipo="web"
+            ),
         ]
         resultado = format_chunks_with_meta(chunks)
         assert "Sitio Web, 2023" in resultado

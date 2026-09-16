@@ -28,16 +28,18 @@ class RevisionRepository:
         faltantes: list | None = None,
     ) -> None:
         """Inserta una fila de trazabilidad (append-only: cada corrida deja su historial)."""
-        self._db.add(RevisionCapitulo(
-            run_key=run_key,
-            capitulo=capitulo,
-            sabor=sabor,
-            n_iteraciones=n_iteraciones,
-            iter_ganadora=iter_ganadora,
-            score_inicial=score_inicial,
-            score_final=score_final,
-            motivo_parada=motivo_parada,
-            dimensiones=dimensiones,
-            faltantes=faltantes,
-        ))
+        self._db.add(
+            RevisionCapitulo(
+                run_key=run_key,
+                capitulo=capitulo,
+                sabor=sabor,
+                n_iteraciones=n_iteraciones,
+                iter_ganadora=iter_ganadora,
+                score_inicial=score_inicial,
+                score_final=score_final,
+                motivo_parada=motivo_parada,
+                dimensiones=dimensiones,
+                faltantes=faltantes,
+            )
+        )
         self._db.commit()

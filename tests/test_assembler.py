@@ -158,14 +158,24 @@ def test_apa_formatter_deduplication():
         fuente_tipo="web",
         fuente_url="https://example.com/page",
         score=0.9,
-        metadatos={"titulo": "Page A", "fuente_nombre": "example.com", "año": "2022", "autor": None},  # noqa: E501
+        metadatos={
+            "titulo": "Page A",
+            "fuente_nombre": "example.com",
+            "año": "2022",
+            "autor": None,
+        },  # noqa: E501
     )
     chunk_b = ChunkResult(
         chunk_texto="Texto B diferente",
         fuente_tipo="web",
         fuente_url="https://example.com/page",
         score=0.8,
-        metadatos={"titulo": "Page A", "fuente_nombre": "example.com", "año": "2022", "autor": None},  # noqa: E501
+        metadatos={
+            "titulo": "Page A",
+            "fuente_nombre": "example.com",
+            "año": "2022",
+            "autor": None,
+        },  # noqa: E501
     )
     refs = build_references_section([chunk_a, chunk_b])
     assert len(refs) == 1
@@ -194,8 +204,10 @@ def _make_informe() -> InformePiloto:
             fuente_url="https://fuente-a.com/informe",
             score=0.91,
             metadatos={
-                "titulo": "Informe A", "fuente_nombre": "fuente-a.com",
-                "año": "2024", "autor": None,
+                "titulo": "Informe A",
+                "fuente_nombre": "fuente-a.com",
+                "año": "2024",
+                "autor": None,
             },
         ),
     ]
@@ -206,6 +218,7 @@ def _make_informe() -> InformePiloto:
         chunks_usados=chunks,
     )
     from ic.infrastructure.citation.apa_formatter import build_references_section
+
     refs = build_references_section(chunks)
     return InformePiloto(empresa=empresa, gics=gics, cap_benchmarking=cap, referencias=refs)
 

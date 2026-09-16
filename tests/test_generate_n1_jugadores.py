@@ -15,7 +15,6 @@ from unittest.mock import patch
 
 from ic.shared.types import Cap21Globales, Cap21Jugadores, Cap21Regionales, Cap21Startups
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -26,19 +25,28 @@ _SRC = pathlib.Path("src/ic/domain/use_cases/generate_n1.py").read_text()
 def _cap21_suficiente() -> Cap21Jugadores:
     g = Cap21Globales(
         texto="### 2.1.1. Referentes Globales\n\nNestlé.",
-        candidatos=["Nestlé"], n_candidatos_con_web=1, retrieval_suficiente=True,
+        candidatos=["Nestlé"],
+        n_candidatos_con_web=1,
+        retrieval_suficiente=True,
     )
     r = Cap21Regionales(
         texto="### 2.1.2. Referentes Regionales LatAm/Colombia\n\nNutressa.",
-        empresas_emis=["Nutressa"], n_con_emis=1, retrieval_suficiente=True,
+        empresas_emis=["Nutressa"],
+        n_con_emis=1,
+        retrieval_suficiente=True,
     )
     s = Cap21Startups(
         texto="### 2.1.3. Startups y Disruptores del sector\n\nStartup X.",
-        locales=[], internacionales=["Startup X"], retrieval_suficiente=True,
+        locales=[],
+        internacionales=["Startup X"],
+        retrieval_suficiente=True,
     )
     return Cap21Jugadores(
         texto="## 2.1. Jugadores Clave\n\n" + g.texto,
-        globales=g, regionales=r, startups=s, retrieval_suficiente=True,
+        globales=g,
+        regionales=r,
+        startups=s,
+        retrieval_suficiente=True,
     )
 
 
@@ -57,11 +65,10 @@ class _FakeJugadoresUseCase:
 # US2: Tests de wiring en generate_n1.py (source inspection)
 # ---------------------------------------------------------------------------
 
+
 def test_generate_n1_instancia_generate21_jugadores() -> None:
     """generate_n1.py debe instanciar Generate21Jugadores y asignarlo a jugadores_use_case."""
-    assert "Generate21Jugadores(" in _SRC, (
-        "Generate21Jugadores no se instancia en generate_n1.py"
-    )
+    assert "Generate21Jugadores(" in _SRC, "Generate21Jugadores no se instancia en generate_n1.py"
     assert "jugadores_use_case = Generate21Jugadores(" in _SRC, (
         "jugadores_use_case no está asignado en generate_n1.py"
     )
@@ -100,6 +107,7 @@ def test_generate_n1_importa_generate21_jugadores() -> None:
 # US3: Test de cache sectorial en GenerateBenchmarking
 # ---------------------------------------------------------------------------
 
+
 def test_sector_cache_hit_pipeline_pasa_cached_al_jugadores() -> None:
     """US3: cuando _load_sector_cache retorna globales cacheados, jugadores_use_case.execute()
     recibe cached_globales no-None. Verifica la integración GenerateBenchmarking ↔ jugadores."""
@@ -107,7 +115,9 @@ def test_sector_cache_hit_pipeline_pasa_cached_al_jugadores() -> None:
 
     cached_g = Cap21Globales(
         texto="### 2.1.1. Referentes Globales\n\nNestlé (cache).",
-        candidatos=["Nestlé"], n_candidatos_con_web=1, retrieval_suficiente=True,
+        candidatos=["Nestlé"],
+        n_candidatos_con_web=1,
+        retrieval_suficiente=True,
     )
     jugadores = _FakeJugadoresUseCase()
 

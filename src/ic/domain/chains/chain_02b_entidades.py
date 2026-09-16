@@ -83,8 +83,10 @@ def parse_entidades(raw: str) -> list[str]:
 
 
 def build_chain_entidades(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_02B),
-        ("human", USER_PROMPT_02B),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_02B),
+            ("human", USER_PROMPT_02B),
+        ]
+    )
     return prompt | llm | StrOutputParser()

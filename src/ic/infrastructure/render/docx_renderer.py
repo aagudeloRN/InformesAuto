@@ -60,6 +60,7 @@ class DocxRenderer:
 # Normal style (T16.2, DT-024)
 # ---------------------------------------------------------------------------
 
+
 def _apply_normal_style(doc: Document) -> None:
     """Fija el estilo Normal: Open Sans 11 pt, justificado, interlineado 1,16x, espacio 8 pt."""
     style = doc.styles["Normal"]
@@ -77,6 +78,7 @@ def _apply_normal_style(doc: Document) -> None:
 # ---------------------------------------------------------------------------
 # Cover page
 # ---------------------------------------------------------------------------
+
 
 def _add_cover_page(doc: Document, title: str, company: str, date: str) -> None:
     p_title = doc.add_paragraph()
@@ -98,6 +100,7 @@ def _add_cover_page(doc: Document, title: str, company: str, date: str) -> None:
 # ---------------------------------------------------------------------------
 # Footer with page number
 # ---------------------------------------------------------------------------
+
 
 def _add_footer(doc: Document) -> None:
     section = doc.sections[0]
@@ -124,6 +127,7 @@ def _add_footer(doc: Document) -> None:
 # ---------------------------------------------------------------------------
 # TOC field
 # ---------------------------------------------------------------------------
+
 
 def _add_toc_field(doc: Document, title: str) -> None:
     doc.add_heading(title, level=1)
@@ -152,6 +156,7 @@ def _add_toc_field(doc: Document, title: str) -> None:
 # Block dispatcher
 # ---------------------------------------------------------------------------
 
+
 def _dispatch(doc: Document, block: DocumentBlock) -> None:
     match block:
         case Heading():
@@ -177,6 +182,7 @@ def _dispatch(doc: Document, block: DocumentBlock) -> None:
 # Inline text with **bold** and *italic* markers
 # ---------------------------------------------------------------------------
 
+
 def _add_inline_text(para, text: str) -> None:
     parts = _INLINE_RE.split(text)
     for part in parts:
@@ -194,6 +200,7 @@ def _add_inline_text(para, text: str) -> None:
 # ---------------------------------------------------------------------------
 # Table
 # ---------------------------------------------------------------------------
+
 
 def _render_table(doc: Document, block: TableBlock) -> None:
     n_cols = len(block.headers)
@@ -222,6 +229,7 @@ def _render_table(doc: Document, block: TableBlock) -> None:
 # Figure
 # ---------------------------------------------------------------------------
 
+
 def _render_figure(doc: Document, block: FigureBlock) -> None:
     if not os.path.exists(block.image_path):
         doc.add_paragraph(f"[Figura no disponible: {block.alt}]")
@@ -242,6 +250,7 @@ def _render_figure(doc: Document, block: FigureBlock) -> None:
 # Citation (APA — sangría francesa + cursivas)
 # ---------------------------------------------------------------------------
 
+
 def _render_citation(doc: Document, block: CitationBlock) -> None:
     para = doc.add_paragraph()
     fmt = para.paragraph_format
@@ -255,9 +264,9 @@ def _render_citation(doc: Document, block: CitationBlock) -> None:
 # ---------------------------------------------------------------------------
 
 _CALLOUT_COLORS = {
-    "absent_data": "1F4E79",   # azul oscuro
-    "actionable": "375623",    # verde oscuro
-    "warning": "843C0C",       # naranja oscuro
+    "absent_data": "1F4E79",  # azul oscuro
+    "actionable": "375623",  # verde oscuro
+    "warning": "843C0C",  # naranja oscuro
 }
 
 
@@ -275,7 +284,7 @@ def _add_left_border(para, color_hex: str) -> None:
     pBdr = OxmlElement("w:pBdr")
     left = OxmlElement("w:left")
     left.set(qn("w:val"), "single")
-    left.set(qn("w:sz"), "24")   # 3pt
+    left.set(qn("w:sz"), "24")  # 3pt
     left.set(qn("w:space"), "4")
     left.set(qn("w:color"), color_hex)
     pBdr.append(left)

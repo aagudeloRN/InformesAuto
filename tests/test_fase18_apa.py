@@ -44,7 +44,10 @@ def _web_chunk(url="https://example.com/articulo"):
         fuente_url=url,
         score=0.75,
         metadatos={
-            "titulo": "Artículo web", "fuente_nombre": "Example", "año": "2025", "autor": None
+            "titulo": "Artículo web",
+            "fuente_nombre": "Example",
+            "año": "2025",
+            "autor": None,
         },
         chunk_id=None,
     )
@@ -147,6 +150,7 @@ def test_build_references_section_no_contiene_rutas():
 def assert_no_filenames(texto: str) -> None:
     """Helper reutilizable para el E2E: falla si el texto contiene nombres de archivo PDF."""
     import re
+
     filenames = re.findall(r"\b\w[\w\s]*\.pdf\b", texto, re.IGNORECASE)
     assert not filenames, f"Nombres de archivo encontrados en el texto: {filenames}"
 

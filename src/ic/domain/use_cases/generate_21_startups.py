@@ -133,20 +133,24 @@ class Generate21Startups:
         # 5. Construir contextos (locales primero)
         locales_ctx = (
             "\n".join(_format_local_row(r) for r in filas_locales)
-            if filas_locales else "(sin startups locales)"
+            if filas_locales
+            else "(sin startups locales)"
         )
         intl_ctx = (
             format_chunks_as_context(chunks_internacionales)
-            if chunks_internacionales else "(sin disruptores internacionales)"
+            if chunks_internacionales
+            else "(sin disruptores internacionales)"
         )
 
         # 6. Generar prosa
-        texto = self._chain_perfil.invoke({
-            "sector_gics": sector_gics,
-            "nombre_empresa": nombre_empresa,
-            "locales_context": locales_ctx,
-            "internacionales_context": intl_ctx,
-        })
+        texto = self._chain_perfil.invoke(
+            {
+                "sector_gics": sector_gics,
+                "nombre_empresa": nombre_empresa,
+                "locales_context": locales_ctx,
+                "internacionales_context": intl_ctx,
+            }
+        )
         if not isinstance(texto, str):
             texto = str(texto)
         if not texto.startswith(_HEADING):
@@ -154,7 +158,9 @@ class Generate21Startups:
 
         logger.info(
             "Cap21Startups: %d locales, %d internacionales, %d chunks web",
-            len(nombres_locales), len(nombres_internacionales), len(chunks_internacionales),
+            len(nombres_locales),
+            len(nombres_internacionales),
+            len(chunks_internacionales),
         )
 
         return Cap21Startups(

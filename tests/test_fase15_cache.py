@@ -17,6 +17,7 @@ def _make_settings(ttl_hours=168):
 
 def _make_web_result(url="http://test.com"):
     from ic.shared.types import WebResult
+
     return WebResult(url=url, title="Test", content="contenido de prueba")
 
 
@@ -113,6 +114,7 @@ def test_cache_upsert_update_when_existing():
 
 def _make_cached_web(connector, db=None, ttl=168):
     from ic.infrastructure.sources.cached_connector import CachedWebConnector
+
     settings = _make_settings(ttl)
     if db is None:
         db = MagicMock()
@@ -131,9 +133,16 @@ def test_cached_web_miss_then_hit():
     db = MagicMock()
     repo = MagicMock(spec=RetrievalCacheRepository)
     repo.get_fresh.side_effect = [
-        None,                                          # 1ª: miss
-        [{"url": "http://test.com", "title": "Test",  # 2ª: hit
-          "content": "contenido de prueba", "snippet": "", "metadatos": None}],
+        None,  # 1ª: miss
+        [
+            {
+                "url": "http://test.com",
+                "title": "Test",  # 2ª: hit
+                "content": "contenido de prueba",
+                "snippet": "",
+                "metadatos": None,
+            }
+        ],
     ]
 
     with patch(
@@ -185,8 +194,15 @@ def test_cached_openalex_miss_then_hit():
     repo = MagicMock(spec=RetrievalCacheRepository)
     repo.get_fresh.side_effect = [
         None,
-        [{"url": "https://openalex.org/W1", "title": "Paper",
-          "content": "abstract", "snippet": "", "metadatos": None}],
+        [
+            {
+                "url": "https://openalex.org/W1",
+                "title": "Paper",
+                "content": "abstract",
+                "snippet": "",
+                "metadatos": None,
+            }
+        ],
     ]
 
     with patch(

@@ -61,10 +61,17 @@ def test_flag_off_web_devuelve_cap_intacto(monkeypatch):
     cap = _Cap(texto="original")
     store, web = MagicMock(), MagicMock()
     out = hooks.review_web_cap(
-        settings=_Settings(enabled=False), llm=object(),
-        capitulo_nombre="Cap 2 — Análisis Competitivo", criterios="c",
-        cap_obj=cap, run_key="rk", store=store, web=web,
-        sector_gics="Alimentos", sector_gics_code="3020", retrieval_query="q",
+        settings=_Settings(enabled=False),
+        llm=object(),
+        capitulo_nombre="Cap 2 — Análisis Competitivo",
+        criterios="c",
+        cap_obj=cap,
+        run_key="rk",
+        store=store,
+        web=web,
+        sector_gics="Alimentos",
+        sector_gics_code="3020",
+        retrieval_query="q",
     )
     assert out is cap  # cap intacto, mismo objeto
     assert state["judge_calls"] == 0  # el loop nunca se invocó
@@ -75,9 +82,12 @@ def test_flag_off_integracion_devuelve_cap_intacto(monkeypatch):
     state = _patch_judge(monkeypatch, ['{"E":0,"P":0,"V":0,"F":0,"T":0}'])
     cap = _Cap(texto="original")
     out = hooks.review_integration_cap(
-        settings=_Settings(enabled=False), llm=object(),
-        capitulo_nombre="Cap 5 — Convergencia Empresarial", criterios="c",
-        cap_obj=cap, run_key="rk",
+        settings=_Settings(enabled=False),
+        llm=object(),
+        capitulo_nombre="Cap 5 — Convergencia Empresarial",
+        criterios="c",
+        cap_obj=cap,
+        run_key="rk",
     )
     assert out is cap
     assert state["judge_calls"] == 0
@@ -87,9 +97,12 @@ def test_cap_ausente_no_se_revisa(monkeypatch):
     state = _patch_judge(monkeypatch, ['{"E":3,"P":3,"V":3,"F":3,"T":3}'])
     cap = _Cap(texto="ausente", retrieval_suficiente=False)
     out = hooks.review_integration_cap(
-        settings=_Settings(enabled=True), llm=object(),
-        capitulo_nombre="Cap 6 — Accionables Estratégicos", criterios="c",
-        cap_obj=cap, run_key="rk",
+        settings=_Settings(enabled=True),
+        llm=object(),
+        capitulo_nombre="Cap 6 — Accionables Estratégicos",
+        criterios="c",
+        cap_obj=cap,
+        run_key="rk",
     )
     assert out is cap
     assert state["judge_calls"] == 0  # retrieval insuficiente → no entra al loop
@@ -102,9 +115,12 @@ def test_pasa_gate_no_revisa(monkeypatch):
     state = _patch_judge(monkeypatch, ['{"E":3,"P":3,"V":3,"F":2,"T":2}'])  # total 13, pasa
     cap = _Cap(texto="bueno")
     out = hooks.review_integration_cap(
-        settings=_Settings(enabled=True), llm=object(),
-        capitulo_nombre="Cap 5 — Convergencia Empresarial", criterios="c",
-        cap_obj=cap, run_key="rk",
+        settings=_Settings(enabled=True),
+        llm=object(),
+        capitulo_nombre="Cap 5 — Convergencia Empresarial",
+        criterios="c",
+        cap_obj=cap,
+        run_key="rk",
     )
     assert out is cap
     assert state["judge_calls"] == 1  # juzgó una vez
@@ -116,20 +132,30 @@ def test_pasa_gate_no_revisa(monkeypatch):
 
 def test_web_rebusca_y_resintetiza(monkeypatch):
     # 1ª evaluación no pasa (con faltante) → revisa; 2ª pasa.
-    _patch_judge(monkeypatch, [
-        '{"E":1,"P":1,"V":1,"F":1,"T":1,"faltantes":["incluir cuota de mercado"]}',
-        '{"E":3,"P":3,"V":3,"F":2,"T":2}',
-    ])
+    _patch_judge(
+        monkeypatch,
+        [
+            '{"E":1,"P":1,"V":1,"F":1,"T":1,"faltantes":["incluir cuota de mercado"]}',
+            '{"E":3,"P":3,"V":3,"F":2,"T":2}',
+        ],
+    )
     cap = _Cap(texto="flojo")
     store, web = MagicMock(), MagicMock()
     web.search.return_value = [type("R", (), {"content": "c", "url": "u"})()]
     store.search.return_value = ["chunk1", "chunk2"]
 
     out = hooks.review_web_cap(
-        settings=_Settings(enabled=True), llm=object(),
-        capitulo_nombre="Cap 2 — Análisis Competitivo", criterios="c",
-        cap_obj=cap, run_key="rk", store=store, web=web,
-        sector_gics="Alimentos", sector_gics_code="3020", retrieval_query="q",
+        settings=_Settings(enabled=True),
+        llm=object(),
+        capitulo_nombre="Cap 2 — Análisis Competitivo",
+        criterios="c",
+        cap_obj=cap,
+        run_key="rk",
+        store=store,
+        web=web,
+        sector_gics="Alimentos",
+        sector_gics_code="3020",
+        retrieval_query="q",
         kb_competidores=["Nestlé"],
     )
     assert web.search.called  # Reflexion con herramientas: re-buscó
@@ -143,15 +169,21 @@ def test_web_rebusca_y_resintetiza(monkeypatch):
 
 
 def test_integracion_no_hace_retrieval(monkeypatch):
-    state = _patch_judge(monkeypatch, [
-        '{"E":1,"P":1,"V":1,"F":1,"T":1,"faltantes":["profundizar áreas"]}',
-        '{"E":3,"P":3,"V":3,"F":2,"T":2}',
-    ])
+    state = _patch_judge(
+        monkeypatch,
+        [
+            '{"E":1,"P":1,"V":1,"F":1,"T":1,"faltantes":["profundizar áreas"]}',
+            '{"E":3,"P":3,"V":3,"F":2,"T":2}',
+        ],
+    )
     cap = _Cap(texto="flojo", chunks_usados=["c1"])
     out = hooks.review_integration_cap(
-        settings=_Settings(enabled=True), llm=object(),
-        capitulo_nombre="Cap 5 — Convergencia Empresarial", criterios="c",
-        cap_obj=cap, run_key="rk",
+        settings=_Settings(enabled=True),
+        llm=object(),
+        capitulo_nombre="Cap 5 — Convergencia Empresarial",
+        criterios="c",
+        cap_obj=cap,
+        run_key="rk",
     )
     assert out.texto.startswith("texto revisado")
     assert out.chunks_usados == ["c1"]  # sin nuevo retrieval; evidencia previa intacta

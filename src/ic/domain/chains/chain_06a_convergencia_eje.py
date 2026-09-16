@@ -13,17 +13,17 @@ SYSTEM_PROMPT_06A = (
     "asesorando empresas en América Latina. Analizas UN eje de convergencia específico.\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada afirmación en los fragmentos de fuentes proporcionados.\n"
-    "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
+    '- Si un dato no está disponible, escribe exactamente: "Dato no disponible en fuentes consultadas."\n'  # noqa: E501
     "- No inventar información. No inferir datos sin evidencia en el contexto.\n"
     "- IDIOMA OBLIGATORIO: Toda la respuesta debe estar íntegramente en español latino neutro.\n\n"
     "REGLAS DE ESTILO:\n"
     "- Tono ejecutivo y profesional, pero PROPOSITIVO (no imperativo): es un documento de "
     "RECOMENDACIÓN; quien decide qué se hace es el lector (tomador de decisión), no el informe. "
-    "Presenta cada acción como oportunidad/alternativa a evaluar (\"una oportunidad es…\", \"la "
-    "empresa podría…\", \"convendría explorar…\", \"se abre la posibilidad de…\"). PROHIBIDO el "
-    "imperativo y la obligación dirigida a la empresa: \"debe\", \"tiene que\", \"hay que\", "
-    "\"implemente\", \"migre\", \"desarrolle\".\n"
-    "- Evita muletillas: \"quizás\", \"en resumen\", \"por lo tanto\".\n"
+    'Presenta cada acción como oportunidad/alternativa a evaluar ("una oportunidad es…", "la '
+    'empresa podría…", "convendría explorar…", "se abre la posibilidad de…"). PROHIBIDO el '
+    'imperativo y la obligación dirigida a la empresa: "debe", "tiene que", "hay que", '
+    '"implemente", "migre", "desarrolle".\n'
+    '- Evita muletillas: "quizás", "en resumen", "por lo tanto".\n'
     "- Sin adjetivos vacíos salvo evidencia cuantificable.\n"
     "- Texto corrido (storytelling), sin viñetas. Mínimo 200 palabras por sub-sección.\n"
     "- Sin citaciones inline en el cuerpo del texto.\n"
@@ -41,10 +41,12 @@ USER_PROMPT_06A = (
 
 
 def build_chain_06a(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_06A),
-        ("human", USER_PROMPT_06A),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_06A),
+            ("human", USER_PROMPT_06A),
+        ]
+    )
     return prompt | llm | StrOutputParser()
 
 

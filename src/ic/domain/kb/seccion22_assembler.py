@@ -13,14 +13,20 @@ _TITULO = "## 2.2. División de Competidores"
 
 _CUADRANTE_LABELS: dict[str, tuple[str, str]] = {
     "masivo_tradicional": ("Masivo / Volumen", "Jugadores Tradicionales (Modelos Consolidados)"),
-    "masivo_innovador":   ("Masivo / Volumen", "Entrantes Innovadores (Modelos Ágiles / DeepTech / Startups)"),
-    "nicho_tradicional":  ("Nicho / Premium",  "Jugadores Tradicionales (Modelos Consolidados)"),
-    "nicho_innovador":    ("Nicho / Premium",  "Entrantes Innovadores (Modelos Ágiles / DeepTech / Startups)"),
+    "masivo_innovador": (
+        "Masivo / Volumen",
+        "Entrantes Innovadores (Modelos Ágiles / DeepTech / Startups)",
+    ),
+    "nicho_tradicional": ("Nicho / Premium", "Jugadores Tradicionales (Modelos Consolidados)"),
+    "nicho_innovador": (
+        "Nicho / Premium",
+        "Entrantes Innovadores (Modelos Ágiles / DeepTech / Startups)",
+    ),
 }
 
 _ROW_ORDER = [
     ("Masivo / Volumen", "masivo_tradicional", "masivo_innovador"),
-    ("Nicho / Premium",  "nicho_tradicional",  "nicho_innovador"),
+    ("Nicho / Premium", "nicho_tradicional", "nicho_innovador"),
 ]
 
 _ABSENT_PARAGRAPH = (
@@ -66,18 +72,14 @@ def assemble_seccion_22(cap22_llm_output: dict, closed_list: list[str]) -> str:
     for clave, nombres in cuadrantes.items():
         for nombre in nombres:
             if nombre in seen:
-                raise DuplicateError(
-                    f"'{nombre}' aparece en '{seen[nombre]}' y en '{clave}'"
-                )
+                raise DuplicateError(f"'{nombre}' aparece en '{seen[nombre]}' y en '{clave}'")
             seen[nombre] = clave
 
     # --- Validación de cobertura ---
     nombres_en_tabla = set(seen.keys())
     faltantes = [n for n in closed_list if n not in nombres_en_tabla]
     if faltantes:
-        raise CoverageError(
-            f"Empresas sin clasificar: {faltantes}"
-        )
+        raise CoverageError(f"Empresas sin clasificar: {faltantes}")
 
     # --- Render de la tabla 2×2 ---
     header = (

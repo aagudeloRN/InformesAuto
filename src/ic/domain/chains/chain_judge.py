@@ -87,8 +87,10 @@ USER_PROMPT_JUDGE = (
 
 
 def build_chain_judge(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_JUDGE),
-        ("human", USER_PROMPT_JUDGE),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_JUDGE),
+            ("human", USER_PROMPT_JUDGE),
+        ]
+    )
     return prompt | llm | StrOutputParser()

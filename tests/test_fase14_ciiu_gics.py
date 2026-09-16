@@ -14,12 +14,12 @@ def test_seccion_comfama_8430_es_O():
 
 
 def test_seccion_por_division():
-    assert ciiu_to_seccion("2011") == "C"   # manufactura (Andercol, químicos)
-    assert ciiu_to_seccion("6810") == "L"   # inmobiliaria
-    assert ciiu_to_seccion("6110") == "J"   # telecomunicaciones
-    assert ciiu_to_seccion("4711") == "G"   # comercio minorista
-    assert ciiu_to_seccion("8511") == "P"   # educación
-    assert ciiu_to_seccion("3511") == "D"   # electricidad
+    assert ciiu_to_seccion("2011") == "C"  # manufactura (Andercol, químicos)
+    assert ciiu_to_seccion("6810") == "L"  # inmobiliaria
+    assert ciiu_to_seccion("6110") == "J"  # telecomunicaciones
+    assert ciiu_to_seccion("4711") == "G"  # comercio minorista
+    assert ciiu_to_seccion("8511") == "P"  # educación
+    assert ciiu_to_seccion("3511") == "D"  # electricidad
 
 
 def test_seccion_acepta_int_y_prefijos():
@@ -30,8 +30,8 @@ def test_seccion_acepta_int_y_prefijos():
 def test_seccion_invalida():
     assert ciiu_to_seccion(None) is None
     assert ciiu_to_seccion("") is None
-    assert ciiu_to_seccion("8") is None       # menos de 2 dígitos
-    assert ciiu_to_seccion("0000") is None    # división 00 fuera de rango
+    assert ciiu_to_seccion("8") is None  # menos de 2 dígitos
+    assert ciiu_to_seccion("0000") is None  # división 00 fuera de rango
 
 
 # --- ciiu_to_gics_candidates (≥5 CIIU reales) ---

@@ -35,14 +35,38 @@ _WS = re.compile(r"\s+")
 
 # Boilerplate frecuente en informes EMIS/Euromonitor/MarketLine que spaCy etiqueta como ORG pero
 # NO es una empresa (copyright, licencias, nombres de la casa editora como fuente, artículos).
-BOILERPLATE: frozenset[str] = frozenset({
-    "the", "however", "source", "sources", "figure", "total", "powered", "licensed",
-    "all rights reserved", "unauthorized distribution prohibited", "isi markets",
-    "marketline", "emis", "not to be photocopied page", "cc by", "copyright",
-    "profile is a", "industry profiles marketline this", "by organizations in the",
-    # Acrónimos genéricos / metadatos de informe que NO son empresas (alta frecuencia, no señal).
-    "utc", "cagr", "lng", "cps", "ems", "emdes", "page", "industry profiles",
-})
+BOILERPLATE: frozenset[str] = frozenset(
+    {
+        "the",
+        "however",
+        "source",
+        "sources",
+        "figure",
+        "total",
+        "powered",
+        "licensed",
+        "all rights reserved",
+        "unauthorized distribution prohibited",
+        "isi markets",
+        "marketline",
+        "emis",
+        "not to be photocopied page",
+        "cc by",
+        "copyright",
+        "profile is a",
+        "industry profiles marketline this",
+        "by organizations in the",
+        # Acr?nimos gen?ricos / metadatos de informe que NO son empresas (no se?al).
+        "utc",
+        "cagr",
+        "lng",
+        "cps",
+        "ems",
+        "emdes",
+        "page",
+        "industry profiles",
+    }
+)
 
 # Artefactos de extracción: racha de ≥3 letras sueltas espaciadas (OCR: "p a g e", "m a r") y
 # años (2025) → no son nombres de empresa.
@@ -131,8 +155,7 @@ class EntityRecognizer:
         import spacy
 
         modelo = (
-            self._settings.ner_spacy_model_es if lang == "es"
-            else self._settings.ner_spacy_model_en
+            self._settings.ner_spacy_model_es if lang == "es" else self._settings.ner_spacy_model_en
         )
         # Solo el componente NER: sin tagger/parser/lemmatizer → más rápido sobre miles de chunks.
         self._nlp[lang] = spacy.load(

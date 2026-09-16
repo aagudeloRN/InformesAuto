@@ -58,14 +58,17 @@ class GenerateConvergencia:
 
         chunks_caps = self._store.search(
             f"{sector_gics} {nombre_empresa} tendencias ecosistema benchmarking estrategia",
-            sector_gics=sector_gics_code, empresa_id=empresa_id,
+            sector_gics=sector_gics_code,
+            empresa_id=empresa_id,
         )
         query_territorial = (
             f"{sector_gics} {nombre_empresa} "
             "sostenibilidad transformación digital desarrollo económico Medellín"
         )
         chunks_territorial = self._store.search(
-            query_territorial, sector_gics=sector_gics_code, empresa_id=empresa_id,
+            query_territorial,
+            sector_gics=sector_gics_code,
+            empresa_id=empresa_id,
         )
 
         seen: set[str] = set()
@@ -95,12 +98,14 @@ class GenerateConvergencia:
         if self._chain_eje is None:
             context_caps = format_chunks_as_context(chunks_caps)
             context_territorial = format_chunks_as_context(chunks_territorial)
-            texto = self._chain_synth.invoke({
-                "descripcion_empresa": descripcion_empresa,
-                "sector_gics": sector_gics,
-                "retrieval_caps_anteriores": context_caps,
-                "retrieval_convergencia_territorial": context_territorial,
-            })
+            texto = self._chain_synth.invoke(
+                {
+                    "descripcion_empresa": descripcion_empresa,
+                    "sector_gics": sector_gics,
+                    "retrieval_caps_anteriores": context_caps,
+                    "retrieval_convergencia_territorial": context_territorial,
+                }
+            )
             texto = strip_preamble(texto)
             if has_cjk_characters(texto):
                 return CapConvergencia(
@@ -113,8 +118,12 @@ class GenerateConvergencia:
                     chunks_usados=unique_chunks,
                 )
             texto = self._enforce_areas(texto)
-            return CapConvergencia(texto=texto, n_chunks_usados=len(unique_chunks),
-                                   retrieval_suficiente=True, chunks_usados=unique_chunks)
+            return CapConvergencia(
+                texto=texto,
+                n_chunks_usados=len(unique_chunks),
+                retrieval_suficiente=True,
+                chunks_usados=unique_chunks,
+            )
 
         # Divide y vencerás (RN-009): 3 ejes en paralelo + síntesis
         def _invoke_eje(eje_def: dict) -> str:
@@ -126,9 +135,9 @@ class GenerateConvergencia:
             f_soc = pool.submit(_invoke_eje, EJE_SOCIAL)
         texto_tec, texto_mer, texto_soc = f_tec.result(), f_mer.result(), f_soc.result()
 
-        texto_final = self._chain_synth.invoke({
-            "partes": "\n\n---\n\n".join([texto_tec, texto_soc, texto_mer])
-        })
+        texto_final = self._chain_synth.invoke(
+            {"partes": "\n\n---\n\n".join([texto_tec, texto_soc, texto_mer])}
+        )
         texto_final = strip_preamble(texto_final)
 
         if has_cjk_characters(texto_final):

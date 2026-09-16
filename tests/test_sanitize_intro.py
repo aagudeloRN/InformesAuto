@@ -33,11 +33,7 @@ class TestSanitizeIntro:
         assert sanitize_intro(crudo) == INTRO_LIMPIO
 
     def test_lineas_razonamiento_ingles_filtradas(self):
-        crudo = (
-            "We should contextualize the chapter.\n"
-            "Let me write it now.\n"
-            f"{INTRO_LIMPIO}"
-        )
+        crudo = f"We should contextualize the chapter.\nLet me write it now.\n{INTRO_LIMPIO}"
         assert sanitize_intro(crudo) == INTRO_LIMPIO
 
     def test_solo_razonamiento_devuelve_vacio(self):

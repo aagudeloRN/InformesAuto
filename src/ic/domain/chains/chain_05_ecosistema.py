@@ -16,14 +16,14 @@ SYSTEM_PROMPT_05 = (
     "América Latina.\n\n"
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada evento con datos de las fuentes proporcionadas (empresas, montos, fechas).\n"
-    "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
+    '- Si un dato no está disponible, escribe exactamente: "Dato no disponible en fuentes consultadas."\n'  # noqa: E501
     "- No inventar eventos, montos, actores ni relaciones bajo ninguna circunstancia.\n"
     "- No menciones escasez de fuentes; solo reporta el estado del dato.\n"
     "- IDIOMA OBLIGATORIO: Toda la respuesta debe estar íntegramente en español latino neutro. "
     "Está prohibido usar chino, inglés u otro idioma.\n\n"
     "REGLAS DE ESTILO:\n"
-    "- Tono ejecutivo y directo. Prohibido: \"podría\", \"quizás\", \"en resumen\", "
-    "\"por lo tanto\", \"cabe destacar\", \"es importante mencionar\".\n"
+    '- Tono ejecutivo y directo. Prohibido: "podría", "quizás", "en resumen", '
+    '"por lo tanto", "cabe destacar", "es importante mencionar".\n'
     "- Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo que haya evidencia cuantificable.\n"  # noqa: E501
     "- Cada evento es un bloque con: título en negrilla + narrativa breve de la ejecución + "
     "capacidad estratégica adquirida + vulnerabilidad mitigada.\n"
@@ -39,28 +39,43 @@ _FORMATO_EVENTO = (
     "- Capacidad estratégica adquirida: qué gana la empresa/actor con el movimiento.\n"
     "- Vulnerabilidad mitigada: qué riesgo o dependencia reduce.\n"
     "Si no hay 3 eventos con evidencia en las fuentes, presenta los que existan y, para el "
-    "resto, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n\n"
+    'resto, escribe exactamente: "Dato no disponible en fuentes consultadas."\n\n'
 )
 
 # Subsecciones del Cap 4 como datos (DT-058): (id, título, encabezado descriptivo, consulta RAG).
 # El capítulo es adaptativo: cada subsección se gatea por su propio retrieval en
 # generate_ecosistema y solo se emiten las que tienen evidencia suficiente (ADR-002).
 SUBSECCIONES: list[tuple[str, str, str, str]] = [
-    ("4.1", "Inversiones",
-     "Inversiones relevantes en empresas, startups o capacidad productiva del sector.",
-     "inversiones capital riesgo capacidad productiva startups"),
-    ("4.2", "Integraciones Verticales",
-     "Movimientos de integración hacia proveedores o canales de distribución.",
-     "integración vertical proveedores canales distribución"),
-    ("4.3", "Fusiones y Adquisiciones (M&A)",
-     "Operaciones de fusión o adquisición entre actores del sector.",
-     "fusiones adquisiciones M&A compra de empresas"),
-    ("4.4", "Joint Ventures",
-     "Empresas conjuntas y sociedades de riesgo compartido entre actores del sector.",
-     "joint venture sociedad conjunta riesgo compartido alianza"),
-    ("4.5", "Alianzas de Compra y Abastecimiento",
-     "Acuerdos de compra, abastecimiento o colaboración comercial entre actores del sector.",
-     "alianzas compra abastecimiento colaboración comercial"),
+    (
+        "4.1",
+        "Inversiones",
+        "Inversiones relevantes en empresas, startups o capacidad productiva del sector.",
+        "inversiones capital riesgo capacidad productiva startups",
+    ),
+    (
+        "4.2",
+        "Integraciones Verticales",
+        "Movimientos de integración hacia proveedores o canales de distribución.",
+        "integración vertical proveedores canales distribución",
+    ),
+    (
+        "4.3",
+        "Fusiones y Adquisiciones (M&A)",
+        "Operaciones de fusión o adquisición entre actores del sector.",
+        "fusiones adquisiciones M&A compra de empresas",
+    ),
+    (
+        "4.4",
+        "Joint Ventures",
+        "Empresas conjuntas y sociedades de riesgo compartido entre actores del sector.",
+        "joint venture sociedad conjunta riesgo compartido alianza",
+    ),
+    (
+        "4.5",
+        "Alianzas de Compra y Abastecimiento",
+        "Acuerdos de compra, abastecimiento o colaboración comercial entre actores del sector.",
+        "alianzas compra abastecimiento colaboración comercial",
+    ),
 ]
 
 
@@ -78,7 +93,7 @@ def build_secciones_solicitadas(activas: list[tuple[str, str, str, str]]) -> str
 
 
 USER_PROMPT_05 = (
-    "Genera el \"Capítulo 4. Panorama del Ecosistema\" para el informe de inteligencia "
+    'Genera el "Capítulo 4. Panorama del Ecosistema" para el informe de inteligencia '
     "competitiva de la empresa descrita a continuación.\n\n"
     "DESCRIPCIÓN DE LA EMPRESA:\n{descripcion_empresa}\n\n"
     "CLASIFICACIÓN SECTORIAL:\n{sector_gics}\n\n"
@@ -89,18 +104,20 @@ USER_PROMPT_05 = (
     "Prioriza eventos del sector {sector_gics} con foco en Colombia y América Latina cuando la "
     "evidencia lo permita.\n\n"
     "Inicia obligatoriamente con el siguiente párrafo introductorio (transcríbelo exactamente):\n"
-    "\"El panorama del ecosistema analiza los movimientos corporativos que reconfiguran la "
+    '"El panorama del ecosistema analiza los movimientos corporativos que reconfiguran la '
     "cadena de valor del sector: inversiones, integraciones verticales, fusiones y adquisiciones, "
     "joint ventures y alianzas de abastecimiento. Comprender estos movimientos permite anticipar "
-    "cambios en la estructura competitiva y detectar oportunidades de posicionamiento.\"\n\n"
+    'cambios en la estructura competitiva y detectar oportunidades de posicionamiento."\n\n'
     "Desarrolla EXACTAMENTE las siguientes secciones en este orden (no agregues otras):\n\n"
     "{secciones_solicitadas}"
 )
 
 
 def build_chain_05(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_05),
-        ("human", USER_PROMPT_05),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_05),
+            ("human", USER_PROMPT_05),
+        ]
+    )
     return prompt | llm | StrOutputParser()

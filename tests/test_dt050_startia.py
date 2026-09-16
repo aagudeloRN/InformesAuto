@@ -7,7 +7,7 @@ from ic.shared.ingest.startia import parse_startia
 
 def test_crosswalk_verticales_clave():
     assert vertical_to_gics("FinTech") == "4020"
-    assert vertical_to_gics("agtech") == "3020"    # case-insensitive
+    assert vertical_to_gics("agtech") == "3020"  # case-insensitive
     assert vertical_to_gics("Software") == "4510"
     assert vertical_to_gics("Desconocida") is None
     assert vertical_to_gics(None) is None
@@ -53,6 +53,9 @@ def test_parse_vertical_desconocida_no_rompe():
 def test_parse_fallback_a_razon_social_y_fila_invalida():
     p = parse_startia(_row(**{"NOMBRE_STARTUP": None}), normalize=normalize_entity)
     assert p.nombre == "VILU LATAM S.A.S."
-    assert parse_startia(
-        _row(**{"NOMBRE_STARTUP": None, "RAZON_SOCIAL": None}), normalize=normalize_entity
-    ) is None
+    assert (
+        parse_startia(
+            _row(**{"NOMBRE_STARTUP": None, "RAZON_SOCIAL": None}), normalize=normalize_entity
+        )
+        is None
+    )

@@ -74,7 +74,9 @@ _OK = "## 2.1\n\n| Campo | Valor |\n|--|--|\n| Nombre + País | Danone — Franc
 
 def _run(primary: _SeqChain, escalation: _SeqChain | None):
     return GenerateBenchmarking(
-        chain=primary, store=_FakeStore(), web_connector=_FakeWeb(),
+        chain=primary,
+        store=_FakeStore(),
+        web_connector=_FakeWeb(),
         escalation_chain=escalation,
     ).execute(nombre_empresa="Alpina", descripcion_empresa="Láctea.", sector_gics="Alimentos")
 

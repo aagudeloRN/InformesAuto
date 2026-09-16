@@ -21,7 +21,9 @@ def _emis_chunk(nombre: str = "Empresa Regional") -> ChunkResult:
 
 
 def _web_chunk() -> ChunkResult:
-    return ChunkResult(chunk_texto="Web info", fuente_tipo="web", fuente_url="http://x.com", score=0.7)
+    return ChunkResult(
+        chunk_texto="Web info", fuente_tipo="web", fuente_url="http://x.com", score=0.7
+    )
 
 
 class _FakeChain:
@@ -57,6 +59,7 @@ class _FakeWebConnector:
         if not self._has_results:
             return []
         from ic.shared.types import WebResult
+
         return [WebResult(url="http://x.com", title="T", content="c", snippet="s")]
 
 
@@ -140,7 +143,7 @@ def test_excluye_empresa_focal_de_regionales():
     """Los nombres EMIS que coinciden con la empresa focal no deben aparecer en empresas_emis."""
     # Alpina aparece en los metadatos de un chunk EMIS
     emis = [
-        _emis_chunk("Alpina"),   # empresa focal → debe filtrarse
+        _emis_chunk("Alpina"),  # empresa focal → debe filtrarse
         _emis_chunk("Nutresa"),
         _emis_chunk("Colanta"),
     ]

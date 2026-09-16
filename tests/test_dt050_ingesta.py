@@ -27,24 +27,24 @@ def test_extract_all_ciiu_multiactividad_sin_duplicados():
 
 
 def test_division_alimentos_bebidas_tabaco_es_3020():
-    assert ciiu_division_to_gics("1040") == "3020"   # lácteos
-    assert ciiu_division_to_gics("1101") == "3020"   # bebidas alcohólicas
-    assert ciiu_division_to_gics("1200") == "3020"   # tabaco
-    assert ciiu_division_to_gics("0141") == "3020"   # ganado bovino (agro)
+    assert ciiu_division_to_gics("1040") == "3020"  # lácteos
+    assert ciiu_division_to_gics("1101") == "3020"  # bebidas alcohólicas
+    assert ciiu_division_to_gics("1200") == "3020"  # tabaco
+    assert ciiu_division_to_gics("0141") == "3020"  # ganado bovino (agro)
 
 
 def test_division_casos_representativos():
-    assert ciiu_division_to_gics("2910") == "2510"   # vehículos → automóviles
-    assert ciiu_division_to_gics("6201") == "4510"   # programación → software
-    assert ciiu_division_to_gics("6810") == "6020"   # inmobiliaria
-    assert ciiu_division_to_gics("6419") == "4010"   # banca
-    assert ciiu_division_to_gics("2100") == "3520"   # farmacéutica
+    assert ciiu_division_to_gics("2910") == "2510"  # vehículos → automóviles
+    assert ciiu_division_to_gics("6201") == "4510"  # programación → software
+    assert ciiu_division_to_gics("6810") == "6020"  # inmobiliaria
+    assert ciiu_division_to_gics("6419") == "4010"  # banca
+    assert ciiu_division_to_gics("2100") == "3520"  # farmacéutica
 
 
 def test_override_comercio_basicos_es_3010():
     # Comercio de básicos (alimentos/farmacia) → consumo básico (3010), no discrecional (2550).
-    assert ciiu_division_to_gics("4711") == "3010"   # minorista no especializado
-    assert ciiu_division_to_gics("4773") == "3010"   # farmacéuticos
+    assert ciiu_division_to_gics("4711") == "3010"  # minorista no especializado
+    assert ciiu_division_to_gics("4773") == "3010"  # farmacéuticos
     # El resto del comercio cae en el default de división (discrecional).
     assert ciiu_division_to_gics("4751") == "2550"
 
@@ -52,7 +52,7 @@ def test_override_comercio_basicos_es_3010():
 def test_division_sin_codigo_o_sin_correspondencia():
     assert ciiu_division_to_gics(None) is None
     assert ciiu_division_to_gics("9") is None
-    assert ciiu_division_to_gics("9900") is None     # Sección U → sin correspondencia
+    assert ciiu_division_to_gics("9900") is None  # Sección U → sin correspondencia
 
 
 # --- parser EmpresasColombia ---
@@ -91,10 +91,12 @@ def test_parse_nutresa_lacteos_food():
 
 def test_parse_multiactividad_varias_membresias():
     p = parse_empresa_colombia(
-        _row(**{
-            "Sector (Local)": "Cría De Ganado (A0141); Elaboración De Lácteos (C1040)",
-            "Actividades principales (Local)": "",
-        }),
+        _row(
+            **{
+                "Sector (Local)": "Cría De Ganado (A0141); Elaboración De Lácteos (C1040)",
+                "Actividades principales (Local)": "",
+            }
+        ),
         normalize=normalize_entity,
     )
     assert p is not None

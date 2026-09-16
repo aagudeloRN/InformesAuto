@@ -76,9 +76,5 @@ def test_cap5_paralelo_e2e():
         "esperado ≥500 para un capítulo completo"
     )
     secciones = [s for s in result.texto.split("\n\n") if s.strip()]
-    assert len(secciones) >= 3, (
-        f"Se esperan ≥3 secciones (una por eje), hay {len(secciones)}"
-    )
-    assert elapsed < 30 * 60, (
-        f"Cap5 paralelo tardó {elapsed:.0f}s — límite 30 min (1800s)"
-    )
+    assert len(secciones) >= 3, f"Se esperan ≥3 secciones (una por eje), hay {len(secciones)}"
+    assert elapsed < 30 * 60, f"Cap5 paralelo tardó {elapsed:.0f}s — límite 30 min (1800s)"

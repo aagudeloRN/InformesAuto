@@ -36,6 +36,7 @@ def _all_text(doc: Document) -> str:
 def _minimal_png(path: Path) -> None:
     """Crea un PNG válido de 10×10 píxel usando Pillow."""
     from PIL import Image
+
     img = Image.new("RGB", (10, 10), color=(0, 128, 255))
     img.save(str(path), format="PNG")
 
@@ -138,9 +139,7 @@ def test_citation_italic_apa(tmp_path):
     apa = "Autor, A. (2024). *Título del artículo*. *Revista Académica*, 10(2), 45–60."
     DocxRenderer().render(_make_doc(blocks=[CitationBlock(apa)]), out)
     word_doc = Document(out)
-    italic_runs = [
-        r for p in word_doc.paragraphs for r in p.runs if r.italic and r.text.strip()
-    ]
+    italic_runs = [r for p in word_doc.paragraphs for r in p.runs if r.italic and r.text.strip()]
     assert len(italic_runs) >= 1, "Debe haber al menos un run en cursiva en la referencia APA"
     italic_text = " ".join(r.text for r in italic_runs)
     assert "Título del artículo" in italic_text or "Revista Académica" in italic_text

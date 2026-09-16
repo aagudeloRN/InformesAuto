@@ -83,9 +83,7 @@ def test_generate_benchmarking_usa_advanced_en_queries_competidores():
     )
 
     assert web.search.call_count >= 1
-    assert all(
-        c.kwargs.get("search_depth") == "advanced" for c in web.search.call_args_list
-    )
+    assert all(c.kwargs.get("search_depth") == "advanced" for c in web.search.call_args_list)
 
 
 # ---------------------------------------------------------------------------
@@ -153,8 +151,11 @@ def _chunk(i):
     from ic.shared.types import ChunkResult
 
     return ChunkResult(
-        chunk_texto=f"perfil competidor {i}", fuente_tipo="web",
-        fuente_url="http://x", score=0.8, metadatos={"autor": "X", "año": "2025"},
+        chunk_texto=f"perfil competidor {i}",
+        fuente_tipo="web",
+        fuente_url="http://x",
+        score=0.8,
+        metadatos={"autor": "X", "año": "2025"},
         chunk_id=f"id-{i}",
     )
 
@@ -196,7 +197,9 @@ def _informe_minimo():
     empresa = DescripcionEmpresa(nombre_empresa="ACME S.A.", actividad_ciiu=None, texto="**ACME**")
     gics = ClasificacionGICS(grupo_gics="Bancos (GICS 4010)", justificacion="j", texto_raw="r")
     cap = CapBenchmarking(
-        texto="## 2.1. Jugadores\nTexto.", n_chunks_usados=1, retrieval_suficiente=True,
+        texto="## 2.1. Jugadores\nTexto.",
+        n_chunks_usados=1,
+        retrieval_suficiente=True,
     )
     return InformePiloto(empresa=empresa, gics=gics, cap_benchmarking=cap)
 
@@ -299,11 +302,11 @@ def test_assembler_intercala_2_3_mercado_antes_de_2_4():
 
     informe = _informe_minimo()
     informe.cap_benchmarking.texto = (
-        "## 2.1. Jugadores\nTexto.\n\n## 2.2. División\nTexto.\n\n"
-        "## 2.4. Módulos\nTexto."
+        "## 2.1. Jugadores\nTexto.\n\n## 2.2. División\nTexto.\n\n## 2.4. Módulos\nTexto."
     )
     informe.cap_mercado = CapMercado(
-        texto="## 2.3. Mercado\nTamaño del mercado.", n_chunks_usados=3,
+        texto="## 2.3. Mercado\nTamaño del mercado.",
+        n_chunks_usados=3,
         retrieval_suficiente=True,
     )
 
@@ -321,7 +324,9 @@ def test_assembler_omite_mercado_si_ausente():
 
     informe = _informe_minimo()
     informe.cap_mercado = CapMercado(
-        texto="x", n_chunks_usados=0, retrieval_suficiente=False,
+        texto="x",
+        n_chunks_usados=0,
+        retrieval_suficiente=False,
     )
     report = PilotAssembler().build(informe)
     headings = [b.text.strip() for b in report.blocks if isinstance(b, Heading)]

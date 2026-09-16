@@ -132,7 +132,7 @@ def _es_valor_util(valor: str) -> bool:
 
 
 def _split_nombre_pais(valor: str) -> tuple[str, str | None]:
-    """"Nestlé — Suiza" → ("Nestlé", "Suiza"). Sin separador → (valor, None)."""
+    """ "Nestlé — Suiza" → ("Nestlé", "Suiza"). Sin separador → (valor, None)."""
     for sep in ("—", "–", " - ", "|"):
         if sep in valor:
             izq, der = valor.split(sep, 1)

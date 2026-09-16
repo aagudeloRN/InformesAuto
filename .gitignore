@@ -27,3 +27,7 @@ documentos_sectoriales/*.pdf
 *:Zone.Identifier
 # Informes manuales del cliente (verdad de terreno para gap analysis/eval; proprietarios, local)
 docs/ReportesHumanos/
+
+# Windows WSL metadata files
+*.Zone.Identifier
+*Zone.Identifier*

@@ -45,7 +45,9 @@ class Embedder:
                 pass  # La descarga es best-effort; no abortar si Ollama no responde
 
     def embed(self, text: str) -> list[float]:
-        keep_alive = self._active_keep_alive if self._active_keep_alive is not None else self._keep_alive  # noqa: E501
+        keep_alive = (
+            self._active_keep_alive if self._active_keep_alive is not None else self._keep_alive
+        )  # noqa: E501
         last_exc: Exception | None = None
         for attempt, wait in enumerate(_RETRY_WAITS):
             if wait:
@@ -59,9 +61,8 @@ class Embedder:
                 resp.raise_for_status()
                 return resp.json()["embedding"]
             except (httpx.HTTPStatusError, httpx.TimeoutException) as exc:
-                is_retryable = (
-                    isinstance(exc, httpx.TimeoutException)
-                    or (isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 500)
+                is_retryable = isinstance(exc, httpx.TimeoutException) or (
+                    isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 500
                 )
                 if is_retryable and attempt < len(_RETRY_WAITS) - 1:
                     last_exc = exc

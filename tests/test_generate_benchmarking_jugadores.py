@@ -38,6 +38,7 @@ class _FakeStore:
 class _FakeWebConnector:
     def search(self, query, max_results=5, search_depth="basic"):
         from ic.shared.types import WebResult
+
         return [WebResult(url="http://x.com", title="T", content="c", snippet="s")]
 
 
@@ -106,7 +107,7 @@ def test_fallback_a_kb_assembler_si_jugadores_falla():
 
 
 def test_sector_cache_hit_evita_reejecutar_submodulos():
-    """T042: cached_globales no-None se pasa a jugadores.execute cuando hay sector cache hit (SC-005)."""
+    """T042: cached_globales se pasa a jugadores.execute cuando hay sector cache hit (SC-005)."""
     from unittest.mock import patch
 
     from ic.shared.types import Cap21Globales

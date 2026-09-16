@@ -85,6 +85,7 @@ def _make_failing_tier(exc: Exception):
 
 def _resilient(tiers):
     from ic.infrastructure.llm.gateway import ResilientChatModel
+
     return ResilientChatModel(tiers=tiers)
 
 

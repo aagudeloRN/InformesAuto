@@ -21,8 +21,8 @@ SYSTEM_PROMPT_01 = (
     "2. FUENTES: Usa EXCLUSIVAMENTE la información del contexto web proporcionado en el prompt. "
     "No inventes datos que no estén en ese contexto.\n"
     "3. AUSENCIA: Si un dato específico no aparece en el contexto, escribe exactamente: "
-    "\"Dato no disponible en fuentes consultadas.\"\n"
-    "4. INFERENCIAS: Si realizas una inferencia lógica a partir del contexto, márcala con \"Inferencia:\".\n"  # noqa: E501
+    '"Dato no disponible en fuentes consultadas."\n'
+    '4. INFERENCIAS: Si realizas una inferencia lógica a partir del contexto, márcala con "Inferencia:".\n'  # noqa: E501
     "5. FORMATO: Sin emojis. Sin encabezados genéricos. Sin meta-comentarios. "
     "Solo el perfil estructurado solicitado."
 )
@@ -63,10 +63,12 @@ def build_chain_01(llms: BaseChatModel | list[BaseChatModel]) -> Runnable:
     if not isinstance(llms, list):
         llms = [llms]
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_01),
-        ("human", USER_PROMPT_01),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_01),
+            ("human", USER_PROMPT_01),
+        ]
+    )
     parser = StrOutputParser()
 
     chains = [prompt | llm | parser for llm in llms]

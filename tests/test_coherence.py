@@ -9,10 +9,12 @@ from ic.domain.coherence import (
 
 
 def test_une_y_etiqueta_capitulos():
-    out = build_caps_summary([
-        ("Cap 2 — Benchmarking", "Alpina lidera el mercado lácteo."),
-        ("Cap 3 — Tendencias", "Crece la demanda de plant-based."),
-    ])
+    out = build_caps_summary(
+        [
+            ("Cap 2 — Benchmarking", "Alpina lidera el mercado lácteo."),
+            ("Cap 3 — Tendencias", "Crece la demanda de plant-based."),
+        ]
+    )
     assert "## Cap 2 — Benchmarking" in out
     assert "Alpina lidera" in out
     assert "## Cap 3 — Tendencias" in out
@@ -20,11 +22,13 @@ def test_une_y_etiqueta_capitulos():
 
 
 def test_ignora_textos_vacios_o_en_blanco():
-    out = build_caps_summary([
-        ("Cap 2", "Contenido real."),
-        ("Cap 3", ""),
-        ("Cap 4", "   "),
-    ])
+    out = build_caps_summary(
+        [
+            ("Cap 2", "Contenido real."),
+            ("Cap 3", ""),
+            ("Cap 4", "   "),
+        ]
+    )
     assert "Cap 2" in out
     assert "Cap 3" not in out
     assert "Cap 4" not in out
@@ -94,11 +98,11 @@ def test_devuelve_labels_eliminados():
 
 def test_histograma_clasifica_on_sector_exento_ajeno():
     metas = [
-        {"sector_gics": "3020", "titulo": "EMIS Lácteos"},          # on-sector primario
+        {"sector_gics": "3020", "titulo": "EMIS Lácteos"},  # on-sector primario
         {"sector_gics": "2510", "sectores": ["3020"], "titulo": "Multi"},  # on-sector por array
-        {"sector_gics": None, "es_global": "true", "titulo": "Global"},    # exento global
-        {"sector_gics": None, "titulo": "Web"},                     # exento web (sin sector)
-        {"sector_gics": "2510", "titulo": "Autos EMIS"},            # ajeno
+        {"sector_gics": None, "es_global": "true", "titulo": "Global"},  # exento global
+        {"sector_gics": None, "titulo": "Web"},  # exento web (sin sector)
+        {"sector_gics": "2510", "titulo": "Autos EMIS"},  # ajeno
     ]
     h = sector_histogram(metas, "3020")
     assert h.on_sector == 2
@@ -110,7 +114,7 @@ def test_histograma_clasifica_on_sector_exento_ajeno():
 def test_histograma_es_global_bool_y_metadatos_none():
     metas = [
         {"sector_gics": None, "es_global": True, "titulo": "Global bool"},  # exento
-        None,                                                               # exento (sin meta)
+        None,  # exento (sin meta)
     ]
     h = sector_histogram(metas, "3020")
     assert (h.on_sector, h.exento, h.ajeno) == (0, 2, 0)

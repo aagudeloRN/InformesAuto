@@ -36,24 +36,26 @@ _SYSTEM = (
 _HUMAN = (
     "Clasifica las empresas de la lista cerrada en la matriz 2×2 y redacta la síntesis "
     "de presión competitiva.\n\n"
-    'Responde SOLO con este JSON (sin markdown fences):\n'
-    '{{\n'
+    "Responde SOLO con este JSON (sin markdown fences):\n"
+    "{{\n"
     '  "cuadrantes": {{\n'
     '    "masivo_tradicional": ["..."],\n'
     '    "masivo_innovador":   ["..."],\n'
     '    "nicho_tradicional":  ["..."],\n'
     '    "nicho_innovador":    []\n'
-    '  }},\n'
+    "  }},\n"
     '  "intro": "Párrafo introductorio (1-2 oraciones).",\n'
     '  "sintesis_incumbente": "Análisis de la defensa del incumbente.",\n'
     '  "sintesis_entrante": "Análisis del ataque del entrante y la servitización."\n'
-    '}}'
+    "}}"
 )
 
 
 def build_chain_cap2_22_division(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", _SYSTEM),
-        ("human", _HUMAN),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _SYSTEM),
+            ("human", _HUMAN),
+        ]
+    )
     return prompt | llm | StrOutputParser()

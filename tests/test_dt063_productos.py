@@ -55,8 +55,12 @@ def _pr(nombre, descriptor, *, alcance=None, verificado=False, tiebreak=0):
     from ic.domain.kb.relevance import ProductoRankRow
 
     return ProductoRankRow(
-        nombre=nombre, nombre_normalizado=nombre.lower(), descriptor=descriptor,
-        alcance=alcance, verificado=verificado, tiebreak=tiebreak,
+        nombre=nombre,
+        nombre_normalizado=nombre.lower(),
+        descriptor=descriptor,
+        alcance=alcance,
+        verificado=verificado,
+        tiebreak=tiebreak,
     )
 
 
@@ -65,12 +69,12 @@ def test_rank_ordena_por_solape_luego_evidencia():
 
     rows = [
         _pr("Danone", "yogurt y lácteos", tiebreak=1),
-        _pr("PepsiCo", "gaseosas y snacks", tiebreak=99),   # sin solape lácteo
+        _pr("PepsiCo", "gaseosas y snacks", tiebreak=99),  # sin solape lácteo
         _pr("Lactalis", "quesos y leche", tiebreak=1),
     ]
     out = rank_by_product_overlap(rows, {"lacteos", "yogurt", "leche", "quesos"}, limit=8)
     assert set(out[:2]) == {"Danone", "Lactalis"}  # solape lácteo primero
-    assert out[-1] == "PepsiCo"                     # más evidencia pero sin solape → al final
+    assert out[-1] == "PepsiCo"  # más evidencia pero sin solape → al final
 
 
 def test_rank_require_overlap_descarta_sin_solape():

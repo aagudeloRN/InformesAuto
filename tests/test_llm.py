@@ -49,6 +49,7 @@ requires_network = pytest.mark.skipif(not _network_available(), reason="Sin acce
 
 # --- Lógica pura (sin Ollama) ---
 
+
 def test_absent_data_below_threshold():
     chunks = [
         ChunkResult(chunk_texto="texto", fuente_tipo="web", fuente_url=None, score=0.8),
@@ -64,6 +65,7 @@ def test_absent_data_paragraph_not_empty():
 
 
 # --- CostTracker: lógica pura ---
+
 
 def test_cost_tracker_add_ollama_call_registra_tiempo():
     tracker = CostTracker(budget_limit=1.0)
@@ -96,6 +98,7 @@ def test_ollama_gateway_registra_tiempo_via_cost_tracker():
     }
 
     from langchain_core.messages import HumanMessage
+
     with patch("ic.infrastructure.llm.gateway.httpx.post", return_value=fake_response):
         result = llm.invoke([HumanMessage(content="test")])
 
@@ -118,6 +121,7 @@ def test_ollama_gateway_sin_tracker_no_falla():
     }
 
     from langchain_core.messages import HumanMessage
+
     with patch("ic.infrastructure.llm.gateway.httpx.post", return_value=fake_response):
         result = llm.invoke([HumanMessage(content="test")])
     assert result.content == "ok"
@@ -125,12 +129,14 @@ def test_ollama_gateway_sin_tracker_no_falla():
 
 # --- Tests con Ollama real ---
 
+
 @pytest.mark.slow
 @requires_ollama
 def test_ollama_gateway_simple_complete():
     llm = build_llm(settings)
     assert isinstance(llm, OllamaGatewayLLM)
     from langchain_core.messages import HumanMessage
+
     result = llm.invoke([HumanMessage(content="Responde solo: OK")])
     assert result.content.strip() != ""
 
@@ -140,11 +146,13 @@ def test_ollama_gateway_simple_complete():
 def test_chain_02_gics_noel():
     llm = build_llm(settings)
     chain = build_chain_02(llm)
-    result = chain.invoke({
-        "nombre_empresa": "Noel S.A.S.",
-        "descripcion_empresa": _NOEL_DESC,
-        "pistas": "",
-    })
+    result = chain.invoke(
+        {
+            "nombre_empresa": "Noel S.A.S.",
+            "descripcion_empresa": _NOEL_DESC,
+            "pistas": "",
+        }
+    )
     assert isinstance(result, str)
     assert len(result) > 0
     result_lower = result.lower()

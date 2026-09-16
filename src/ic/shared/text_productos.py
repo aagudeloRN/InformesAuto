@@ -13,23 +13,91 @@ import re
 import unicodedata
 
 # Encabezado exacto que emite chain_01. Se tolera nivel de "#", acentos y mayúsculas.
-_HEADING_RE = re.compile(
-    r"^#{1,4}\s*productos\s+y\s+servicios\s*$", re.IGNORECASE | re.MULTILINE
-)
+_HEADING_RE = re.compile(r"^#{1,4}\s*productos\s+y\s+servicios\s*$", re.IGNORECASE | re.MULTILINE)
 _NEXT_HEADING_RE = re.compile(r"^#{1,4}\s+\S", re.MULTILINE)
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 # Palabras vacías/genéricas que no discriminan un producto (es neutro). No fabrican señal.
-_STOPWORDS: frozenset[str] = frozenset({
-    "de", "del", "la", "las", "el", "los", "y", "e", "o", "u", "en", "con", "para", "por",
-    "que", "una", "uno", "unos", "unas", "un", "al", "a", "su", "sus", "se", "es", "son",
-    "como", "mas", "muy", "entre", "sobre", "tambien", "ademas", "esta", "este", "estos",
-    "estas", "ser", "tiene", "tienen", "ofrece", "ofrecen", "empresa", "compania", "productos",
-    "producto", "servicios", "servicio", "principales", "diversos", "varios", "gama", "linea",
-    "portafolio", "incluye", "incluyen", "mercado", "clientes", "cliente", "sector", "actividad",
-    "actividades", "solucion", "soluciones", "dato", "disponible", "fuentes", "consultadas",
-    "inferencia", "diferentes", "amplia", "amplio", "nacional", "internacional", "calidad",
-})
+_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "de",
+        "del",
+        "la",
+        "las",
+        "el",
+        "los",
+        "y",
+        "e",
+        "o",
+        "u",
+        "en",
+        "con",
+        "para",
+        "por",
+        "que",
+        "una",
+        "uno",
+        "unos",
+        "unas",
+        "un",
+        "al",
+        "a",
+        "su",
+        "sus",
+        "se",
+        "es",
+        "son",
+        "como",
+        "mas",
+        "muy",
+        "entre",
+        "sobre",
+        "tambien",
+        "ademas",
+        "esta",
+        "este",
+        "estos",
+        "estas",
+        "ser",
+        "tiene",
+        "tienen",
+        "ofrece",
+        "ofrecen",
+        "empresa",
+        "compania",
+        "productos",
+        "producto",
+        "servicios",
+        "servicio",
+        "principales",
+        "diversos",
+        "varios",
+        "gama",
+        "linea",
+        "portafolio",
+        "incluye",
+        "incluyen",
+        "mercado",
+        "clientes",
+        "cliente",
+        "sector",
+        "actividad",
+        "actividades",
+        "solucion",
+        "soluciones",
+        "dato",
+        "disponible",
+        "fuentes",
+        "consultadas",
+        "inferencia",
+        "diferentes",
+        "amplia",
+        "amplio",
+        "nacional",
+        "internacional",
+        "calidad",
+    }
+)
 
 
 def _normalize(texto: str) -> str:
@@ -49,7 +117,7 @@ def extract_productos_servicios(texto: str | None) -> str:
     m = _HEADING_RE.search(texto)
     if not m:
         return ""
-    resto = texto[m.end():]
+    resto = texto[m.end() :]
     sig = _NEXT_HEADING_RE.search(resto)
     seccion = resto[: sig.start()] if sig else resto
     return seccion.strip()
@@ -64,7 +132,8 @@ def producto_terms(seccion: str | None, min_len: int = 4) -> set[str]:
     if not seccion:
         return set()
     return {
-        t for t in _TOKEN_RE.findall(_normalize(seccion))
+        t
+        for t in _TOKEN_RE.findall(_normalize(seccion))
         if len(t) >= min_len and t not in _STOPWORDS
     }
 

@@ -65,6 +65,7 @@ def test_normal_style_widow_control(tmp_path):
 # T16.3: tabla Word de ficha de competidor
 # ---------------------------------------------------------------------------
 
+
 def test_docx_table_block_rendered(tmp_path):
     """Un TableBlock en el ReportDocument se renderiza como tabla Word nativa."""
     block = TableBlock(

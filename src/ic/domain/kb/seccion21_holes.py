@@ -76,12 +76,14 @@ def fill_holes(
             continue
         procesados += 1
         try:
-            raw = chain.invoke({
-                "nombre": nombre,
-                "sector_gics": sector_gics,
-                "evidencia_rag": evidencia_rag,
-                "campos_faltantes": _format_campos_faltantes(faltantes),
-            })
+            raw = chain.invoke(
+                {
+                    "nombre": nombre,
+                    "sector_gics": sector_gics,
+                    "evidencia_rag": evidencia_rag,
+                    "campos_faltantes": _format_campos_faltantes(faltantes),
+                }
+            )
         except Exception:  # noqa: BLE001 — el hole-filling es un boost; nunca rompe la corrida.
             logger.warning("hole-filling falló para %r", nombre, exc_info=True)
             continue
@@ -95,6 +97,7 @@ def fill_holes(
                 rellenados.setdefault(nombre, {})[clave] = valor
     logger.info(
         "hole-filling: %d competidores procesados, %d con datos nuevos",
-        procesados, len(rellenados),
+        procesados,
+        len(rellenados),
     )
     return enriquecidas, rellenados

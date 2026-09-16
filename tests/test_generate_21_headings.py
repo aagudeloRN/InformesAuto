@@ -12,7 +12,6 @@ from typing import Any
 from ic.domain.use_cases.generate_21_globales import Generate21Globales
 from ic.domain.use_cases.generate_21_regionales import Generate21Regionales
 from ic.domain.use_cases.generate_21_startups import Generate21Startups
-from ic.shared.types import ChunkResult
 
 
 class _FakeChain:
@@ -47,7 +46,9 @@ class _FakeStore:
 
 class _FakeWeb:
     def search(self, *_args: Any, **_kwargs: Any) -> list[SimpleNamespace]:
-        return [SimpleNamespace(content="contenido web", url="http://example.com", title="Empresa X")]
+        return [
+            SimpleNamespace(content="contenido web", url="http://example.com", title="Empresa X")
+        ]
 
 
 class _FakeEntidadRepo:

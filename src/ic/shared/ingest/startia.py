@@ -31,16 +31,14 @@ def _limpio(valor: Any) -> str | None:
 
 
 def _split_verticales(valor: Any) -> list[str]:
-    """"FINTECH; HRTECH" → ['FINTECH', 'HRTECH']. Tolera ';' y ','."""
+    """ "FINTECH; HRTECH" → ['FINTECH', 'HRTECH']. Tolera ';' y ','."""
     if valor is None:
         return []
     bruto = str(valor).replace(",", ";")
     return [v.strip() for v in bruto.split(";") if v.strip()]
 
 
-def parse_startia(
-    row: dict[str, Any], *, normalize: Callable[[str], str]
-) -> ParsedEntidad | None:
+def parse_startia(row: dict[str, Any], *, normalize: Callable[[str], str]) -> ParsedEntidad | None:
     """Fila cruda StartIA → ParsedEntidad (segmento=startup), o None si no hay nombre."""
     nombre = _limpio(row.get(COL_NOMBRE)) or _limpio(row.get(COL_RAZON))
     if not nombre:

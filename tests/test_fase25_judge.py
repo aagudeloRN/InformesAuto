@@ -99,11 +99,13 @@ def _stub_llm(respuesta: str):
 def test_chain_judge_produce_score_parseable():
     llm = _stub_llm('{"E":3,"P":2,"V":3,"F":2,"T":3,"faltantes":[]}')
     chain = build_chain_judge(llm)
-    raw = chain.invoke({
-        "capitulo_nombre": "Cap 2 — Análisis Competitivo",
-        "criterios_capitulo": CRITERIOS_CAPITULO["Cap 2 — Análisis Competitivo"],
-        "texto_capitulo": "Texto de prueba del capítulo.",
-    })
+    raw = chain.invoke(
+        {
+            "capitulo_nombre": "Cap 2 — Análisis Competitivo",
+            "criterios_capitulo": CRITERIOS_CAPITULO["Cap 2 — Análisis Competitivo"],
+            "texto_capitulo": "Texto de prueba del capítulo.",
+        }
+    )
     score = parse_rubric_score(raw)
     assert score.parseable
     assert score.total == 13

@@ -69,7 +69,9 @@ def test_ingest_batched_skips_duplicate_chunks(fake_settings):
         patch("ic.infrastructure.sources.pdf_ingestor._chunk_exists", return_value=True),
         patch("ic.infrastructure.sources.pdf_ingestor._release_vram"),
     ):
-        mock_reader_cls.return_value = _make_fake_reader(["Contenido página 1", "Contenido página 2"])  # noqa: E501
+        mock_reader_cls.return_value = _make_fake_reader(
+            ["Contenido página 1", "Contenido página 2"]
+        )  # noqa: E501
         mock_embedder_cls.return_value = MagicMock()
         mock_session_cls.return_value.__enter__ = MagicMock(return_value=MagicMock())
         mock_session_cls.return_value.__exit__ = MagicMock(return_value=False)

@@ -59,8 +59,7 @@ def _reconstruct_cap21(ctx: _PipelineContext):
                     startups = obj
 
         retrieval_ok = any(
-            obj is not None and obj.retrieval_suficiente
-            for obj in (globales, regionales, startups)
+            obj is not None and obj.retrieval_suficiente for obj in (globales, regionales, startups)
         )
         if not retrieval_ok and globales is None and regionales is None and startups is None:
             return None

@@ -50,10 +50,12 @@ class Generate21Globales:
         productos: str = "",
     ) -> Cap21Globales:
         # 1. Proponer candidatos vía LLM
-        raw = self._chain_candidatos.invoke({
-            "sector_gics": sector_gics,
-            "productos": productos or descripcion_empresa,
-        })
+        raw = self._chain_candidatos.invoke(
+            {
+                "sector_gics": sector_gics,
+                "productos": productos or descripcion_empresa,
+            }
+        )
         todos = parse_pares_globales(str(raw)) if isinstance(raw, str) else (raw or [])
 
         # 2. Excluir la empresa focal y recortar a max_empresas
@@ -110,12 +112,14 @@ class Generate21Globales:
 
         # 6. Generar prosa
         ctx = format_chunks_as_context(chunks)
-        texto = self._chain_perfil.invoke({
-            "sector_gics": sector_gics,
-            "candidatos": ", ".join(candidatos),
-            "nombre_empresa": nombre_empresa,
-            "chunks_context": ctx,
-        })
+        texto = self._chain_perfil.invoke(
+            {
+                "sector_gics": sector_gics,
+                "candidatos": ", ".join(candidatos),
+                "nombre_empresa": nombre_empresa,
+                "chunks_context": ctx,
+            }
+        )
         if not isinstance(texto, str):
             texto = str(texto)
         if not texto.startswith(_HEADING):
@@ -123,7 +127,9 @@ class Generate21Globales:
 
         logger.info(
             "Cap21Globales: %d candidatos, %d con web, %d chunks",
-            len(candidatos), n_con_web, len(chunks),
+            len(candidatos),
+            n_con_web,
+            len(chunks),
         )
 
         return Cap21Globales(

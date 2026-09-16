@@ -149,16 +149,18 @@ class PdfIngestor:
         doc_id = uuid.uuid4()
         try:
             with SessionLocal() as db_doc:
-                db_doc.add(DocumentoLocal(
-                    id=doc_id,
-                    empresa_id=empresa_id,
-                    nombre_archivo=Path(pdf_path).name,
-                    ruta_archivo=os.path.abspath(pdf_path),
-                    tipo=tipo,
-                    sector_gics=sector_efectivo,
-                    estado_ingesta=EstadoIngesta.PENDIENTE,
-                    metadatos=metadatos_base,
-                ))
+                db_doc.add(
+                    DocumentoLocal(
+                        id=doc_id,
+                        empresa_id=empresa_id,
+                        nombre_archivo=Path(pdf_path).name,
+                        ruta_archivo=os.path.abspath(pdf_path),
+                        tipo=tipo,
+                        sector_gics=sector_efectivo,
+                        estado_ingesta=EstadoIngesta.PENDIENTE,
+                        metadatos=metadatos_base,
+                    )
+                )
                 db_doc.commit()
         except Exception:
             logger.warning("No se pudo registrar DocumentoLocal", exc_info=True)
@@ -179,9 +181,11 @@ class PdfIngestor:
             for batch_idx in range(n_batches):
                 start_page = batch_idx * batch_size
                 end_page = min(start_page + batch_size, total_pages)
-                batch_text = _sanitize_text("\n".join(
-                    page.extract_text() or "" for page in reader.pages[start_page:end_page]
-                )).strip()
+                batch_text = _sanitize_text(
+                    "\n".join(
+                        page.extract_text() or "" for page in reader.pages[start_page:end_page]
+                    )
+                ).strip()
 
                 if not batch_text:
                     logger.info("Lote %d/%d: sin texto — saltando", batch_idx + 1, n_batches)
@@ -220,8 +224,12 @@ class PdfIngestor:
 
                 logger.info(
                     "Lote %d/%d (págs %d–%d): %d chunks nuevos, %d omitidos",
-                    batch_idx + 1, n_batches, start_page + 1, end_page,
-                    len(new_chunks), len(chunks) - len(new_chunks),
+                    batch_idx + 1,
+                    n_batches,
+                    start_page + 1,
+                    end_page,
+                    len(new_chunks),
+                    len(chunks) - len(new_chunks),
                 )
 
         if doc_id is not None:
@@ -237,6 +245,8 @@ class PdfIngestor:
 
         logger.info(
             "PDF '%s': %d chunks ingestados en %d lotes",
-            Path(pdf_path).name, total_inserted, n_batches,
+            Path(pdf_path).name,
+            total_inserted,
+            n_batches,
         )
         return total_inserted

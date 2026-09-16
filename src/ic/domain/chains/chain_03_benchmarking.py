@@ -20,7 +20,7 @@ SYSTEM_PROMPT_03 = (
     "(mal: (Alpina, Carvajal, 2019); bien: (Euromonitor, 2024)). Si varios datos vienen de "
     "fuentes distintas, cita cada uno por separado con su propio (Autor, año). "
     "NUNCA cites un nombre de archivo (.pdf, .docx); usa SIEMPRE el autor o institución.\n"
-    "- Si un dato no está disponible en las fuentes, escribe: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
+    '- Si un dato no está disponible en las fuentes, escribe: "Dato no disponible en fuentes consultadas."\n'  # noqa: E501
     "- No inventar información bajo ninguna circunstancia.\n"
     "- No mencionar escasez o poca disponibilidad de fuentes; solo reportar el estado del dato.\n"
     "- No incluir a la empresa analizada ni a su grupo corporativo como competidor.\n"
@@ -45,7 +45,7 @@ SYSTEM_PROMPT_03 = (
     "- Estilo general para 2.2, 2.4 y 2.5:\n"
     "    * Variar el ritmo: alternar frases cortas (≤12 palabras) con frases más largas.\n"
     "    * Máximo 1 ejemplo concreto por párrafo.\n"
-    "    * Prohibido: \"en resumen\", \"por lo tanto\", \"cabe destacar\", \"es importante mencionar\".\n"  # noqa: E501
+    '    * Prohibido: "en resumen", "por lo tanto", "cabe destacar", "es importante mencionar".\n'  # noqa: E501
     "    * Sin adjetivos vacíos (innovador, disruptivo, revolucionario) salvo que haya evidencia "
     "cuantificable en las fuentes.\n"
     "    * Cada párrafo: entre 80 y 150 palabras.\n"
@@ -59,7 +59,7 @@ SYSTEM_PROMPT_03 = (
 )
 
 USER_PROMPT_03 = (
-    "Genera el \"Capítulo 2. Análisis Competitivo\" para el informe de inteligencia competitiva "
+    'Genera el "Capítulo 2. Análisis Competitivo" para el informe de inteligencia competitiva '
     "de la empresa descrita a continuación.\n\n"
     "DESCRIPCIÓN DE LA EMPRESA:\n"
     "{descripcion_empresa}\n\n"
@@ -76,7 +76,7 @@ USER_PROMPT_03 = (
     "## 2.1. Jugadores Clave - Líderes del Mercado\n\n"
     "Identifica y analiza 14 actores: 8 líderes globales, 3 referentes regionales (LatAm/Colombia) "  # noqa: E501
     "y 3 startups o disruptores del sector.\n"
-    "Si arriba se listan \"Referentes Globales OBLIGATORIOS\", los actores de la subcategoría global "  # noqa: E501
+    'Si arriba se listan "Referentes Globales OBLIGATORIOS", los actores de la subcategoría global '  # noqa: E501
     "deben ser EXACTAMENTE esas empresas (usa el RAG solo para describir sus datos, nunca para "
     "elegir otras); si no se listan, identifícalos a partir de las fichas RAG del sector.\n"
     "Para cada actor, un mini-párrafo en prosa con los datos disponibles en las fuentes "
@@ -87,7 +87,7 @@ USER_PROMPT_03 = (
     "Genera una matriz 2×2 que clasifique los 14 actores cruzando:\n"
     "- Eje X: Enfoque de Mercado (Masivo/Volumen ↔ Nicho/Premium)\n"
     "- Eje Y: Nivel de Disrupción (Jugadores Tradicionales ↔ Entrantes Innovadores)\n\n"
-    "Luego escribe la \"Síntesis de Presión Competitiva\" como texto corrido (storytelling), "
+    'Luego escribe la "Síntesis de Presión Competitiva" como texto corrido (storytelling), '
     "sin viñetas, aplicando las reglas de estilo del system prompt.\n\n"
     "## 2.4. Módulos de Innovación, Inversión y RRHH\n\n"
     "Análisis sectorial global (no por empresa). Tres bloques independientes:\n"
@@ -137,8 +137,10 @@ def build_chain_03(llm: OllamaGatewayLLM, *, omitir_21: bool = False) -> Runnabl
     """Cadena del Cap 2. ``omitir_21=True`` (DT-066/B2): el LLM no redacta 2.1 (se ensambla aparte)
     y recibe la 2.1 ya hecha como contexto. ``False`` = prompt canónico idéntico (invariante)."""
     user = USER_PROMPT_03_SIN_21 if omitir_21 else USER_PROMPT_03
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_03),
-        ("human", user),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_03),
+            ("human", user),
+        ]
+    )
     return prompt | llm | StrOutputParser()

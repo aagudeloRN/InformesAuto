@@ -56,14 +56,9 @@ def _render_repositorio() -> None:
     with st.expander("➕ Subir documento", expanded=False):
         # Cargar empresas conocidas para asociación de docs (T18.3)
         _empresas_conocidas: list[tuple[str, str]] = [("", "— ninguna (documento sectorial) —")]
-        try:
-            from ic.data.database import SessionLocal as _SL
-            from ic.data.repositories.empresa_repo import EmpresaRepository as _ER
-            with _SL() as _db_e:
-                for _emp in _ER(_db_e).list_all():
-                    _empresas_conocidas.append((str(_emp.id), _emp.nombre))
-        except Exception:
-            pass
+        from ic.domain.use_cases.ui_query_services import list_empresas_conocidas
+
+        _empresas_conocidas = list_empresas_conocidas()
 
         with st.form("repo_upload_form"):
             archivo = st.file_uploader("Archivo PDF", type=["pdf"])
@@ -126,27 +121,12 @@ def _render_repositorio() -> None:
                     except Exception as exc:
                         st.error(f"Error al ingerir: {exc}")
 
-    # ── Listado ─────────────────────────────────────────────────────────────
+    # ?? Listado ?????????????????????????????????????????????????????????????
     st.markdown("### Documentos indexados")
     try:
-        from ic.data.database import SessionLocal
-        from ic.data.repositories.documento_repo import DocumentoRepository
+        from ic.domain.use_cases.ui_query_services import list_documentos_indexados
 
-        with SessionLocal() as db:
-            docs = DocumentoRepository(db).list_all()
-            filas = [
-                {
-                    "id": str(d.id),
-                    "nombre": d.nombre_archivo,
-                    "tipo": d.tipo,
-                    "sector": d.sector_gics or "—",
-                    "activo": bool(d.activo),
-                    "año": (d.metadatos or {}).get("año", "—"),
-                    "n_chunks": (d.metadatos or {}).get("n_chunks", "—"),
-                    "fecha": d.created_at.strftime("%Y-%m-%d %H:%M") if d.created_at else "—",
-                }
-                for d in docs
-            ]
+        filas = list_documentos_indexados()
     except Exception as e:
         st.error(f"No se pudo consultar el repositorio: {e}")
         return
@@ -171,10 +151,9 @@ def _render_repositorio() -> None:
                 key=f"toggle_{fila['id']}",
                 use_container_width=True,
             ):
-                import uuid as _uuid
+                from ic.domain.use_cases.ui_query_services import set_documento_activo
 
-                with SessionLocal() as db:
-                    DocumentoRepository(db).set_activo(_uuid.UUID(fila["id"]), nuevo_estado)
+                set_documento_activo(fila["id"], nuevo_estado)
                 st.rerun()
 
             confirm_key = f"confirm_del_{fila['id']}"
@@ -183,11 +162,10 @@ def _render_repositorio() -> None:
             if st.session_state.get(confirm_key):
                 st.warning("Esto borrará el documento y todos sus chunks. ¿Confirmas?")
                 cc1, cc2 = st.columns(2)
-                if cc1.button("Sí, borrar", key=f"yes_{fila['id']}"):
-                    import uuid as _uuid
+                if cc1.button("S?, borrar", key=f"yes_{fila['id']}"):
+                    from ic.domain.use_cases.ui_query_services import delete_documento_con_chunks
 
-                    with SessionLocal() as db:
-                        n = DocumentoRepository(db).delete_with_chunks(_uuid.UUID(fila["id"]))
+                    n = delete_documento_con_chunks(fila["id"])
                     st.session_state.pop(confirm_key, None)
                     st.success(f"Borrado: {n} chunks eliminados.")
                     st.rerun()
@@ -209,13 +187,11 @@ def _render_historial() -> None:
     offset = (page - 1) * _PAGE_SIZE
 
     try:
-        from ic.data.database import SessionLocal
-        from ic.data.repositories.informe_repo import InformeRepository
+        from ic.domain.use_cases.ui_query_services import list_informes_recientes
 
-        with SessionLocal() as db:
-            rows = InformeRepository(db).list_recientes(
-                limit=_PAGE_SIZE, offset=offset, empresa_filter=filtro or None
-            )
+        rows = list_informes_recientes(
+            limit=_PAGE_SIZE, offset=offset, empresa_filter=filtro or None
+        )
     except Exception as e:
         st.error(f"No se pudo consultar el historial: {e}")
         return
@@ -236,14 +212,16 @@ def _render_historial() -> None:
         )
         writer.writeheader()
         for inf, emp in rows:
-            writer.writerow({
-                "empresa": emp,
-                "fecha": inf.created_at.strftime("%Y-%m-%d %H:%M") if inf.created_at else "",
-                "estado": inf.estado,
-                "costo_usd": f"{inf.costo_usd:.4f}" if inf.costo_usd is not None else "",
-                "tiempo_s": f"{inf.tiempo_generacion_s:.0f}" if inf.tiempo_generacion_s else "",
-                "n_fuentes": (inf.metricas_fiabilidad or {}).get("n_fuentes_total", ""),
-            })
+            writer.writerow(
+                {
+                    "empresa": emp,
+                    "fecha": inf.created_at.strftime("%Y-%m-%d %H:%M") if inf.created_at else "",
+                    "estado": inf.estado,
+                    "costo_usd": f"{inf.costo_usd:.4f}" if inf.costo_usd is not None else "",
+                    "tiempo_s": f"{inf.tiempo_generacion_s:.0f}" if inf.tiempo_generacion_s else "",
+                    "n_fuentes": (inf.metricas_fiabilidad or {}).get("n_fuentes_total", ""),
+                }
+            )
         st.download_button(
             label="⬇️ Exportar página a CSV",
             data=buf.getvalue().encode(),
@@ -280,10 +258,7 @@ def _render_historial() -> None:
                 if ausencia:
                     st.caption(f"Sin evidencia suficiente: {', '.join(ausencia)}")
 
-            if (
-                informe.estado == EstadoInforme.COMPLETADO
-                and informe.ruta_documento_final
-            ):
+            if informe.estado == EstadoInforme.COMPLETADO and informe.ruta_documento_final:
                 docx_path = Path(informe.ruta_documento_final)
                 if docx_path.exists():
                     with open(docx_path, "rb") as f:
@@ -376,37 +351,41 @@ with tab_gen:
                 "Descubrir globales (LLM + web)",
                 value=True,
                 help="Identifica líderes mundiales del sector y los corrobora en web (≥2 fuentes). "
-                     "Más lento; consume cuota API.",
+                "Más lento; consume cuota API.",
             )
             mod_local = st.checkbox(
                 "Jugadores colombianos (reg. + startups)",
                 value=True,
                 help="Inyecta empresas locales del directorio (EmpresasColombia + StartIA) "
-                     "como regionales y startups en la tabla 2.1.",
+                "como regionales y startups en la tabla 2.1.",
             )
             mod_det = st.checkbox(
                 "Tabla 2.1 determinista desde KB",
                 value=True,
                 help="Ensambla la tabla de jugadores clave desde hechos verificados del KB "
-                     "en lugar de dejar que el LLM la redacte. Reduce 'Dato no disponible'.",
+                "en lugar de dejar que el LLM la redacte. Reduce 'Dato no disponible'.",
             )
 
         with col_m2:
             st.markdown("**Caps 3–6**")
             mod_tend = st.checkbox(
-                "Cap 3 — Tendencias sectoriales", value=True,
+                "Cap 3 — Tendencias sectoriales",
+                value=True,
                 help="Análisis de tendencias tecnológicas y regulatorias del sector.",
             )
             mod_eco = st.checkbox(
-                "Cap 4 — Ecosistema empresarial", value=True,
+                "Cap 4 — Ecosistema empresarial",
+                value=True,
                 help="Panorama de inversiones, fusiones, alianzas y actores del ecosistema.",
             )
             mod_conv = st.checkbox(
-                "Cap 5 — Convergencia empresarial", value=True,
+                "Cap 5 — Convergencia empresarial",
+                value=True,
                 help="Síntesis cruzada de Caps 2–4. Requiere Cap 3 y Cap 4.",
             )
             mod_acc = st.checkbox(
-                "Cap 6 — Accionables estratégicos", value=True,
+                "Cap 6 — Accionables estratégicos",
+                value=True,
                 help="Recomendaciones accionables derivadas del análisis. Requiere Cap 5.",
             )
 
@@ -429,16 +408,22 @@ with tab_gen:
             "Revisión automática por capítulo",
             value=False,
             help="Loop generar→juez→revisar sobre cada capítulo. Más lento y consume más cuota. "
-                 "Desactivado por defecto.",
+            "Desactivado por defecto.",
         )
 
         st.divider()
         st.markdown("**Opciones de caché**")
         col_c1, col_c2 = st.columns(2)
-        use_cache = col_c1.checkbox("Usar caché de capítulos", value=True,
-                                    help="Reutiliza capítulos ya generados para esta empresa.")
-        refresh_cache = col_c2.checkbox("Forzar regeneración completa", value=False,
-                                        help="Invalida el caché y regenera todo desde cero.")
+        use_cache = col_c1.checkbox(
+            "Usar caché de capítulos",
+            value=True,
+            help="Reutiliza capítulos ya generados para esta empresa.",
+        )
+        refresh_cache = col_c2.checkbox(
+            "Forzar regeneración completa",
+            value=False,
+            help="Invalida el caché y regenera todo desde cero.",
+        )
 
         submitted = st.form_submit_button("🚀 Generar informe", use_container_width=True)
 
@@ -454,8 +439,7 @@ with tab_gen:
             settings = get_settings()
         except Exception as e:
             st.error(
-                f"Error cargando configuración: {e}\n"
-                "Verifica que el archivo `.env` esté presente."
+                f"Error cargando configuración: {e}\nVerifica que el archivo `.env` esté presente."
             )
             st.stop()
 
@@ -498,12 +482,20 @@ with tab_gen:
 
             uc = GenerateInforme(settings)
             _todos_caps = mod_tend and mod_eco and mod_conv and mod_acc
-            caps_set: set[str] | None = None if _todos_caps else {
-                c for flag, c in [
-                    (mod_tend, "cap3"), (mod_eco, "cap4"),
-                    (mod_conv, "cap5"), (mod_acc, "cap6"),
-                ] if flag
-            }
+            caps_set: set[str] | None = (
+                None
+                if _todos_caps
+                else {
+                    c
+                    for flag, c in [
+                        (mod_tend, "cap3"),
+                        (mod_eco, "cap4"),
+                        (mod_conv, "cap5"),
+                        (mod_acc, "cap6"),
+                    ]
+                    if flag
+                }
+            )
             params = InformeParams(
                 empresa=empresa.strip(),
                 ciiu=ciiu.strip() or None,
@@ -542,8 +534,7 @@ with tab_gen:
                     data=f,
                     file_name=docx_path.name,
                     mime=(
-                        "application/vnd.openxmlformats-"
-                        "officedocument.wordprocessingml.document"
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),
                     use_container_width=True,
                 )
@@ -567,12 +558,11 @@ with tab_gen:
             col_r.metric("Referencias", str(result.n_referencias))
 
             if result.tokens_in or result.tokens_out:
-                st.caption(
-                    f"Tokens: {result.tokens_in:,} entrada / {result.tokens_out:,} salida"
-                )
+                st.caption(f"Tokens: {result.tokens_in:,} entrada / {result.tokens_out:,} salida")
 
             _modulos_on = [
-                lbl for lbl, activo in [
+                lbl
+                for lbl, activo in [
                     ("Globales", mod_globales),
                     ("Jugadores CO", mod_local),
                     ("Tabla KB", mod_det),
@@ -581,7 +571,8 @@ with tab_gen:
                     ("Convergencia", mod_conv),
                     ("Accionables", mod_acc),
                     ("Self-review", mod_selfreview),
-                ] if activo
+                ]
+                if activo
             ]
             st.caption(f"Módulos activos: {', '.join(_modulos_on) if _modulos_on else '—'}")
 

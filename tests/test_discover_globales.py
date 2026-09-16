@@ -28,12 +28,26 @@ class TestGateCorroboracion:
     def test_sufijos_societarios_no_dan_falso_negativo(self):
         # Regresión (E2E 3020): el LLM emite "JBS S.A." / "Tyson Foods, Inc."; la web dice "JBS" /
         # "Tyson Foods". Se matchea el núcleo, no la forma legal literal.
-        assert contar_corroboracion("JBS S.A.", [
-            "JBS is the world's largest meat company", "Report on JBS 2025",
-        ]) == 2
-        assert contar_corroboracion("Tyson Foods, Inc.", [
-            "Tyson Foods reported revenue", "perfil de tyson foods",
-        ]) == 2
+        assert (
+            contar_corroboracion(
+                "JBS S.A.",
+                [
+                    "JBS is the world's largest meat company",
+                    "Report on JBS 2025",
+                ],
+            )
+            == 2
+        )
+        assert (
+            contar_corroboracion(
+                "Tyson Foods, Inc.",
+                [
+                    "Tyson Foods reported revenue",
+                    "perfil de tyson foods",
+                ],
+            )
+            == 2
+        )
 
     def test_match_por_limite_de_palabra(self):
         # "jbs" no debe casar dentro de otra palabra ("jbservice").
@@ -47,7 +61,10 @@ class TestGateCorroboracion:
 
 def _web(content: str, url: str = "https://e.com/x") -> WebResult:
     return WebResult(
-        url=url, title="Perfil", content=content, snippet="s",
+        url=url,
+        title="Perfil",
+        content=content,
+        snippet="s",
         metadatos={"titulo": "Perfil", "año": "2025", "autor": None},
     )
 
@@ -58,16 +75,16 @@ class TestDiscoverGlobales:
         chain.invoke.return_value = llm_json
         web = MagicMock()
         web.search.side_effect = lambda q, **_: [
-            _web(c, f"https://e.com/{i}")
-            for i, c in enumerate(web_content_por_query(q))
+            _web(c, f"https://e.com/{i}") for i, c in enumerate(web_content_por_query(q))
         ]
         store = MagicMock()
         seed = MagicMock()
         conteos = DiscoverGlobales(
-            chain=chain, web_connector=web, store=store, min_corrob=min_corrob,
-        ).discover(
-            sector_gics="Alimentos", productos="lácteos, leche, yogurt", seed_repo_fn=seed
-        )
+            chain=chain,
+            web_connector=web,
+            store=store,
+            min_corrob=min_corrob,
+        ).discover(sector_gics="Alimentos", productos="lácteos, leche, yogurt", seed_repo_fn=seed)
         return conteos, store, seed
 
     def test_corroborado_siembra_verificado_e_ingiere(self):
@@ -100,7 +117,11 @@ class TestDiscoverGlobales:
         web = MagicMock()
         web.search.return_value = [_web("Perfil de Nestlé"), _web("Nestlé revenue")]
         DiscoverGlobales(
-            chain=chain, web_connector=web, store=MagicMock(), min_corrob=2, force_ddg=True,
+            chain=chain,
+            web_connector=web,
+            store=MagicMock(),
+            min_corrob=2,
+            force_ddg=True,
         ).discover(sector_gics="Alimentos", productos="", seed_repo_fn=MagicMock())
         assert web.search.call_args.kwargs.get("force_ddg") is True
 
@@ -116,7 +137,8 @@ class TestDiscoverGlobales:
 
     def test_sin_candidatos_no_busca_ni_siembra(self):
         conteos, store, seed = self._run(
-            llm_json="[]", web_content_por_query=lambda q: [],
+            llm_json="[]",
+            web_content_por_query=lambda q: [],
         )
         assert conteos == {"recomendados": 0, "corroborados": 0, "no_corroborados": 0}
         store.ingest.assert_not_called()

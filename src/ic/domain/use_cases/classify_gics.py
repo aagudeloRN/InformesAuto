@@ -32,11 +32,13 @@ class ClassifyGICS:
         candidatos = ciiu_to_gics_candidates(ciiu) if ciiu else []
         pistas = self._build_pistas(candidatos)
 
-        texto_raw = self._chain.invoke({
-            "nombre_empresa": nombre_empresa,
-            "descripcion_empresa": descripcion_empresa,
-            "pistas": pistas,
-        })
+        texto_raw = self._chain.invoke(
+            {
+                "nombre_empresa": nombre_empresa,
+                "descripcion_empresa": descripcion_empresa,
+                "pistas": pistas,
+            }
+        )
 
         grupo = self._extract_field(texto_raw, "Grupo Industrial")
         justificacion = self._extract_field(texto_raw, "Justificación")
@@ -52,9 +54,7 @@ class ClassifyGICS:
     def _build_pistas(self, candidatos: list[str]) -> str:
         if not candidatos:
             return ""
-        nombres = [
-            f"{self._nombre_por_codigo.get(c, c)} (GICS {c})" for c in candidatos
-        ]
+        nombres = [f"{self._nombre_por_codigo.get(c, c)} (GICS {c})" for c in candidatos]
         return (
             "\nPISTA (por el CIIU de la empresa, el grupo suele estar entre estos candidatos; "
             "elige el más ajustado al core business, pero puedes apartarte si la descripción lo "
@@ -80,7 +80,9 @@ class ClassifyGICS:
         if tiene_codigo_explicito:
             logger.warning(
                 "Clasificación GICS %s fuera de los candidatos del CIIU %s; se respeta el "
-                "código explícito del LLM.", code, candidatos,
+                "código explícito del LLM.",
+                code,
+                candidatos,
             )
             return grupo
 
@@ -88,7 +90,10 @@ class ClassifyGICS:
         nombre = self._nombre_por_codigo.get(corregido, corregido)
         logger.warning(
             "Clasificación GICS sin código explícito y fuera de candidatos (resuelto=%s). "
-            "Se corrige a %s (GICS %s) por el CIIU.", code, nombre, corregido,
+            "Se corrige a %s (GICS %s) por el CIIU.",
+            code,
+            nombre,
+            corregido,
         )
         return f"{nombre} (GICS {corregido})"
 

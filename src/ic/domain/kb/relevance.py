@@ -31,21 +31,56 @@ from ic.shared.text_productos import producto_overlap
 # Palabras propias de MEDIOS (no empresas del sector): un nombre con alguna de estas es un
 # publisher/medio, no un competidor. Match por token exacto (no substring) para no atrapar
 # empresas cuyo nombre las contenga como fragmento.
-_MEDIA_TOKENS: frozenset[str] = frozenset({
-    "news", "magazine", "journal", "times", "press", "gazette", "herald", "bulletin",
-    "daily", "weekly", "tribune", "chronicle", "observer", "wire", "media", "newsletter",
-    "insights", "insider",
-})
+_MEDIA_TOKENS: frozenset[str] = frozenset(
+    {
+        "news",
+        "magazine",
+        "journal",
+        "times",
+        "press",
+        "gazette",
+        "herald",
+        "bulletin",
+        "daily",
+        "weekly",
+        "tribune",
+        "chronicle",
+        "observer",
+        "wire",
+        "media",
+        "newsletter",
+        "insights",
+        "insider",
+    }
+)
 
 # Palabras/fragmentos de MÉTRICAS financieras que el OCR pega como si fueran nombres de empresa
 # ("ProfitMargin" → "profitmargin"; "Profit perEmployee" → "profit peremployee").
-_METRIC_TOKENS: frozenset[str] = frozenset({
-    "profit", "profitmargin", "margin", "peremployee", "ebitda", "ebit", "revenue",
-    "turnover", "opex", "capex", "roa", "roe", "roi", "yoy",
-})
+_METRIC_TOKENS: frozenset[str] = frozenset(
+    {
+        "profit",
+        "profitmargin",
+        "margin",
+        "peremployee",
+        "ebitda",
+        "ebit",
+        "revenue",
+        "turnover",
+        "opex",
+        "capex",
+        "roa",
+        "roe",
+        "roi",
+        "yoy",
+    }
+)
 # Formas pegadas (sin espacio) que no se parten en tokens.
 _METRIC_GLUED: tuple[str, ...] = (
-    "profitmargin", "peremployee", "grossmargin", "netmargin", "operatingmargin",
+    "profitmargin",
+    "peremployee",
+    "grossmargin",
+    "netmargin",
+    "operatingmargin",
 )
 
 
@@ -165,7 +200,7 @@ def format_referentes_globales(nombres: list[str] | None) -> str:
         return ""
     vinetas = "\n".join(f"- {n}" for n in limpios)
     return (
-        "Referentes Globales OBLIGATORIOS (sección 2.1.1): las fichas de \"Referentes Globales\" "
+        'Referentes Globales OBLIGATORIOS (sección 2.1.1): las fichas de "Referentes Globales" '
         "son EXACTAMENTE estas empresas. No elijas otras del RAG ni sustituyas ninguna; usa el RAG "
         "solo para llenar sus campos:\n" + vinetas
     )
@@ -194,9 +229,7 @@ def format_fichas_conocidas(fichas: dict[str, dict[str, str]]) -> str:
     )
 
 
-def format_jugadores_locales(
-    regionales: list[LocalRow], startups: list[LocalRow]
-) -> str:
+def format_jugadores_locales(regionales: list[LocalRow], startups: list[LocalRow]) -> str:
     """Bloque de contexto estructurado con jugadores locales del directorio (DT-050). Puro.
 
     Ground-truth para anclar 2.1.2 (regionales) y 2.1.3 (startups) sin depender solo de la web
@@ -211,8 +244,7 @@ def format_jugadores_locales(
         )
     if startups:
         bloques.append(
-            "Startups regionales del directorio:\n"
-            + "\n".join(_linea_local(r) for r in startups)
+            "Startups regionales del directorio:\n" + "\n".join(_linea_local(r) for r in startups)
         )
     return "\n\n".join(bloques)
 

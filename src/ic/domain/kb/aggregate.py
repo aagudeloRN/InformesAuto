@@ -35,11 +35,28 @@ SIGNAL_RUIDO = "ruido"
 # Tokens propios de TÍTULOS/METADATOS de informe (no de nombres de empresa). Un normalizado que
 # contiene alguno y es "largo" (varias palabras) es casi seguro un fragmento de título de reporte
 # ("colombia construction equipment market report", "latin america transportation sector report").
-_REPORT_TOKENS: frozenset[str] = frozenset({
-    "report", "market", "outlook", "database", "comparisons", "comparison", "forecast",
-    "statistics", "overview", "analysis", "review", "series", "table", "data table",
-    "industry profile", "country", "quarterly", "annual",
-})
+_REPORT_TOKENS: frozenset[str] = frozenset(
+    {
+        "report",
+        "market",
+        "outlook",
+        "database",
+        "comparisons",
+        "comparison",
+        "forecast",
+        "statistics",
+        "overview",
+        "analysis",
+        "review",
+        "series",
+        "table",
+        "data table",
+        "industry profile",
+        "country",
+        "quarterly",
+        "annual",
+    }
+)
 # Palabras funcionales que no cuentan para la longitud "de nombre propio".
 _MIN_PALABRAS_TITULO = 4
 
@@ -51,34 +68,110 @@ _ACRONIMO_RE = re.compile(r"^[a-z]{2,4}$")
 # atrapa cuando se concentran en pocos sectores (IEA↔energía, Euromonitor↔consumo). Se identifican
 # por un TOKEN de marca distintivo (raro en nombres de competidor real). Consistente con el prompt
 # de chain_02b, que ya instruye "no incluyas fuentes (Euromonitor, DANE)". Curación, no invención.
-_PUBLISHER_TOKENS: frozenset[str] = frozenset({
-    "fitch", "euromonitor", "marketline", "globaldata", "mordor", "statista", "cepal",
-    "oecd", "imf", "unctad", "deloitte", "pwc", "kpmg", "mckinsey", "gartner", "nielsen",
-    "bloomberg", "reuters", "moody", "standard", "poors", "spglobal", "mapfre", "infiniti",
-    "tbrc", "bmi", "cfa", "eiu", "ihs", "frost", "sullivan", "grandview", "technavio",
-    "comtrade", "dane", "worldbank", "bancolombia", "supersociedades", "supersalud",
-    "fedesarrollo", "anif", "asobancaria",
-})
+_PUBLISHER_TOKENS: frozenset[str] = frozenset(
+    {
+        "fitch",
+        "euromonitor",
+        "marketline",
+        "globaldata",
+        "mordor",
+        "statista",
+        "cepal",
+        "oecd",
+        "imf",
+        "unctad",
+        "deloitte",
+        "pwc",
+        "kpmg",
+        "mckinsey",
+        "gartner",
+        "nielsen",
+        "bloomberg",
+        "reuters",
+        "moody",
+        "standard",
+        "poors",
+        "spglobal",
+        "mapfre",
+        "infiniti",
+        "tbrc",
+        "bmi",
+        "cfa",
+        "eiu",
+        "ihs",
+        "frost",
+        "sullivan",
+        "grandview",
+        "technavio",
+        "comtrade",
+        "dane",
+        "worldbank",
+        "bancolombia",
+        "supersociedades",
+        "supersalud",
+        "fedesarrollo",
+        "anif",
+        "asobancaria",
+    }
+)
 
 # Fuentes multi-palabra sin token de marca distintivo (organismos/multilaterales): se descartan por
 # nombre normalizado completo.
-_PUBLISHER_NAMES: frozenset[str] = frozenset({
-    "international energy agency", "international monetary fund", "world bank",
-    "the business research company", "united nations", "world trade organization",
-    "inter american development bank", "world economic forum", "european commission",
-    "us energy information administration", "energy information administration",
-    "un comtrade database", "world energy outlook", "world energy investment",
-})
+_PUBLISHER_NAMES: frozenset[str] = frozenset(
+    {
+        "international energy agency",
+        "international monetary fund",
+        "world bank",
+        "the business research company",
+        "united nations",
+        "world trade organization",
+        "inter american development bank",
+        "world economic forum",
+        "european commission",
+        "us energy information administration",
+        "energy information administration",
+        "un comtrade database",
+        "world energy outlook",
+        "world energy investment",
+    }
+)
 
 # Términos genéricos que NO son entidades: geografías/regiones, bloques y sustantivos de sector que
 # spaCy etiqueta ORG. Se descartan por nombre normalizado completo (conservador para no borrar
 # empresas cuyo nombre contenga uno de estos como parte).
-_GENERIC_NOISE: frozenset[str] = frozenset({
-    "latam", "latin america", "european union", "non oecd", "oecd", "energia", "energy",
-    "fintech", "global fintech", "credit ratings", "mer", "i l", "cti", "sic", "llms",
-    "convergencia", "usd", "cop", "eur", "gdp", "pib", "cagr", "middle east", "asia pacific",
-    "north america", "south america", "sub saharan africa", "eurozone", "brics",
-})
+_GENERIC_NOISE: frozenset[str] = frozenset(
+    {
+        "latam",
+        "latin america",
+        "european union",
+        "non oecd",
+        "oecd",
+        "energia",
+        "energy",
+        "fintech",
+        "global fintech",
+        "credit ratings",
+        "mer",
+        "i l",
+        "cti",
+        "sic",
+        "llms",
+        "convergencia",
+        "usd",
+        "cop",
+        "eur",
+        "gdp",
+        "pib",
+        "cagr",
+        "middle east",
+        "asia pacific",
+        "north america",
+        "south america",
+        "sub saharan africa",
+        "eurozone",
+        "brics",
+    }
+)
 
 
 @dataclass
@@ -175,21 +268,21 @@ def aggregate_menciones(
         display = forma_counter.most_common(1)[0][0] if forma_counter else k
         aliases = sorted(s for s in forma_counter if s != display)
 
-        signal = _clasificar_signal(
-            k, n_sectores if n_sectores else 1, publisher_min_sectores
-        )
+        signal = _clasificar_signal(k, n_sectores if n_sectores else 1, publisher_min_sectores)
 
-        out.append(EntidadCandidata(
-            nombre_normalizado=k,
-            nombre=display,
-            aliases=aliases,
-            n_menciones=menciones[k],
-            n_chunks=n_chunks,
-            n_sectores=n_sectores,
-            sector_dominante=sector_dominante,
-            concentracion=round(concentracion, 4),
-            signal=signal,
-        ))
+        out.append(
+            EntidadCandidata(
+                nombre_normalizado=k,
+                nombre=display,
+                aliases=aliases,
+                n_menciones=menciones[k],
+                n_chunks=n_chunks,
+                n_sectores=n_sectores,
+                sector_dominante=sector_dominante,
+                concentracion=round(concentracion, 4),
+                signal=signal,
+            )
+        )
     return out
 
 

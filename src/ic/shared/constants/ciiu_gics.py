@@ -19,19 +19,33 @@ from ic.shared.constants.gics_groups import _normalize, gics_options
 
 # .../src/ic/shared/constants/ciiu_gics.py → parents[4] es la raíz del repo.
 _CSV_PATH = (
-    Path(__file__).resolve().parents[4]
-    / "documentos_sectoriales"
-    / "Comparacion_GICS_CIIU.csv"
+    Path(__file__).resolve().parents[4] / "documentos_sectoriales" / "Comparacion_GICS_CIIU.csv"
 )
 
 # CIIU Rev.4: rango de divisiones (2 primeros dígitos) → letra de Sección.
 # (01-03=A, 05-09=B, 10-33=C, 35=D, 36-39=E, 41-43=F, 45-47=G, 49-53=H, 55-56=I, 58-63=J,
 #  64-66=K, 68=L, 69-75=M, 77-82=N, 84=O, 85=P, 86-88=Q, 90-93=R, 94-96=S, 97-98=T, 99=U)
 _SECCION_RANGOS: list[tuple[int, int, str]] = [
-    (1, 3, "A"), (5, 9, "B"), (10, 33, "C"), (35, 35, "D"), (36, 39, "E"),
-    (41, 43, "F"), (45, 47, "G"), (49, 53, "H"), (55, 56, "I"), (58, 63, "J"),
-    (64, 66, "K"), (68, 68, "L"), (69, 75, "M"), (77, 82, "N"), (84, 84, "O"),
-    (85, 85, "P"), (86, 88, "Q"), (90, 93, "R"), (94, 96, "S"), (97, 98, "T"),
+    (1, 3, "A"),
+    (5, 9, "B"),
+    (10, 33, "C"),
+    (35, 35, "D"),
+    (36, 39, "E"),
+    (41, 43, "F"),
+    (45, 47, "G"),
+    (49, 53, "H"),
+    (55, 56, "I"),
+    (58, 63, "J"),
+    (64, 66, "K"),
+    (68, 68, "L"),
+    (69, 75, "M"),
+    (77, 82, "N"),
+    (84, 84, "O"),
+    (85, 85, "P"),
+    (86, 88, "Q"),
+    (90, 93, "R"),
+    (94, 96, "S"),
+    (97, 98, "T"),
     (99, 99, "U"),
 ]
 
@@ -136,55 +150,109 @@ _CIIU_EMBEBIDO_RE = re.compile(r"\(([A-U])(\d{3,4})\)")
 # división; los casos genuinamente ambiguos (comercio) se afinan con `_CIIU_CLASE_OVERRIDES`.
 _CIIU_DIVISION_GICS: dict[int, str] = {
     # A — Agricultura, ganadería, pesca → producción agroindustrial de alimentos.
-    1: "3020", 2: "3020", 3: "3020",
+    1: "3020",
+    2: "3020",
+    3: "3020",
     # B — Minería.
-    5: "1010", 6: "1010", 7: "1510", 8: "1510", 9: "1010",
+    5: "1010",
+    6: "1010",
+    7: "1510",
+    8: "1510",
+    9: "1010",
     # C — Manufactura.
-    10: "3020", 11: "3020", 12: "3020",          # alimentos, bebidas, tabaco
-    13: "2520", 14: "2520", 15: "2520",          # textiles, confección, cuero/calzado
-    16: "1510", 17: "1510",                       # madera, papel
-    18: "2020",                                   # impresión (servicios comerciales)
-    19: "1010",                                   # coque y refinación de petróleo
-    20: "1510", 22: "1510", 23: "1510", 24: "1510",  # químicos, caucho/plástico, minerales, metales
-    21: "3520",                                   # farmacéutica
-    25: "2010", 27: "2010", 28: "2010", 30: "2010", 33: "2010",  # metalmecánica/maquinaria
-    26: "4520",                                   # electrónica/informática/óptica
-    29: "2510",                                   # vehículos automotores
-    31: "2520", 32: "2520",                       # muebles, otras manufacturas
+    10: "3020",
+    11: "3020",
+    12: "3020",  # alimentos, bebidas, tabaco
+    13: "2520",
+    14: "2520",
+    15: "2520",  # textiles, confección, cuero/calzado
+    16: "1510",
+    17: "1510",  # madera, papel
+    18: "2020",  # impresión (servicios comerciales)
+    19: "1010",  # coque y refinación de petróleo
+    20: "1510",
+    22: "1510",
+    23: "1510",
+    24: "1510",  # químicos, caucho/plástico, minerales, metales
+    21: "3520",  # farmacéutica
+    25: "2010",
+    27: "2010",
+    28: "2010",
+    30: "2010",
+    33: "2010",  # metalmecánica/maquinaria
+    26: "4520",  # electrónica/informática/óptica
+    29: "2510",  # vehículos automotores
+    31: "2520",
+    32: "2520",  # muebles, otras manufacturas
     # D — Electricidad/gas.
     35: "5510",
     # E — Agua/residuos.
-    36: "5510", 37: "2020", 38: "2020", 39: "2020",
+    36: "5510",
+    37: "2020",
+    38: "2020",
+    39: "2020",
     # F — Construcción.
-    41: "2010", 42: "2010", 43: "2010",
+    41: "2010",
+    42: "2010",
+    43: "2010",
     # G — Comercio (ambiguo 2550/3010; ver overrides de clase para básicos).
-    45: "2550", 46: "2550", 47: "2550",
+    45: "2550",
+    46: "2550",
+    47: "2550",
     # H — Transporte y almacenamiento.
-    49: "2030", 50: "2030", 51: "2030", 52: "2030", 53: "2030",
+    49: "2030",
+    50: "2030",
+    51: "2030",
+    52: "2030",
+    53: "2030",
     # I — Alojamiento y servicio de comidas.
-    55: "2530", 56: "2530",
+    55: "2530",
+    56: "2530",
     # J — Información y comunicaciones.
-    58: "5020", 59: "5020", 60: "5020",          # edición, cine/música, radiodifusión
-    61: "5010",                                   # telecomunicaciones
-    62: "4510", 63: "4510",                       # programación, servicios de información
+    58: "5020",
+    59: "5020",
+    60: "5020",  # edición, cine/música, radiodifusión
+    61: "5010",  # telecomunicaciones
+    62: "4510",
+    63: "4510",  # programación, servicios de información
     # K — Financiero y seguros.
-    64: "4010", 65: "4030", 66: "4020",
+    64: "4010",
+    65: "4030",
+    66: "4020",
     # L — Inmobiliario.
     68: "6020",
     # M — Actividades profesionales, científicas y técnicas (publicidad → medios).
-    69: "2020", 70: "2020", 71: "2020", 72: "2020", 73: "5020", 74: "2020", 75: "2020",
+    69: "2020",
+    70: "2020",
+    71: "2020",
+    72: "2020",
+    73: "5020",
+    74: "2020",
+    75: "2020",
     # N — Servicios administrativos y de apoyo.
-    77: "2020", 78: "2020", 79: "2020", 80: "2020", 81: "2020", 82: "2020",
+    77: "2020",
+    78: "2020",
+    79: "2020",
+    80: "2020",
+    81: "2020",
+    82: "2020",
     # O — Administración pública y defensa.
     84: "2020",
     # P — Educación.
     85: "2530",
     # Q — Salud humana y asistencia social.
-    86: "3510", 87: "3510", 88: "3510",
+    86: "3510",
+    87: "3510",
+    88: "3510",
     # R — Arte, entretenimiento y recreación.
-    90: "5020", 91: "5020", 92: "5020", 93: "2530",
+    90: "5020",
+    91: "5020",
+    92: "5020",
+    93: "2530",
     # S — Otras actividades de servicios.
-    94: "2020", 95: "2530", 96: "2530",
+    94: "2020",
+    95: "2530",
+    96: "2530",
 }
 
 # Overrides por CLASE (4 díg) para la ambigüedad de comercio (Sección G): alimentos/farmacia son
@@ -192,10 +260,19 @@ _CIIU_DIVISION_GICS: dict[int, str] = {
 # cae en el default de división (2550).
 _CIIU_CLASE_OVERRIDES: dict[str, str] = {
     # mayorista de básicos (alimentos/bebidas/tabaco)
-    "4630": "3010", "4631": "3010", "4632": "3010", "4633": "3010", "4634": "3010",
-    "4711": "3010", "4719": "3010",  # minorista no especializado (predomina alimentos)
+    "4630": "3010",
+    "4631": "3010",
+    "4632": "3010",
+    "4633": "3010",
+    "4634": "3010",
+    "4711": "3010",
+    "4719": "3010",  # minorista no especializado (predomina alimentos)
     # minorista de alimentos y bebidas
-    "4721": "3010", "4722": "3010", "4723": "3010", "4724": "3010", "4729": "3010",
+    "4721": "3010",
+    "4722": "3010",
+    "4723": "3010",
+    "4724": "3010",
+    "4729": "3010",
     "4773": "3010",  # minorista de productos farmacéuticos y medicinales
 }
 

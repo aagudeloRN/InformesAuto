@@ -6,9 +6,7 @@ Cubre los 6 escenarios del quickstart.md.
 
 from __future__ import annotations
 
-import dataclasses
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -19,14 +17,13 @@ from ic.shared.types import (
     Cap21Regionales,
     Cap21Startups,
     ChunkResult,
-    ClasificacionCompetidor,
-    CuadranteKey,
     DescripcionEmpresa,
 )
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
+
 
 def _chunk() -> ChunkResult:
     return ChunkResult(chunk_texto="ctx", fuente_tipo="web", fuente_url="http://x", score=0.8)
@@ -87,12 +84,15 @@ def _valid_llm_json(cuadrantes: dict | None = None) -> str:
             "nicho_innovador": [],
         }
     import json
-    return json.dumps({
-        "cuadrantes": cuadrantes,
-        "intro": "El ecosistema se segmenta por enfoque de mercado y modelo operativo.",
-        "sintesis_incumbente": "Los incumbentes aprovechan economías de escala.",
-        "sintesis_entrante": "Las startups atacan con modelos ágiles.",
-    })
+
+    return json.dumps(
+        {
+            "cuadrantes": cuadrantes,
+            "intro": "El ecosistema se segmenta por enfoque de mercado y modelo operativo.",
+            "sintesis_incumbente": "Los incumbentes aprovechan economías de escala.",
+            "sintesis_entrante": "Las startups atacan con modelos ágiles.",
+        }
+    )
 
 
 class _FakeLLM:
@@ -150,6 +150,7 @@ def _make_uc(llm_responses: list[str], initial_checkpoint: dict | None = None):
 # T008 — US1: clasificación exhaustiva
 # ---------------------------------------------------------------------------
 
+
 def test_clasificacion_exhaustiva():
     """Todas las 5 empresas quedan clasificadas; retrieval_suficiente True."""
     uc, llm, repo = _make_uc([_valid_llm_json()])
@@ -163,7 +164,6 @@ def test_clasificacion_exhaustiva():
     assert nombres_clasificados == {"EmpresaA", "EmpresaB", "EmpresaC", "StartupX", "StartupY"}
 
     # suma cross-cuadrante == 5
-    import re
     # verificar que la tabla tiene todos
     assert "EmpresaA" in cap22.texto
     assert "EmpresaB" in cap22.texto
@@ -175,20 +175,24 @@ def test_clasificacion_exhaustiva():
 # T009 — US2: lista cerrada — nombre ajeno eliminado
 # ---------------------------------------------------------------------------
 
+
 def test_lista_cerrada_nombre_ajeno():
     """EmpresaZ (ajena) es detectada y eliminada; queda en warnings."""
     import json
-    llm_json_with_intruder = json.dumps({
-        "cuadrantes": {
-            "masivo_tradicional": ["EmpresaA", "EmpresaB", "EmpresaZ"],  # EmpresaZ es intruso
-            "masivo_innovador": ["StartupX", "StartupY"],
-            "nicho_tradicional": ["EmpresaC"],
-            "nicho_innovador": [],
-        },
-        "intro": "Segmentación.",
-        "sintesis_incumbente": "Incumbentes.",
-        "sintesis_entrante": "Entrantes.",
-    })
+
+    llm_json_with_intruder = json.dumps(
+        {
+            "cuadrantes": {
+                "masivo_tradicional": ["EmpresaA", "EmpresaB", "EmpresaZ"],  # EmpresaZ es intruso
+                "masivo_innovador": ["StartupX", "StartupY"],
+                "nicho_tradicional": ["EmpresaC"],
+                "nicho_innovador": [],
+            },
+            "intro": "Segmentación.",
+            "sintesis_incumbente": "Incumbentes.",
+            "sintesis_entrante": "Entrantes.",
+        }
+    )
     uc, _, repo = _make_uc([llm_json_with_intruder])
     cap22 = uc(run_key="r2", cap21=_cap21_con_5(), empresa=_empresa())
 
@@ -201,20 +205,24 @@ def test_lista_cerrada_nombre_ajeno():
 # T010 — US1: cuadrante vacío muestra (ninguno)
 # ---------------------------------------------------------------------------
 
+
 def test_cuadrante_vacio_muestra_ninguno():
     """Cuadrantes vacíos muestran (ninguno); ninguna fila se omite."""
     import json
-    all_in_one = json.dumps({
-        "cuadrantes": {
-            "masivo_tradicional": ["EmpresaA", "EmpresaB", "EmpresaC", "StartupX", "StartupY"],
-            "masivo_innovador": [],
-            "nicho_tradicional": [],
-            "nicho_innovador": [],
-        },
-        "intro": "Todo en masivo tradicional.",
-        "sintesis_incumbente": "Incumbentes dominan.",
-        "sintesis_entrante": "Sin entrantes innovadores.",
-    })
+
+    all_in_one = json.dumps(
+        {
+            "cuadrantes": {
+                "masivo_tradicional": ["EmpresaA", "EmpresaB", "EmpresaC", "StartupX", "StartupY"],
+                "masivo_innovador": [],
+                "nicho_tradicional": [],
+                "nicho_innovador": [],
+            },
+            "intro": "Todo en masivo tradicional.",
+            "sintesis_incumbente": "Incumbentes dominan.",
+            "sintesis_entrante": "Sin entrantes innovadores.",
+        }
+    )
     uc, _, _ = _make_uc([all_in_one])
     cap22 = uc(run_key="r3", cap21=_cap21_con_5(), empresa=_empresa())
 
@@ -229,6 +237,7 @@ def test_cuadrante_vacio_muestra_ninguno():
 # ---------------------------------------------------------------------------
 # T016 — US3: regeneración no altera cap_1 ni cap_2_1
 # ---------------------------------------------------------------------------
+
 
 def test_regeneracion_no_altera_cap1_ni_cap21():
     """Regenerar Cap 2.2 no modifica checkpoints de cap_1 ni cap_2_1."""
@@ -266,6 +275,7 @@ def test_regeneracion_no_altera_cap1_ni_cap21():
 # T018 — US4: Cap 2.1 vacío → ausencia sin invocar LLM
 # ---------------------------------------------------------------------------
 
+
 def test_cap21_vacio_devuelve_ausencia():
     """Cap 2.1 vacío → párrafo de ausencia, LLM no invocado."""
     uc, fake_llm, _ = _make_uc([_valid_llm_json()])
@@ -284,6 +294,7 @@ def test_cap21_vacio_devuelve_ausencia():
 # T019 — US4: JSON malformado → retry x2 → ausencia
 # ---------------------------------------------------------------------------
 
+
 def test_json_malformado_devuelve_ausencia():
     """LLM siempre devuelve JSON inválido → 2 reintentos → párrafo de ausencia."""
     uc, fake_llm, _ = _make_uc(["no es json válido", "tampoco es json"])
@@ -298,8 +309,10 @@ def test_json_malformado_devuelve_ausencia():
 # T026 — Error de red / API se propaga sin silenciar (FR-012)
 # ---------------------------------------------------------------------------
 
+
 def test_error_red_propagado():
     """Errores de red/API se propagan; el use_case no los suprime silenciosamente."""
+
     class _ErrorChain:
         def invoke(self, inputs):
             raise RuntimeError("red")
@@ -314,20 +327,24 @@ def test_error_red_propagado():
 # T027 — dato_no_disponible marcado cuando síntesis indica falta de atributos
 # ---------------------------------------------------------------------------
 
+
 def test_dato_no_disponible_marcado():
     """Empresas con 'Dato no disponible' en sintesis_incumbente/entrante quedan marcadas."""
     import json
-    llm_json = json.dumps({
-        "cuadrantes": {
-            "masivo_tradicional": ["EmpresaA", "EmpresaB"],
-            "masivo_innovador": ["StartupX", "StartupY"],
-            "nicho_tradicional": ["EmpresaC"],
-            "nicho_innovador": [],
-        },
-        "intro": "Segmentación.",
-        "sintesis_incumbente": "Dato no disponible en fuentes consultadas para EmpresaA.",
-        "sintesis_entrante": "Dato no disponible en fuentes consultadas para StartupX.",
-    })
+
+    llm_json = json.dumps(
+        {
+            "cuadrantes": {
+                "masivo_tradicional": ["EmpresaA", "EmpresaB"],
+                "masivo_innovador": ["StartupX", "StartupY"],
+                "nicho_tradicional": ["EmpresaC"],
+                "nicho_innovador": [],
+            },
+            "intro": "Segmentación.",
+            "sintesis_incumbente": "Dato no disponible en fuentes consultadas para EmpresaA.",
+            "sintesis_entrante": "Dato no disponible en fuentes consultadas para StartupX.",
+        }
+    )
     uc, _, _ = _make_uc([llm_json])
     cap22 = uc(run_key="r8", cap21=_cap21_con_5(), empresa=_empresa())
 
@@ -344,9 +361,11 @@ def test_dato_no_disponible_marcado():
 # T028 — Un solo competidor genera con warning representatividad
 # ---------------------------------------------------------------------------
 
+
 def test_un_competidor_genera_con_warning():
-    """Con solo 1 competidor en Cap 2.1, se genera normalmente pero con warning de representatividad."""
+    """Con solo 1 competidor en Cap 2.1, se genera normalmente con warning de representatividad."""
     import json
+
     cap21_uno = Cap21Jugadores(
         texto="## 2.1...",
         globales=Cap21Globales(
@@ -360,17 +379,19 @@ def test_un_competidor_genera_con_warning():
         retrieval_suficiente=True,
         chunks_usados=[_chunk()],
     )
-    llm_json = json.dumps({
-        "cuadrantes": {
-            "masivo_tradicional": ["EmpresaSola"],
-            "masivo_innovador": [],
-            "nicho_tradicional": [],
-            "nicho_innovador": [],
-        },
-        "intro": "Un solo competidor.",
-        "sintesis_incumbente": "EmpresaSola domina el mercado.",
-        "sintesis_entrante": "Sin entrantes identificados.",
-    })
+    llm_json = json.dumps(
+        {
+            "cuadrantes": {
+                "masivo_tradicional": ["EmpresaSola"],
+                "masivo_innovador": [],
+                "nicho_tradicional": [],
+                "nicho_innovador": [],
+            },
+            "intro": "Un solo competidor.",
+            "sintesis_incumbente": "EmpresaSola domina el mercado.",
+            "sintesis_entrante": "Sin entrantes identificados.",
+        }
+    )
     uc, _, _ = _make_uc([llm_json])
     cap22 = uc(run_key="r9", cap21=cap21_uno, empresa=_empresa())
 

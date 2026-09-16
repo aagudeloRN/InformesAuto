@@ -60,9 +60,8 @@ def _dedup_startups(
     intl_filtrados = [
         n for n in startups.internacionales if _clave_exclusion(n) not in claves_superiores
     ]
-    if (
-        len(locales_filtrados) == len(startups.locales)
-        and len(intl_filtrados) == len(startups.internacionales)
+    if len(locales_filtrados) == len(startups.locales) and len(intl_filtrados) == len(
+        startups.internacionales
     ):
         return startups
     return replace(startups, locales=locales_filtrados, internacionales=intl_filtrados)
@@ -151,8 +150,10 @@ class Generate21Jugadores:
 
         # Deduplicación cross-tier (Global > Regional > Startup)
         if (
-            globales and globales.retrieval_suficiente
-            and regionales and regionales.retrieval_suficiente
+            globales
+            and globales.retrieval_suficiente
+            and regionales
+            and regionales.retrieval_suficiente
         ):
             regionales = _dedup_regionales(globales, regionales)
         if startups and startups.retrieval_suficiente:
@@ -160,20 +161,16 @@ class Generate21Jugadores:
 
         # Verificar si todos fallan
         todos_ausentes = all(
-            obj is None or not obj.retrieval_suficiente
-            for obj in (globales, regionales, startups)
+            obj is None or not obj.retrieval_suficiente for obj in (globales, regionales, startups)
         )
 
         if todos_ausentes:
-            texto = (
-                f"{_HEADING}\n\n"
-                + build_absent_paragraph(
-                    _SECTION_LABEL,
-                    "No se encontraron fuentes suficientes para ningún sub-módulo "
-                    "(Referentes Globales, Regionales ni Startups). "
-                    "Incorpore informes EMIS, datos de StartIA y conexión a internet "
-                    "para regenerar",
-                )
+            texto = f"{_HEADING}\n\n" + build_absent_paragraph(
+                _SECTION_LABEL,
+                "No se encontraron fuentes suficientes para ningún sub-módulo "
+                "(Referentes Globales, Regionales ni Startups). "
+                "Incorpore informes EMIS, datos de StartIA y conexión a internet "
+                "para regenerar",
             )
             return Cap21Jugadores(
                 texto=texto,

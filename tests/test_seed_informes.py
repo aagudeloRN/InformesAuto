@@ -29,20 +29,26 @@ def _bloques_informe():
         DocxParagraph("2.1. Jugadores Clave - Líderes del Mercado", "Heading 2"),
         DocxParagraph("El ecosistema actual cuenta con actores principales.", "Body Text"),
         DocxParagraph("Referentes Globales", "Body Text"),
-        DocxTable([
-            ["Empresa", "País de Origen", "Portafolio / Productos"],
-            ["Nestlé S.A.", "Suiza", "Galletas | snacks"],  # el `|` debe sanearse
-        ]),
+        DocxTable(
+            [
+                ["Empresa", "País de Origen", "Portafolio / Productos"],
+                ["Nestlé S.A.", "Suiza", "Galletas | snacks"],  # el `|` debe sanearse
+            ]
+        ),
         DocxParagraph("Mayor Fortaleza - Referentes Globales", "Body Text"),
-        DocxTable([
-            ["Empresa", "Propuesta de Valor", "Mayor Fortaleza"],
-            ["Nestlé S.A.", "Nutrición y calidad", "Red de distribución global"],
-        ]),
+        DocxTable(
+            [
+                ["Empresa", "Propuesta de Valor", "Mayor Fortaleza"],
+                ["Nestlé S.A.", "Nutrición y calidad", "Red de distribución global"],
+            ]
+        ),
         DocxParagraph("Referentes Regionales (Latam/Colombia)", "Body Text"),
-        DocxTable([
-            ["Empresa", "País de Origen", "Portafolio / Productos"],
-            ["Colombina S.A.", "Colombia", "Confitería"],
-        ]),
+        DocxTable(
+            [
+                ["Empresa", "País de Origen", "Portafolio / Productos"],
+                ["Colombina S.A.", "Colombia", "Confitería"],
+            ]
+        ),
         DocxParagraph("2.2. División de competidores", "Heading 2"),
         DocxTable([["Ya", "no"], ["cuenta", "esta"]]),  # tras 2.2 → se descarta
     ]

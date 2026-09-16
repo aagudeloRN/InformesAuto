@@ -119,13 +119,17 @@ class Generate21Regionales:
         # 5. Generar prosa
         ctx_emis = format_chunks_as_context(chunks_emis)
         ctx_web = format_chunks_as_context(chunks_web) if chunks_web else "(sin complemento web)"
-        texto = self._chain_perfil.invoke({
-            "sector_gics": sector_gics,
-            "nombre_empresa": nombre_empresa,
-            "empresas_emis": ", ".join(nombres_emis) if nombres_emis else "identificadas en EMIS",
-            "chunks_emis_context": ctx_emis,
-            "chunks_web_context": ctx_web,
-        })
+        texto = self._chain_perfil.invoke(
+            {
+                "sector_gics": sector_gics,
+                "nombre_empresa": nombre_empresa,
+                "empresas_emis": ", ".join(nombres_emis)
+                if nombres_emis
+                else "identificadas en EMIS",
+                "chunks_emis_context": ctx_emis,
+                "chunks_web_context": ctx_web,
+            }
+        )
         if not isinstance(texto, str):
             texto = str(texto)
         if not texto.startswith(_HEADING):
@@ -134,7 +138,9 @@ class Generate21Regionales:
         todos_chunks = chunks_emis + chunks_web
         logger.info(
             "Cap21Regionales: %d chunks EMIS, %d empresas, %d web",
-            len(chunks_emis), len(nombres_emis), len(chunks_web),
+            len(chunks_emis),
+            len(nombres_emis),
+            len(chunks_web),
         )
 
         return Cap21Regionales(

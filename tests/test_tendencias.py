@@ -102,9 +102,7 @@ class TestGenerateTendencias:
         ]
 
         mock_openalex = MagicMock()
-        mock_openalex.search.return_value = [
-            _make_web_result("Food trends", "Research shows...")
-        ]
+        mock_openalex.search.return_value = [_make_web_result("Food trends", "Research shows...")]
 
         return GenerateTendencias(
             chain=mock_chain,

@@ -37,9 +37,18 @@ class _FakeRepo:
         self._pool = pool
 
     def search_similar(
-        self, _vec, top_k, _threshold, _empresa_id=None, sector_gics=None,
-        solo_activos=True, max_chunks_per_doc=None, sector_estricto=False,
-        global_estricto=False, empresa_estricto=False, mmr_lambda=1.0,
+        self,
+        _vec,
+        top_k,
+        _threshold,
+        _empresa_id=None,
+        sector_gics=None,
+        solo_activos=True,
+        max_chunks_per_doc=None,
+        sector_estricto=False,
+        global_estricto=False,
+        empresa_estricto=False,
+        mmr_lambda=1.0,
         fuente_tipo_filter=None,
     ) -> list[tuple]:
         if sector_estricto or global_estricto or empresa_estricto:
@@ -95,9 +104,7 @@ def test_search_backfills_to_min_distinct_docs():
 
 def test_search_monodoc_corpus_does_not_break():
     """Corpus de un solo documento: devuelve lo que hay, sin error ni relleno imposible."""
-    pool = [
-        (_FakeObj(f"a{i}", "docA", meta={"doc": "A"}), 0.9 - i * 0.01) for i in range(4)
-    ]
+    pool = [(_FakeObj(f"a{i}", "docA", meta={"doc": "A"}), 0.9 - i * 0.01) for i in range(4)]
     results = _store(pool).search("consulta")
     assert _distinct_docs(results) == {"A"}
     assert len(results) == 4

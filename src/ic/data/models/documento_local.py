@@ -51,8 +51,7 @@ def ensure_documento_columns(engine) -> None:
         ]:
             conn.execute(
                 text(
-                    f"ALTER TABLE {schema}.documentos_locales "
-                    f"ADD COLUMN IF NOT EXISTS {col} {tipo}"
+                    f"ALTER TABLE {schema}.documentos_locales ADD COLUMN IF NOT EXISTS {col} {tipo}"
                 )
             )
         # Refrescar el CHECK de tipo para admitir valores nuevos (p.ej. PAPER_ACADEMICO)

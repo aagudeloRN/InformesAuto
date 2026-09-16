@@ -52,15 +52,11 @@ def context_precision(retrieved: list[RetrievedChunk], expected_sector: str) -> 
     return correctos / len(con_sector)
 
 
-def cross_sector_contamination(
-    retrieved: list[RetrievedChunk], expected_sector: str
-) -> float:
+def cross_sector_contamination(retrieved: list[RetrievedChunk], expected_sector: str) -> float:
     """Fracción del top-k con sector propio que NO pertenece al esperado (web exenta)."""
     if not retrieved:
         return 0.0
-    malos = sum(
-        1 for r in retrieved if _has_sector(r) and not _on_sector(r, expected_sector)
-    )
+    malos = sum(1 for r in retrieved if _has_sector(r) and not _on_sector(r, expected_sector))
     return malos / len(retrieved)
 
 

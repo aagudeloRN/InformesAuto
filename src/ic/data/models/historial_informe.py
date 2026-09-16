@@ -47,6 +47,7 @@ class HistorialInforme(Base):
 def ensure_historial_columns(engine) -> None:
     """Migración idempotente: agrega columnas nuevas si no existen."""
     from ic.shared.config import get_settings
+
     schema = get_settings().db_schema
     with engine.begin() as conn:
         for col, tipo in [
@@ -54,6 +55,8 @@ def ensure_historial_columns(engine) -> None:
             ("tokens_out", "INTEGER"),
             ("metricas_fiabilidad", "JSONB"),
         ]:
-            conn.execute(text(
-                f"ALTER TABLE {schema}.historial_informes ADD COLUMN IF NOT EXISTS {col} {tipo}"
-            ))
+            conn.execute(
+                text(
+                    f"ALTER TABLE {schema}.historial_informes ADD COLUMN IF NOT EXISTS {col} {tipo}"
+                )
+            )

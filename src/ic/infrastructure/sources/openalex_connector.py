@@ -50,9 +50,7 @@ class OpenAlexConnector:
 
     def __init__(self, settings: Settings) -> None:
         self._email = settings.openalex_email
-        self._headers = {
-            "User-Agent": f"InformesAuto/0.5 (mailto:{self._email or 'anon'})"
-        }
+        self._headers = {"User-Agent": f"InformesAuto/0.5 (mailto:{self._email or 'anon'})"}
 
     def search(self, query: str, max_results: int = 5) -> list[WebResult]:
         """Busca trabajos académicos en OpenAlex.

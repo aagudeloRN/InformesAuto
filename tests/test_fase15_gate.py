@@ -22,8 +22,14 @@ def _run_gate(snapshot_data: dict, budget_data: dict, tmp_path: Path) -> int:
     snap_file.write_text(json.dumps(snapshot_data), encoding="utf-8")
     budget_file.write_text(json.dumps(budget_data), encoding="utf-8")
     result = subprocess.run(
-        [sys.executable, str(_GATE_SCRIPT),
-         "--snapshot", str(snap_file), "--budget", str(budget_file)],
+        [
+            sys.executable,
+            str(_GATE_SCRIPT),
+            "--snapshot",
+            str(snap_file),
+            "--budget",
+            str(budget_file),
+        ],
         capture_output=True,
     )
     return result.returncode

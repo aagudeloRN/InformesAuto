@@ -50,8 +50,10 @@ class _FakeWeb:
 def _chunks(n: int = 6) -> list[ChunkResult]:
     return [
         ChunkResult(
-            chunk_texto=f"Fragmento {i}.", fuente_tipo="web",
-            fuente_url=f"https://ej.com/{i}", score=0.9,
+            chunk_texto=f"Fragmento {i}.",
+            fuente_tipo="web",
+            fuente_url=f"https://ej.com/{i}",
+            score=0.9,
         )
         for i in range(n)
     ]
@@ -89,10 +91,12 @@ def test_prompt_sin_21_formatea_sin_variables_faltantes():
     # Riesgo real que el FakeChain no cubre: el ChatPromptTemplate debe resolver TODAS las variables
     # (incl. {seccion_21_context}) y respetar las llaves escapadas {{...}} del bloque radar. Un
     # payload completo debe formatear sin KeyError ni variables sobrantes.
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_03),
-        ("human", USER_PROMPT_03_SIN_21),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_03),
+            ("human", USER_PROMPT_03_SIN_21),
+        ]
+    )
     payload = {
         "descripcion_empresa": "Empresa láctea.",
         "sector_gics": "Alimentos, bebidas y tabaco",
@@ -113,7 +117,11 @@ def test_prompt_sin_21_formatea_sin_variables_faltantes():
 def test_b2_antepone_21_ensamblada_y_pasa_contexto():
     chain = _FakeChain()
     cap = _execute(
-        chain, seccion21_enabled=True, tiers=_TIERS, fichas_kb=_FICHAS, holes_chain=None,
+        chain,
+        seccion21_enabled=True,
+        tiers=_TIERS,
+        fichas_kb=_FICHAS,
+        holes_chain=None,
     )
     assert isinstance(cap, CapBenchmarking)
     # La 2.1 ensamblada (determinista, desde el KB) abre el capítulo…

@@ -98,7 +98,10 @@ class PGVectorStore:
         # el resto del pool alimenta la sustitución por documentos no representados.
         pool_k = max(k, k * _DIVERSITY_POOL_MULT) if self._min_distinct_docs > 0 else k
         pool = self._repo.search_similar(
-            query_vec, pool_k, t, empresa_id,
+            query_vec,
+            pool_k,
+            t,
+            empresa_id,
             sector_gics=sector_gics,
             solo_activos=solo_activos,
             max_chunks_per_doc=self._max_chunks_per_doc,
@@ -117,7 +120,10 @@ class PGVectorStore:
         capa_sectorial: list[tuple] = []
         if sector_gics is not None and self._sector_reserve > 0:
             capa_sectorial = self._repo.search_similar(
-                query_vec, self._sector_reserve, t_reserve, empresa_id,
+                query_vec,
+                self._sector_reserve,
+                t_reserve,
+                empresa_id,
                 sector_gics=sector_gics,
                 solo_activos=solo_activos,
                 sector_estricto=True,
@@ -128,7 +134,10 @@ class PGVectorStore:
         capa_global: list[tuple] = []
         if self._global_reserve > 0:
             capa_global = self._repo.search_similar(
-                query_vec, self._global_reserve, t_reserve, None,
+                query_vec,
+                self._global_reserve,
+                t_reserve,
+                None,
                 solo_activos=solo_activos,
                 global_estricto=True,
                 fuente_tipo_filter=fuente_tipo_filter,
@@ -138,7 +147,10 @@ class PGVectorStore:
         capa_empresa: list[tuple] = []
         if empresa_id is not None and self._empresa_reserve > 0:
             capa_empresa = self._repo.search_similar(
-                query_vec, self._empresa_reserve, t_reserve, empresa_id,
+                query_vec,
+                self._empresa_reserve,
+                t_reserve,
+                empresa_id,
                 solo_activos=solo_activos,
                 empresa_estricto=True,
                 fuente_tipo_filter=fuente_tipo_filter,
@@ -205,7 +217,8 @@ class PGVectorStore:
 
         ids_in_rows = {o.id for o, _ in rows}
         missing = [
-            (o, s) for o, s in pool
+            (o, s)
+            for o, s in pool
             if o.id not in ids_in_rows and self._doc_key(o) not in current_keys
         ]
         if not missing:

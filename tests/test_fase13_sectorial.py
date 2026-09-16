@@ -119,7 +119,7 @@ def test_search_propaga_filtros_sector_y_activos():
     settings.rag_max_chunks_per_doc = 4
     settings.rag_sector_reserve = 3
     settings.rag_sector_reserve_threshold = 0.5
-    settings.rag_global_reserve = 0   # desactivar para este test
+    settings.rag_global_reserve = 0  # desactivar para este test
     settings.rag_empresa_reserve = 0  # desactivar para este test
     settings.rag_mmr_lambda = 1.0
     settings.rag_min_distinct_docs = 0  # aísla la lógica de reservas del piso de diversidad (F22)
@@ -155,7 +155,7 @@ def test_search_reserva_garantiza_chunks_sectoriales():
     settings.rag_max_chunks_per_doc = 4
     settings.rag_sector_reserve = 2
     settings.rag_sector_reserve_threshold = 0.5
-    settings.rag_global_reserve = 0   # desactivar para aislar comportamiento sectorial
+    settings.rag_global_reserve = 0  # desactivar para aislar comportamiento sectorial
     settings.rag_empresa_reserve = 0
     settings.rag_mmr_lambda = 1.0
     settings.rag_min_distinct_docs = 0  # aísla la lógica de reservas del piso de diversidad (F22)
@@ -198,7 +198,7 @@ def test_search_reserva_global_garantiza_chunks_globales():
     settings.rag_top_k = 3
     settings.rag_similarity_threshold = 0.7
     settings.rag_max_chunks_per_doc = 4
-    settings.rag_sector_reserve = 0   # desactivar sectorial para aislar global
+    settings.rag_sector_reserve = 0  # desactivar sectorial para aislar global
     settings.rag_sector_reserve_threshold = 0.5
     settings.rag_global_reserve = 2
     settings.rag_empresa_reserve = 0
@@ -313,7 +313,8 @@ def test_ingest_batched_estampa_sector_y_fuente_pdf():
 
         ingestor = mod.PdfIngestor(settings)
         ingestor.ingest_batched(
-            pdf_path="/fake/pulso.pdf", sector_gics="2530",
+            pdf_path="/fake/pulso.pdf",
+            sector_gics="2530",
             tipo=TipoDocumento.PDF_SECTORIAL,
         )
 

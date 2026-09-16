@@ -16,9 +16,7 @@ _VALID_JSON = {
 
 _TEXT_WITH_RADAR = (
     "## 2.1. Jugadores Clave\n\nTexto del análisis.\n\n"
-    "```radar_json\n"
-    + json.dumps(_VALID_JSON, ensure_ascii=False)
-    + "\n```"
+    "```radar_json\n" + json.dumps(_VALID_JSON, ensure_ascii=False) + "\n```"
 )
 
 

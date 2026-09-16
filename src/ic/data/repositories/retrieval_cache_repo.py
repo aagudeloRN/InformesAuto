@@ -40,11 +40,7 @@ class RetrievalCacheRepository:
         qhash = _make_hash(connector, query, max_results)
         now = datetime.now(UTC)
         expires = now + timedelta(hours=ttl_hours)
-        row = (
-            self._db.query(RetrievalCache)
-            .filter(RetrievalCache.query_hash == qhash)
-            .first()
-        )
+        row = self._db.query(RetrievalCache).filter(RetrievalCache.query_hash == qhash).first()
         if row is None:
             row = RetrievalCache(
                 connector=connector,

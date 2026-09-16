@@ -68,7 +68,8 @@ class GenerateTendencias:
         # Retrieval del índice
         chunks = self._store.search(
             f"{sector_query} tendencias estratégicas sector",
-            sector_gics=sector_gics_code, empresa_id=empresa_id,
+            sector_gics=sector_gics_code,
+            empresa_id=empresa_id,
         )
 
         if not check_retrieval_sufficient(chunks, min_chunks=_MIN_CHUNKS):
@@ -82,12 +83,14 @@ class GenerateTendencias:
         context = format_chunks_as_context(chunks)
         academic_context = format_academic_sources(academic_results)
 
-        texto = self._chain.invoke({
-            "descripcion_empresa": descripcion_empresa,
-            "sector_gics": sector_gics,
-            "retrieval_sector": context,
-            "fuentes_academicas": academic_context,
-        })
+        texto = self._chain.invoke(
+            {
+                "descripcion_empresa": descripcion_empresa,
+                "sector_gics": sector_gics,
+                "retrieval_sector": context,
+                "fuentes_academicas": academic_context,
+            }
+        )
         texto = strip_preamble(texto)
 
         if has_cjk_characters(texto):

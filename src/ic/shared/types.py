@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
 @dataclass
@@ -60,17 +60,19 @@ class Referencia:
     apa_string: str
 
 
-class CuadranteKey(str, Enum):
+class CuadranteKey(StrEnum):
     """Identificadores internos de los cuatro cuadrantes de la matriz 2×2 de Cap 2.2."""
+
     MASIVO_TRADICIONAL = "masivo_tradicional"
-    MASIVO_INNOVADOR   = "masivo_innovador"
-    NICHO_TRADICIONAL  = "nicho_tradicional"
-    NICHO_INNOVADOR    = "nicho_innovador"
+    MASIVO_INNOVADOR = "masivo_innovador"
+    NICHO_TRADICIONAL = "nicho_tradicional"
+    NICHO_INNOVADOR = "nicho_innovador"
 
 
 @dataclass
 class ClasificacionCompetidor:
     """Asignación de un competidor de Cap 2.1 a uno de los cuatro cuadrantes."""
+
     nombre: str
     cuadrante: CuadranteKey
     dato_no_disponible: bool = False
@@ -79,6 +81,7 @@ class ClasificacionCompetidor:
 @dataclass
 class Cap22Division:
     """Resultado completo del subcapítulo 2.2 División de Competidores."""
+
     texto: str
     clasificaciones: list["ClasificacionCompetidor"]
     n_empresas_procesadas: int
@@ -126,6 +129,7 @@ class Cap21Jugadores:
 @dataclass
 class CostReport:
     """Registro de costo de una llamada LLM individual."""
+
     modelo: str
     tokens_in: int
     tokens_out: int
@@ -136,6 +140,7 @@ class CostReport:
 @dataclass
 class CapMercado:
     """Cap 2.3 Mercado (T21.6, DT-044): tamaño de mercado, segmentos y tabla por región."""
+
     texto: str
     n_chunks_usados: int
     retrieval_suficiente: bool

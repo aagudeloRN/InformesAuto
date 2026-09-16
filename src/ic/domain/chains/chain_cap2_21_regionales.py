@@ -37,8 +37,10 @@ _HUMAN = (
 
 
 def build_chain_cap2_21_regionales(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", _SYSTEM),
-        ("human", _HUMAN),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _SYSTEM),
+            ("human", _HUMAN),
+        ]
+    )
     return prompt | llm | StrOutputParser()

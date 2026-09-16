@@ -62,7 +62,7 @@ def sanitize_intro(text: str) -> str:
     t = _THINK_RE.sub("", text)
     matches = list(_ANSWER_MARKER_RE.finditer(t))
     if matches:
-        t = t[matches[-1].end():]
+        t = t[matches[-1].end() :]
     kept: list[str] = []
     for line in t.splitlines():
         s = line.strip()
@@ -77,8 +77,10 @@ def sanitize_intro(text: str) -> str:
 
 
 def build_chain_intro(llm: BaseChatModel) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_INTRO),
-        ("human", USER_INTRO),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_INTRO),
+            ("human", USER_INTRO),
+        ]
+    )
     return prompt | llm | StrOutputParser() | RunnableLambda(sanitize_intro)

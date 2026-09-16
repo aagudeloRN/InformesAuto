@@ -60,10 +60,12 @@ class DiscoverGlobales:
         # DT-063: steerear el recall del LLM por los PRODUCTOS/SERVICIOS de la empresa analizada
         # (señal de precisión), con el sector solo como límite de dominio. Reemplaza el sub-código
         # GICS (frágil): así una láctea recibe globales de lácteos, no del grupo entero.
-        raw = self._chain.invoke({
-            "sector_gics": sector_gics,
-            "productos": productos or "(no especificados; usar el sector como referencia)",
-        })
+        raw = self._chain.invoke(
+            {
+                "sector_gics": sector_gics,
+                "productos": productos or "(no especificados; usar el sector como referencia)",
+            }
+        )
         candidatos = parse_pares_globales(raw)
         corroborados = 0
         for nombre in candidatos:

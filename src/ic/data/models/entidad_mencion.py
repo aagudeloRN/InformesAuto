@@ -44,27 +44,33 @@ def ensure_entidad_menciones_table(engine) -> None:
 
     schema = get_settings().db_schema
     with engine.begin() as conn:
-        conn.execute(text(
-            f"CREATE TABLE IF NOT EXISTS {schema}.entidad_menciones ("
-            " id BIGSERIAL PRIMARY KEY,"
-            " entidad_normalizada TEXT NOT NULL,"
-            " entidad_texto TEXT NOT NULL,"
-            " tipo TEXT NOT NULL,"
-            " documento_id UUID,"
-            " chunk_id UUID NOT NULL,"
-            " sector TEXT,"
-            " fuente_tipo TEXT,"
-            " estado TEXT NOT NULL DEFAULT 'candidato',"
-            " created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
-            ")"
-        ))
+        conn.execute(
+            text(
+                f"CREATE TABLE IF NOT EXISTS {schema}.entidad_menciones ("
+                " id BIGSERIAL PRIMARY KEY,"
+                " entidad_normalizada TEXT NOT NULL,"
+                " entidad_texto TEXT NOT NULL,"
+                " tipo TEXT NOT NULL,"
+                " documento_id UUID,"
+                " chunk_id UUID NOT NULL,"
+                " sector TEXT,"
+                " fuente_tipo TEXT,"
+                " estado TEXT NOT NULL DEFAULT 'candidato',"
+                " created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+                ")"
+            )
+        )
         # Dedup idempotente: una mención por (entidad_normalizada, chunk_id).
-        conn.execute(text(
-            f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_mencion_dedup "
-            f"ON {schema}.entidad_menciones (entidad_normalizada, chunk_id)"
-        ))
+        conn.execute(
+            text(
+                f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_mencion_dedup "
+                f"ON {schema}.entidad_menciones (entidad_normalizada, chunk_id)"
+            )
+        )
         # Acelera consultas por sector del KB (DT-056).
-        conn.execute(text(
-            f"CREATE INDEX IF NOT EXISTS ix_entidad_mencion_sector "
-            f"ON {schema}.entidad_menciones (sector)"
-        ))
+        conn.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS ix_entidad_mencion_sector "
+                f"ON {schema}.entidad_menciones (sector)"
+            )
+        )

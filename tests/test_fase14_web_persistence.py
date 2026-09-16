@@ -68,22 +68,28 @@ def test_ingest_no_estampa_session_en_pdf():
 
 def _chunk_result(fuente_tipo, chunk_id):
     from ic.shared.types import ChunkResult
+
     return ChunkResult(
-        chunk_texto="x", fuente_tipo=fuente_tipo, fuente_url=None,
-        score=0.8, metadatos=None, chunk_id=chunk_id,
+        chunk_texto="x",
+        fuente_tipo=fuente_tipo,
+        fuente_url=None,
+        score=0.8,
+        metadatos=None,
+        chunk_id=chunk_id,
     )
 
 
 def test_promote_cited_web_selecciona_solo_web_con_id():
     from ic.domain.use_cases.generate_informe import GenerateInforme, _PipelineContext
 
-    ctx = _PipelineContext(params=MagicMock(), settings=MagicMock(), step_fn=None,
-                           total_start=0.0, session_id="sess-1")
+    ctx = _PipelineContext(
+        params=MagicMock(), settings=MagicMock(), step_fn=None, total_start=0.0, session_id="sess-1"
+    )
     chunks = [
         _chunk_result("web", "id-web-1"),
         _chunk_result("web", "id-web-2"),
-        _chunk_result("pdf", "id-pdf-1"),   # no es web → se ignora
-        _chunk_result("web", None),          # web sin id → se ignora
+        _chunk_result("pdf", "id-pdf-1"),  # no es web → se ignora
+        _chunk_result("web", None),  # web sin id → se ignora
     ]
     repo = MagicMock()
     repo.promote_cited_web.return_value = (0, 2)
@@ -102,8 +108,9 @@ def test_promote_cited_web_selecciona_solo_web_con_id():
 def test_sweep_stale_web_llama_al_repo_con_session():
     from ic.domain.use_cases.generate_informe import GenerateInforme, _PipelineContext
 
-    ctx = _PipelineContext(params=MagicMock(), settings=MagicMock(), step_fn=None,
-                           total_start=0.0, session_id="sess-9")
+    ctx = _PipelineContext(
+        params=MagicMock(), settings=MagicMock(), step_fn=None, total_start=0.0, session_id="sess-9"
+    )
     repo = MagicMock()
     repo.sweep_stale_web_sessions.return_value = 3
     with (
@@ -126,8 +133,12 @@ def _mk_web_chunk(db, session_id=None, promoted=False, texto="web x"):
     if promoted:
         meta["promoted"] = "true"
     obj = EmbeddingVectorial(
-        fuente_tipo="web", fuente_url="http://x", chunk_texto=texto,
-        chunk_index=0, embedding=[0.01] * 768, metadatos=meta,
+        fuente_tipo="web",
+        fuente_url="http://x",
+        chunk_texto=texto,
+        chunk_index=0,
+        embedding=[0.01] * 768,
+        metadatos=meta,
     )
     db.add(obj)
     db.commit()
@@ -184,7 +195,7 @@ def test_purge_unused_web_backlog_solo_borra_legacy():
 
         repo.purge_unused_web_backlog()
 
-        assert db.get(EmbeddingVectorial, legacy_id) is None      # legacy borrado
+        assert db.get(EmbeddingVectorial, legacy_id) is None  # legacy borrado
         assert db.get(EmbeddingVectorial, promoted_id) is not None  # promovido intacto
         assert db.get(EmbeddingVectorial, insession_id) is not None  # en sesión intacto
 

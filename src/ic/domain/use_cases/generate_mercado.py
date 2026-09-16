@@ -48,7 +48,8 @@ class GenerateMercado:
 
         chunks = self._store.search(
             f"{sector_gics} tamaño de mercado segmentos crecimiento por región",
-            sector_gics=sector_gics_code, empresa_id=empresa_id,
+            sector_gics=sector_gics_code,
+            empresa_id=empresa_id,
         )
 
         if not check_retrieval_sufficient(chunks, min_chunks=_MIN_CHUNKS):
@@ -60,11 +61,13 @@ class GenerateMercado:
             )
 
         context = format_chunks_as_context(chunks)
-        texto = self._chain.invoke({
-            "descripcion_empresa": descripcion_empresa,
-            "sector_gics": sector_gics,
-            "retrieval_mercado": context,
-        })
+        texto = self._chain.invoke(
+            {
+                "descripcion_empresa": descripcion_empresa,
+                "sector_gics": sector_gics,
+                "retrieval_mercado": context,
+            }
+        )
 
         if has_cjk_characters(texto):
             return CapMercado(

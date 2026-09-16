@@ -6,12 +6,12 @@ from ic.shared.types import WebResult
 
 _CJK_RE = re.compile(
     "["
-    "一-鿿"   # CJK Unified Ideographs
-    "㐀-䶿"   # CJK Extension A
-    "　-〿"   # CJK Symbols and Punctuation
-    "぀-ヿ"   # Hiragana / Katakana
-    "가-힯"   # Korean (Hangul Syllables)
-    "＀-￯"   # Halfwidth / Fullwidth Forms
+    "一-鿿"  # CJK Unified Ideographs
+    "㐀-䶿"  # CJK Extension A
+    "　-〿"  # CJK Symbols and Punctuation
+    "぀-ヿ"  # Hiragana / Katakana
+    "가-힯"  # Korean (Hangul Syllables)
+    "＀-￯"  # Halfwidth / Fullwidth Forms
     "]"
 )
 
@@ -45,9 +45,9 @@ _AUSENCIA_MARKER = "dato no disponible"
 
 def _sin_acentos_lower(text: str) -> str:
     import unicodedata
+
     return "".join(
-        c for c in unicodedata.normalize("NFD", text.casefold())
-        if unicodedata.category(c) != "Mn"
+        c for c in unicodedata.normalize("NFD", text.casefold()) if unicodedata.category(c) != "Mn"
     )
 
 
@@ -126,6 +126,7 @@ def _title_conservador(texto: str) -> str:
     Solo re-capitaliza tokens en mayúsculas de >4 letras (GOLDEN→Golden, ECOCITY→Ecocity); deja
     intactos los que ya tienen caja mixta y los acrónimos cortos.
     """
+
     def _tok(t: str) -> str:
         letras = [c for c in t if c.isalpha()]
         if not letras or not t.isupper():
@@ -133,6 +134,7 @@ def _title_conservador(texto: str) -> str:
         if len(letras) <= 4:
             return t  # acrónimo corto: preservar
         return t.capitalize()
+
     return " ".join(_tok(t) for t in texto.split(" "))
 
 

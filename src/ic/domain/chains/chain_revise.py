@@ -42,8 +42,10 @@ USER_PROMPT_REVISE = (
 
 
 def build_chain_revise(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_REVISE),
-        ("human", USER_PROMPT_REVISE),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_REVISE),
+            ("human", USER_PROMPT_REVISE),
+        ]
+    )
     return prompt | llm | StrOutputParser()

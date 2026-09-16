@@ -6,8 +6,8 @@ Fast (sin DB ni red): stubs para chain_perfil, store, web_connector, entidad_rep
 
 from __future__ import annotations
 
-from ic.domain.use_cases.generate_21_startups import Generate21Startups
 from ic.domain.kb.relevance import LocalRow
+from ic.domain.use_cases.generate_21_startups import Generate21Startups
 from ic.shared.types import Cap21Startups, ChunkResult
 
 
@@ -50,7 +50,10 @@ class _FakeWebConnector:
         if not self._has_results:
             return []
         from ic.shared.types import WebResult
-        return [WebResult(url="http://intl.com", title="Startup Int", content="content", snippet="s")]
+
+        return [
+            WebResult(url="http://intl.com", title="Startup Int", content="content", snippet="s")
+        ]
 
 
 class _FakeEntidadRepo:
@@ -135,12 +138,14 @@ def test_deduplicacion_local_vs_internacional():
     # Si un nombre local aparece en internacionales, solo aparece como local
     locales = [LocalRow(nombre="StartupCo", ciudad="Bogotá", segmento="startup")]
     # StartupCo también está en chunks web → debe deduplicarse
-    chunks_web = [ChunkResult(
-        chunk_texto="StartupCo es una startup colombiana de fintech",
-        fuente_tipo="web",
-        fuente_url="http://x.com",
-        score=0.9,
-    )]
+    chunks_web = [
+        ChunkResult(
+            chunk_texto="StartupCo es una startup colombiana de fintech",
+            fuente_tipo="web",
+            fuente_url="http://x.com",
+            score=0.9,
+        )
+    ]
     uc = _make_use_case(locales=locales, web_chunks=chunks_web, web_has_results=True)
     result = uc.execute(
         nombre_empresa="Alpina",
@@ -159,8 +164,7 @@ def test_deduplicacion_local_vs_internacional():
 def test_internacionales_buscados_cuando_locales_llenos():
     """Con max_locales=3 locales, se buscan internacionales igualmente (FR-009, US3/AC2)."""
     locales = [
-        LocalRow(nombre=f"Startup{i}", ciudad="Bogotá", segmento="startup")
-        for i in range(3)
+        LocalRow(nombre=f"Startup{i}", ciudad="Bogotá", segmento="startup") for i in range(3)
     ]
     web_chunk = ChunkResult(
         chunk_texto="International Disruptor content",
@@ -192,7 +196,7 @@ def test_locales_aparecen_primero_en_prosa():
         web_connector=_FakeWebConnector(True),
         entidad_repo=_FakeEntidadRepo(locales),
     )
-    result = uc.execute(
+    uc.execute(
         nombre_empresa="Alpina",
         descripcion_empresa="Empresa láctea",
         sector_gics="3020",

@@ -69,9 +69,7 @@ class EntidadRepository:
         cond_sector = " AND sector_gics = :sector" if sector_gics else ""
         sql = text(
             f"SELECT id FROM {tabla} "
-            "WHERE nombre_normalizado = :norm AND estado <> :descartado"
-            + cond_sector
-            + " "
+            "WHERE nombre_normalizado = :norm AND estado <> :descartado" + cond_sector + " "
             "ORDER BY (estado = :verificado) DESC, id ASC LIMIT 1"
         )
         params = {
@@ -274,6 +272,4 @@ class EntidadRepository:
 
     def count(self) -> int:
         tabla = Entidad.__table__.fullname
-        return int(
-            self._db.execute(text(f"SELECT count(*) FROM {tabla}")).scalar() or 0
-        )
+        return int(self._db.execute(text(f"SELECT count(*) FROM {tabla}")).scalar() or 0)

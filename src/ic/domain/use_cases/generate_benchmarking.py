@@ -54,9 +54,9 @@ def _load_sector_cache(engine, sector_run_key: str):
             except Exception:
                 return None
 
-        globales   = _deserialize("cap2_21_globales")
+        globales = _deserialize("cap2_21_globales")
         regionales = _deserialize("cap2_21_regionales")
-        startups   = _deserialize("cap2_21_startups")
+        startups = _deserialize("cap2_21_startups")
         if any(x is not None for x in (globales, regionales, startups)):
             logger.info(
                 "Cache sectorial '%s': globales=%s regionales=%s startups=%s",
@@ -69,6 +69,7 @@ def _load_sector_cache(engine, sector_run_key: str):
     except Exception:
         logger.debug("Cache sectorial no disponible para '%s'", sector_run_key, exc_info=True)
         return None, None, None
+
 
 # Bloque cercado del radar emitido al final de la respuesta del LLM (T16.1).
 # Tolera etiquetas de lenguaje variables: ```radar_json, ```json o ``` a secas (T22.2, DT-027).
@@ -211,10 +212,12 @@ class GenerateBenchmarking:
         La lista del KB lidera (menos alucinación, fichas pre-pobladas); se completa con las que
         el LLM extrae de la evidencia. Dedup casefold, cota MAX_ENTIDADES (T22.4/DT-056, RN-001).
         """
-        raw = self._entidades_chain.invoke({
-            "sector_gics": sector_gics,
-            "retrieval_competidores": format_chunks_as_context(chunks),
-        })
+        raw = self._entidades_chain.invoke(
+            {
+                "sector_gics": sector_gics,
+                "retrieval_competidores": format_chunks_as_context(chunks),
+            }
+        )
         del_llm = parse_entidades(raw)
         # Fusión priorizando el KB (global + locales del directorio), sin duplicar (casefold),
         # respetando la cota. Los locales entran a la búsqueda dirigida para poblar 2.1.2/2.1.3.
@@ -230,7 +233,10 @@ class GenerateBenchmarking:
                 break
         logger.info(
             "entidades competidoras: %d (KB=%d, LLM=%d) %s",
-            len(fusionadas), len(self._kb_competidores), len(del_llm), fusionadas,
+            len(fusionadas),
+            len(self._kb_competidores),
+            len(del_llm),
+            fusionadas,
         )
         return fusionadas
 
@@ -302,12 +308,14 @@ class GenerateBenchmarking:
                 if not results:
                     continue
                 evidencia = "\n\n".join(r.content[:1500] for r in results[:3])
-                raw = self._holes_chain.invoke({
-                    "nombre": nombre,
-                    "sector_gics": sector_gics,
-                    "evidencia_rag": evidencia,
-                    "campos_faltantes": _format_campos_faltantes(faltantes),
-                })
+                raw = self._holes_chain.invoke(
+                    {
+                        "nombre": nombre,
+                        "sector_gics": sector_gics,
+                        "evidencia_rag": evidencia,
+                        "campos_faltantes": _format_campos_faltantes(faltantes),
+                    }
+                )
                 nuevos = parse_ficha_fields(raw, set(faltantes))
                 if not nuevos:
                     continue
@@ -315,9 +323,7 @@ class GenerateBenchmarking:
                 with SessionLocal() as db:
                     ensure_entidades_tables(db.get_bind())
                     repo = EntidadRepository(db)
-                    eid = repo.get_id_by_nombre_sector(
-                        normalize_entity(nombre), sector_gics_code
-                    )
+                    eid = repo.get_id_by_nombre_sector(normalize_entity(nombre), sector_gics_code)
                     if eid:
                         for clave, valor in nuevos.items():
                             repo.add_atributo(
@@ -327,7 +333,8 @@ class GenerateBenchmarking:
                 logger.warning("web enrichment falló para global %r", nombre, exc_info=True)
         logger.info(
             "web enrichment globales: %d/%d con datos nuevos",
-            len(resultado), min(top_n, len(globales)),
+            len(resultado),
+            min(top_n, len(globales)),
         )
         return resultado
 
@@ -358,7 +365,9 @@ class GenerateBenchmarking:
 
         retrieval_query = f"{sector_gics} competitors benchmarking {nombre_empresa}"
         chunks = self._store.search(
-            retrieval_query, sector_gics=sector_gics_code, empresa_id=empresa_id,
+            retrieval_query,
+            sector_gics=sector_gics_code,
+            empresa_id=empresa_id,
         )
 
         # T22.4 (DT-054): identificar entidades competidoras y lanzar búsquedas dirigidas por
@@ -372,7 +381,9 @@ class GenerateBenchmarking:
                 self._buscar_por_entidad(entidades, sector_gics)
                 # Re-recuperar con el índice enriquecido (web por-entidad + EMIS individuales).
                 chunks = self._store.search(
-                    retrieval_query, sector_gics=sector_gics_code, empresa_id=empresa_id,
+                    retrieval_query,
+                    sector_gics=sector_gics_code,
+                    empresa_id=empresa_id,
                 )
 
         if not check_retrieval_sufficient(chunks, min_chunks=_MIN_CHUNKS):
@@ -406,12 +417,13 @@ class GenerateBenchmarking:
                 # del mismo (sector_gics_code, sub_gics) sin repetir búsquedas web (SC-005).
                 sector_run_key = (
                     f"sector_{sector_gics_code}_{self._sub_gics or 'any'}"
-                    if sector_gics_code else None
+                    if sector_gics_code
+                    else None
                 )
                 cached_globales = cached_regionales = cached_startups = None
                 if self._engine is not None and sector_run_key is not None:
-                    cached_globales, cached_regionales, cached_startups = (
-                        _load_sector_cache(self._engine, sector_run_key)
+                    cached_globales, cached_regionales, cached_startups = _load_sector_cache(
+                        self._engine, sector_run_key
                     )
                 cap21 = self._jugadores_use_case.execute(
                     nombre_empresa=nombre_empresa,
@@ -439,14 +451,16 @@ class GenerateBenchmarking:
             # DT-UI03: busca web por los top-3 globales anclados, extrae campos y persiste al KB.
             # La siguiente corrida del mismo sector reutiliza los datos sin llamadas adicionales.
             globales = self._tiers.get("global", [])
-            nuevos_web = self._enriquecer_globales_web(
-                globales, sector_gics, sector_gics_code
-            )
+            nuevos_web = self._enriquecer_globales_web(globales, sector_gics, sector_gics_code)
             fichas_para_fill = {n: dict(c) for n, c in self._fichas_kb.items()}
             for nombre, campos in nuevos_web.items():
                 fichas_para_fill.setdefault(nombre, {}).update(campos)
             fichas_enr, _ = fill_holes(
-                self._tiers, fichas_para_fill, self._holes_chain, sector_gics, context,
+                self._tiers,
+                fichas_para_fill,
+                self._holes_chain,
+                sector_gics,
+                context,
                 self._holefill_max,
             )
             seccion_21_md = assemble_seccion_21(self._tiers, fichas_enr)

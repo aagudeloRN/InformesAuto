@@ -40,9 +40,7 @@ def _es_global(meta: dict) -> bool:
     return val is True or str(val).lower() == "true"
 
 
-def sector_histogram(
-    metadatos: list[dict | None], sector_empresa: str
-) -> SectorHistogram:
+def sector_histogram(metadatos: list[dict | None], sector_empresa: str) -> SectorHistogram:
     """Clasifica los metadatos de los chunks citados por su relación con el sector esperado.
 
     Helper puro (Dependency Agnosticism): opera sobre los ``metadatos`` ya en memoria de los
@@ -66,14 +64,10 @@ def sector_histogram(
         else:
             ajeno += 1
             ajenos.append((meta.get("titulo") or "(sin título)", str(sector_gics)))
-    return SectorHistogram(
-        on_sector=on_sector, exento=exento, ajeno=ajeno, ajenos=ajenos
-    )
+    return SectorHistogram(on_sector=on_sector, exento=exento, ajeno=ajeno, ajenos=ajenos)
 
 
-def build_caps_summary(
-    caps: list[tuple[str, str]], max_chars_per_cap: int = 600
-) -> str:
+def build_caps_summary(caps: list[tuple[str, str]], max_chars_per_cap: int = 600) -> str:
     """Une resúmenes etiquetados de capítulos previos para inyectarlos en un prompt.
 
     `caps` es una lista de pares (etiqueta, texto). Cada texto se recorta a
@@ -111,7 +105,7 @@ def enforce_cap5_areas(texto: str, max_area: int = 4) -> tuple[str, list[str]]:
     eliminados: list[str] = []
     for i, m in enumerate(matches):
         fin = matches[i + 1].start() if i + 1 < len(matches) else len(texto)
-        seccion = texto[m.start():fin]
+        seccion = texto[m.start() : fin]
         if int(m.group(1)) <= max_area:
             partes.append(seccion)
         else:

@@ -31,9 +31,7 @@ class RevisionCapitulo(Base):
     motivo_parada: Mapped[str] = mapped_column(Text, nullable=False)
     dimensiones: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     faltantes: Mapped[list | None] = mapped_column(JSONB, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 def ensure_revisiones_tables(engine) -> None:  # type: ignore[no-untyped-def]
@@ -42,23 +40,27 @@ def ensure_revisiones_tables(engine) -> None:  # type: ignore[no-untyped-def]
 
     schema = get_settings().db_schema
     with engine.begin() as conn:
-        conn.execute(text(
-            f"CREATE TABLE IF NOT EXISTS {schema}.revisiones_capitulo ("
-            " id BIGSERIAL PRIMARY KEY,"
-            " run_key TEXT NOT NULL,"
-            " capitulo TEXT NOT NULL,"
-            " sabor TEXT NOT NULL,"
-            " n_iteraciones INTEGER NOT NULL DEFAULT 0,"
-            " iter_ganadora INTEGER NOT NULL DEFAULT 0,"
-            " score_inicial INTEGER NOT NULL DEFAULT 0,"
-            " score_final INTEGER NOT NULL DEFAULT 0,"
-            " motivo_parada TEXT NOT NULL,"
-            " dimensiones JSONB,"
-            " faltantes JSONB,"
-            " created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
-            ")"
-        ))
-        conn.execute(text(
-            f"CREATE INDEX IF NOT EXISTS ix_revision_runkey "
-            f"ON {schema}.revisiones_capitulo (run_key)"
-        ))
+        conn.execute(
+            text(
+                f"CREATE TABLE IF NOT EXISTS {schema}.revisiones_capitulo ("
+                " id BIGSERIAL PRIMARY KEY,"
+                " run_key TEXT NOT NULL,"
+                " capitulo TEXT NOT NULL,"
+                " sabor TEXT NOT NULL,"
+                " n_iteraciones INTEGER NOT NULL DEFAULT 0,"
+                " iter_ganadora INTEGER NOT NULL DEFAULT 0,"
+                " score_inicial INTEGER NOT NULL DEFAULT 0,"
+                " score_final INTEGER NOT NULL DEFAULT 0,"
+                " motivo_parada TEXT NOT NULL,"
+                " dimensiones JSONB,"
+                " faltantes JSONB,"
+                " created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+                ")"
+            )
+        )
+        conn.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS ix_revision_runkey "
+                f"ON {schema}.revisiones_capitulo (run_key)"
+            )
+        )

@@ -18,7 +18,7 @@ _SYSTEM_PROMPT_02_TEMPLATE = (
     "---\n\n"
     "REGLAS ABSOLUTAS:\n"
     "- Elegir EXACTAMENTE UN grupo industrial de los 25 definidos arriba.\n"
-    "- No responder con \"no sé\" ni \"información insuficiente\".\n"
+    '- No responder con "no sé" ni "información insuficiente".\n'
     "- Si la empresa es ambigua, elegir el grupo más probable por core business.\n"
     "- Usar la descripción de la empresa como única fuente; no añadir conocimiento externo.\n"
     "- Formato de salida obligatorio (sin variaciones):\n"
@@ -46,8 +46,10 @@ USER_PROMPT_02 = (
 
 
 def build_chain_02(llm: OllamaGatewayLLM) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_02),
-        ("human", USER_PROMPT_02),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_02),
+            ("human", USER_PROMPT_02),
+        ]
+    )
     return prompt | llm | StrOutputParser()

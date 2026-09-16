@@ -55,8 +55,7 @@ class Toc:
 
 
 DocumentBlock = (
-    Heading | Paragraph | TableBlock | FigureBlock
-    | CitationBlock | Callout | PageBreak | Toc
+    Heading | Paragraph | TableBlock | FigureBlock | CitationBlock | Callout | PageBreak | Toc
 )
 
 

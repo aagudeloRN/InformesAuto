@@ -61,11 +61,13 @@ def _run_review(
     judge_chain = build_chain_judge(judge_llm)
 
     def judge_fn(cap) -> RubricScore:
-        raw = judge_chain.invoke({
-            "capitulo_nombre": capitulo_nombre,
-            "criterios_capitulo": criterios,
-            "texto_capitulo": getattr(cap, "texto", ""),
-        })
+        raw = judge_chain.invoke(
+            {
+                "capitulo_nombre": capitulo_nombre,
+                "criterios_capitulo": criterios,
+                "texto_capitulo": getattr(cap, "texto", ""),
+            }
+        )
         return parse_rubric_score(raw)
 
     try:
@@ -77,15 +79,22 @@ def _run_review(
             max_iter=getattr(settings, "selfreview_max_iter", 3),
         )
     except Exception:  # noqa: BLE001 — la auto-revisión es un boost; nunca rompe la corrida.
-        logger.warning("Auto-revisión falló para '%s' — se conserva el cap original",
-                       capitulo_nombre, exc_info=True)
+        logger.warning(
+            "Auto-revisión falló para '%s' — se conserva el cap original",
+            capitulo_nombre,
+            exc_info=True,
+        )
         return cap_obj
 
     _persist_trace(run_key, capitulo_nombre, sabor, trace)
     logger.info(
         "Auto-revisión [%s/%s]: %d→%d en %d iter (%s)",
-        capitulo_nombre, sabor, trace.score_inicial, trace.score_final,
-        trace.n_iteraciones, trace.motivo_parada,
+        capitulo_nombre,
+        sabor,
+        trace.score_inicial,
+        trace.score_final,
+        trace.n_iteraciones,
+        trace.motivo_parada,
     )
     return mejor_cap
 
@@ -112,8 +121,9 @@ def _persist_trace(run_key: str, capitulo: str, sabor: str, trace: RevisionTrace
                 faltantes=list(trace.mejor.faltantes),
             )
     except Exception:  # noqa: BLE001 — la trazabilidad es best-effort (patrón checkpoint).
-        logger.warning("No se pudo persistir la traza de auto-revisión de '%s'",
-                       capitulo, exc_info=True)
+        logger.warning(
+            "No se pudo persistir la traza de auto-revisión de '%s'", capitulo, exc_info=True
+        )
 
 
 def review_web_cap(
@@ -153,25 +163,35 @@ def review_web_cap(
         # Reusa el anclaje del KB (DT-056): perfiles de competidores canónicos del sector.
         for nombre in kb[:_MAX_QUERIES_KB]:
             _ingest_query(
-                store, web,
+                store,
+                web,
                 f"{nombre} {sector_gics} perfil empresa portafolio productos cuota de mercado",
             )
         chunks = store.search(
-            retrieval_query, sector_gics=sector_gics_code, empresa_id=empresa_id,
+            retrieval_query,
+            sector_gics=sector_gics_code,
+            empresa_id=empresa_id,
         )
-        nuevo_texto = revise_chain.invoke({
-            "capitulo_nombre": capitulo_nombre,
-            "criterios_capitulo": criterios,
-            "borrador_actual": getattr(cap, "texto", ""),
-            "faltantes": _format_faltantes(faltantes),
-            "evidencia": format_chunks_as_context(chunks),
-            "sujetos_anclados": sujetos_anclados,
-        })
+        nuevo_texto = revise_chain.invoke(
+            {
+                "capitulo_nombre": capitulo_nombre,
+                "criterios_capitulo": criterios,
+                "borrador_actual": getattr(cap, "texto", ""),
+                "faltantes": _format_faltantes(faltantes),
+                "evidencia": format_chunks_as_context(chunks),
+                "sujetos_anclados": sujetos_anclados,
+            }
+        )
         return replace(cap, texto=nuevo_texto, chunks_usados=chunks, n_chunks_usados=len(chunks))
 
     return _run_review(
-        settings=settings, judge_llm=llm, capitulo_nombre=capitulo_nombre,
-        criterios=criterios, cap_obj=cap_obj, sabor=SABOR_WEB, revise_fn=revise_fn,
+        settings=settings,
+        judge_llm=llm,
+        capitulo_nombre=capitulo_nombre,
+        criterios=criterios,
+        cap_obj=cap_obj,
+        sabor=SABOR_WEB,
+        revise_fn=revise_fn,
         run_key=run_key,
     )
 
@@ -190,19 +210,26 @@ def review_integration_cap(
 
     def revise_fn(cap, faltantes: list[str]):
         chunks = getattr(cap, "chunks_usados", []) or []
-        nuevo_texto = revise_chain.invoke({
-            "capitulo_nombre": capitulo_nombre,
-            "criterios_capitulo": criterios,
-            "borrador_actual": getattr(cap, "texto", ""),
-            "faltantes": _format_faltantes(faltantes),
-            "evidencia": format_chunks_as_context(chunks),
-            "sujetos_anclados": "",  # Caps 5/6 no anclan fichas de competidor (invariante).
-        })
+        nuevo_texto = revise_chain.invoke(
+            {
+                "capitulo_nombre": capitulo_nombre,
+                "criterios_capitulo": criterios,
+                "borrador_actual": getattr(cap, "texto", ""),
+                "faltantes": _format_faltantes(faltantes),
+                "evidencia": format_chunks_as_context(chunks),
+                "sujetos_anclados": "",  # Caps 5/6 no anclan fichas de competidor (invariante).
+            }
+        )
         return replace(cap, texto=nuevo_texto)  # sin nuevo retrieval (solo re-síntesis)
 
     return _run_review(
-        settings=settings, judge_llm=llm, capitulo_nombre=capitulo_nombre,
-        criterios=criterios, cap_obj=cap_obj, sabor=SABOR_INTEGRACION, revise_fn=revise_fn,
+        settings=settings,
+        judge_llm=llm,
+        capitulo_nombre=capitulo_nombre,
+        criterios=criterios,
+        cap_obj=cap_obj,
+        sabor=SABOR_INTEGRACION,
+        revise_fn=revise_fn,
         run_key=run_key,
     )
 

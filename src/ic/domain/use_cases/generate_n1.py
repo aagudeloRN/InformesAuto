@@ -151,9 +151,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                     store=store,
                     min_corrob=s.discover_globales_min_corrob,
                 ).discover(sector_gics=g, productos=productos, seed_repo_fn=_seed)
-        except (
-            Exception
-        ):  # noqa: BLE001 — el descubrimiento es un boost; nunca rompe la corrida.
+        except Exception:  # noqa: BLE001 — el descubrimiento es un boost; nunca rompe la corrida.
             logger.warning("Descubrimiento LLM de globales falló (sector %s)", g_code)
 
     # T16.0-B: cada thread abre su propia sesión y crea sus propios wrappers cached.
@@ -162,9 +160,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         with SessionLocal() as db:
             store = PGVectorStore(ctx.embedder, EmbeddingRepository(db), s)
             store.session_id = ctx.session_id
-            cached_web = CachedWebConnector(
-                ctx.web, db, s, counter=ctx.cache_web_counter
-            )
+            cached_web = CachedWebConnector(ctx.web, db, s, counter=ctx.cache_web_counter)
             cached_oal = CachedOpenAlexConnector(
                 OpenAlexConnector(s), db, s, counter=ctx.cache_oal_counter
             )
@@ -193,19 +189,13 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                 ensure_entidades_tables(db_p.get_bind())
                 repo_p = EntidadRepository(db_p)
                 for f in fichas:
-                    ent_id = repo_p.get_id_by_nombre_sector(
-                        normalize_entity(f.nombre), g_code
-                    )
+                    ent_id = repo_p.get_id_by_nombre_sector(normalize_entity(f.nombre), g_code)
                     if ent_id is None:
                         continue
                     for clave, valor in f.campos.items():
                         repo_p.add_atributo(ent_id, clave, valor, FUENTE_WEB)
-        except (
-            Exception
-        ):  # noqa: BLE001 — la persistencia de fichas es un boost; nunca rompe.
-            logger.warning(
-                "No se pudieron persistir las fichas del Cap 2", exc_info=True
-            )
+        except Exception:  # noqa: BLE001 — la persistencia de fichas es un boost; nunca rompe.
+            logger.warning("No se pudieron persistir las fichas del Cap 2", exc_info=True)
 
     def _fn_cap2(store, web, _oal):
         # T22.4 (DT-054): cadena de identificación de entidades para búsqueda dirigida por
@@ -259,9 +249,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                         limit=n,
                         exclude_nombre=e,
                     )
-                    jugadores_locales_ctx = format_jugadores_locales(
-                        regionales, startups
-                    )
+                    jugadores_locales_ctx = format_jugadores_locales(regionales, startups)
                     kb_locales = [r.nombre for r in (*regionales, *startups)]
                 # DT-064/T4 + DT-065: pre-fill del prompt con los campos de ficha ya conocidos, de
                 # los globales anclados (persistidos por T3) Y de los locales (data estructurada de
@@ -282,12 +270,8 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                     TIER_REGIONAL: [r.nombre for r in regionales],
                     TIER_STARTUP: [r.nombre for r in startups],
                 }
-        except (
-            Exception
-        ):  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
-            logger.warning(
-                "No se pudo consultar el KB de competidores (sector %s)", g_code
-            )
+        except Exception:  # noqa: BLE001 — el KB es un boost; nunca debe romper la corrida.
+            logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)
         # DT-066/B2: la 2.1 se ensambla desde el KB SOLO si el flag está ON y hay sujetos anclados.
         # En ese caso las cadenas (primaria + escalada) se construyen con omitir_21=True (el LLM no
         # redacta 2.1) y se pasa la cadena de hole-filling. OFF o sin anclas → invariante.
@@ -308,12 +292,8 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                     build_api_llm(s, tier=tier, cost_tracker=ctx.tracker),
                     omitir_21=b2_on,
                 )
-            except (
-                Exception
-            ):  # noqa: BLE001 — sin tier de escalada la corrida sigue igual.
-                logger.warning(
-                    "No se pudo construir la cadena de escalada (tier=%s)", tier
-                )
+            except Exception:  # noqa: BLE001 — sin tier de escalada la corrida sigue igual.
+                logger.warning("No se pudo construir la cadena de escalada (tier=%s)", tier)
         llm_21 = ctx.api_llm or ctx.llm
         jugadores_use_case = Generate21Jugadores(
             gen_globales=Generate21Globales(
@@ -470,14 +450,10 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     _results: dict = {}
     with ThreadPoolExecutor(max_workers=4) as pool:
         _futures = {
-            name: pool.submit(_store, fn)
-            for name, fn in _fns.items()
-            if _restored[name] is None
+            name: pool.submit(_store, fn) for name, fn in _fns.items() if _restored[name] is None
         }
     for name in _fns:
-        _results[name] = (
-            _restored[name] if _restored[name] is not None else _futures[name].result()
-        )
+        _results[name] = _restored[name] if _restored[name] is not None else _futures[name].result()
     ctx.cap, ctx.cap_mercado = _results.get("cap2"), _results.get("mercado")
     ctx.cap_tend, ctx.cap_eco = _results.get("cap3"), _results.get("cap4")
 

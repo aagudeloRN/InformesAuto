@@ -32,8 +32,8 @@ _METODOLOGIA_PARRAFOS = (
     "combina documentos sectoriales, fuentes académicas (OpenAlex) y búsqueda web.",
     "Alcance y trazabilidad: toda afirmación proveniente de fuentes se cita en formato APA y "
     "es trazable hasta el fragmento que la sustenta. Cuando la recuperación no supera el umbral "
-    "de relevancia, el sistema no genera contenido: reporta \"Dato no disponible en fuentes "
-    "consultadas\" e invita a incorporar documentos adicionales. Ninguna afirmación se apoya en "
+    'de relevancia, el sistema no genera contenido: reporta "Dato no disponible en fuentes '
+    'consultadas" e invita a incorporar documentos adicionales. Ninguna afirmación se apoya en '
     "el conocimiento paramétrico del modelo.",
     "Limitaciones: la profundidad de cada capítulo depende de la cobertura de fuentes para el "
     "sector analizado. Los resultados deben ser verificados por un analista antes de su uso en "
@@ -130,11 +130,13 @@ class PilotAssembler:
         else:
             blocks.append(Callout(_ABSENT_MSG, kind="absent_data"))
         if figura_benchmarking:
-            blocks.append(FigureBlock(
-                image_path=figura_benchmarking,
-                alt="Radar de benchmarking competidores Cap 2",
-                caption="Figura 1. Posicionamiento relativo de competidores clave",
-            ))
+            blocks.append(
+                FigureBlock(
+                    image_path=figura_benchmarking,
+                    alt="Radar de benchmarking competidores Cap 2",
+                    caption="Figura 1. Posicionamiento relativo de competidores clave",
+                )
+            )
         blocks.append(Paragraph(""))
 
         # Número de capítulo canónico para renumerar subcapítulos que el LLM numeró mal (DT-032).
@@ -155,11 +157,13 @@ class PilotAssembler:
 
         if informe.cap_accionables is not None:
             blocks.append(Heading("Capítulo 6. Accionables Estratégicos", level=2))
-            blocks.append(Callout(
-                "Los accionables siguientes requieren validación del equipo directivo "
-                "antes de implementación.",
-                kind="actionable",
-            ))
+            blocks.append(
+                Callout(
+                    "Los accionables siguientes requieren validación del equipo directivo "
+                    "antes de implementación.",
+                    kind="actionable",
+                )
+            )
             if informe.cap_accionables.retrieval_suficiente:
                 blocks.extend(parse_markdown(informe.cap_accionables.texto))
             else:
@@ -169,9 +173,9 @@ class PilotAssembler:
         # Metodología (patrón Noel): sección formal antes de Referencias (T21.7, DT-045).
         blocks.append(PageBreak())
         blocks.append(Heading("Metodología", level=2))
-        blocks.append(Paragraph(
-            f"Fuentes consultadas y citadas en este informe: {len(informe.referencias)}."
-        ))
+        blocks.append(
+            Paragraph(f"Fuentes consultadas y citadas en este informe: {len(informe.referencias)}.")
+        )
         for parrafo in _METODOLOGIA_PARRAFOS:
             blocks.append(Paragraph(parrafo))
         blocks.append(Paragraph(""))

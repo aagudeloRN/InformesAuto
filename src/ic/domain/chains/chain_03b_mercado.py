@@ -19,25 +19,25 @@ SYSTEM_PROMPT_03B = (
     "REGLAS DE CONTENIDO:\n"
     "- Sustenta cada cifra (tamaño de mercado, crecimiento, participación) con datos de las "
     "fuentes proporcionadas; indica el año de referencia.\n"
-    "- Si un dato no está disponible, escribe exactamente: \"Dato no disponible en fuentes consultadas.\"\n"  # noqa: E501
+    '- Si un dato no está disponible, escribe exactamente: "Dato no disponible en fuentes consultadas."\n'  # noqa: E501
     "- No inventar cifras ni proyecciones bajo ninguna circunstancia.\n"
     "- No menciones escasez de fuentes; solo reporta el estado del dato.\n"
     "- IDIOMA OBLIGATORIO: Toda la respuesta debe estar íntegramente en español latino neutro. "
     "Está prohibido usar chino, inglés u otro idioma.\n\n"
     "REGLAS DE ESTILO:\n"
-    "- Tono ejecutivo y directo. Prohibido: \"podría\", \"quizás\", \"en resumen\", "
-    "\"por lo tanto\", \"cabe destacar\", \"es importante mencionar\".\n"
+    '- Tono ejecutivo y directo. Prohibido: "podría", "quizás", "en resumen", '
+    '"por lo tanto", "cabe destacar", "es importante mencionar".\n'
     "- Los párrafos narrativos van en texto corrido (storytelling), sin viñetas.\n"
     "- Sin mini-checklists ni meta-comentarios al final. Sin citaciones inline en la narrativa.\n"
 )
 
 USER_PROMPT_03B = (
-    "Genera EXCLUSIVAMENTE la sección \"2.3. Mercado\" del Capítulo 2 para el informe de "
+    'Genera EXCLUSIVAMENTE la sección "2.3. Mercado" del Capítulo 2 para el informe de '
     "inteligencia competitiva de la empresa descrita a continuación. No generes otras secciones.\n\n"  # noqa: E501
     "DESCRIPCIÓN DE LA EMPRESA:\n{descripcion_empresa}\n\n"
     "CLASIFICACIÓN SECTORIAL:\n{sector_gics}\n\n"
     "DATOS DE MERCADO (recuperados por RAG — usar como única fuente):\n{retrieval_mercado}\n\n"
-    "Desarrolla en este orden, iniciando con el encabezado \"## 2.3. Mercado\":\n\n"
+    'Desarrolla en este orden, iniciando con el encabezado "## 2.3. Mercado":\n\n'
     "1. **Tamaño y crecimiento del mercado**: dimensiona el mercado del sector (valor total, "
     "TAM/SAM si consta) y su tasa de crecimiento, con año de referencia. Texto corrido.\n\n"
     "2. **Segmentos de mercado**: describe los principales segmentos y su peso relativo. "
@@ -56,8 +56,10 @@ def format_chunks_as_context(chunks: list[ChunkResult]) -> str:
 
 
 def build_chain_03b(llm: object) -> Runnable:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT_03B),
-        ("human", USER_PROMPT_03B),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT_03B),
+            ("human", USER_PROMPT_03B),
+        ]
+    )
     return prompt | llm | StrOutputParser()

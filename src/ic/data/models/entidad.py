@@ -128,108 +128,120 @@ def ensure_entidades_tables(engine) -> None:  # type: ignore[no-untyped-def]
 
     schema = get_settings().db_schema
     with engine.begin() as conn:
-        conn.execute(text(
-            f"CREATE TABLE IF NOT EXISTS {schema}.entidades ("
-            " id BIGSERIAL PRIMARY KEY,"
-            " tipo TEXT NOT NULL DEFAULT 'competidor',"
-            " nombre TEXT NOT NULL,"
-            " nombre_normalizado TEXT NOT NULL,"
-            " nit TEXT,"
-            " ciudad TEXT,"
-            " pais TEXT,"
-            " sector_gics TEXT,"
-            " sub_gics TEXT,"
-            " alcance TEXT,"
-            " estado TEXT NOT NULL DEFAULT 'candidato',"
-            " aliases JSONB DEFAULT '[]'::jsonb,"
-            " n_menciones BIGINT,"
-            " n_chunks BIGINT,"
-            " n_sectores BIGINT,"
-            " created_at TIMESTAMPTZ NOT NULL DEFAULT now(),"
-            " updated_at TIMESTAMPTZ NOT NULL DEFAULT now()"
-            ")"
-        ))
+        conn.execute(
+            text(
+                f"CREATE TABLE IF NOT EXISTS {schema}.entidades ("
+                " id BIGSERIAL PRIMARY KEY,"
+                " tipo TEXT NOT NULL DEFAULT 'competidor',"
+                " nombre TEXT NOT NULL,"
+                " nombre_normalizado TEXT NOT NULL,"
+                " nit TEXT,"
+                " ciudad TEXT,"
+                " pais TEXT,"
+                " sector_gics TEXT,"
+                " sub_gics TEXT,"
+                " alcance TEXT,"
+                " estado TEXT NOT NULL DEFAULT 'candidato',"
+                " aliases JSONB DEFAULT '[]'::jsonb,"
+                " n_menciones BIGINT,"
+                " n_chunks BIGINT,"
+                " n_sectores BIGINT,"
+                " created_at TIMESTAMPTZ NOT NULL DEFAULT now(),"
+                " updated_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+                ")"
+            )
+        )
         # Dedup fuerte por NIT (cuando existe).
-        conn.execute(text(
-            f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_nit "
-            f"ON {schema}.entidades (nit) WHERE nit IS NOT NULL"
-        ))
+        conn.execute(
+            text(
+                f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_nit "
+                f"ON {schema}.entidades (nit) WHERE nit IS NOT NULL"
+            )
+        )
         # Dedup por (nombre_normalizado, sector) SOLO para entidades sin NIT (NER/LLM). Las que
         # tienen NIT se deduplican por NIT: dos empresas reales pueden compartir nombre + sector,
         # y el NIT es la clave real. Por eso el índice es PARCIAL (WHERE nit IS NULL): si no, el
         # INSERT de una fila EMIS con NIT choca contra un candidato NER homónimo (DT-050). Migración
         # idempotente: se retira el índice global antiguo y se crea el parcial (nombre nuevo).
         conn.execute(text(f"DROP INDEX IF EXISTS {schema}.ux_entidad_nombre_sector"))
-        conn.execute(text(
-            f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_nombre_sector_nonit "
-            f"ON {schema}.entidades (nombre_normalizado, COALESCE(sector_gics, '')) "
-            f"WHERE nit IS NULL"
-        ))
-        conn.execute(text(
-            f"CREATE INDEX IF NOT EXISTS ix_entidad_sector "
-            f"ON {schema}.entidades (sector_gics)"
-        ))
+        conn.execute(
+            text(
+                f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_nombre_sector_nonit "
+                f"ON {schema}.entidades (nombre_normalizado, COALESCE(sector_gics, '')) "
+                f"WHERE nit IS NULL"
+            )
+        )
+        conn.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS ix_entidad_sector ON {schema}.entidades (sector_gics)"
+            )
+        )
         # DT-061: sub-código GICS en tablas ya existentes (idempotente) + índice de anclaje fino.
-        conn.execute(text(
-            f"ALTER TABLE {schema}.entidades ADD COLUMN IF NOT EXISTS sub_gics TEXT"
-        ))
-        conn.execute(text(
-            f"CREATE INDEX IF NOT EXISTS ix_entidad_sub_gics "
-            f"ON {schema}.entidades (sub_gics)"
-        ))
+        conn.execute(text(f"ALTER TABLE {schema}.entidades ADD COLUMN IF NOT EXISTS sub_gics TEXT"))
+        conn.execute(
+            text(f"CREATE INDEX IF NOT EXISTS ix_entidad_sub_gics ON {schema}.entidades (sub_gics)")
+        )
         # DT-061b: alcance global/local (idempotente) para el anclaje de clase mundial.
-        conn.execute(text(
-            f"ALTER TABLE {schema}.entidades ADD COLUMN IF NOT EXISTS alcance TEXT"
-        ))
+        conn.execute(text(f"ALTER TABLE {schema}.entidades ADD COLUMN IF NOT EXISTS alcance TEXT"))
         # DT-050: segmento (startup) para separar el tier 2.1.3 del 2.1.2 (idempotente).
-        conn.execute(text(
-            f"ALTER TABLE {schema}.entidades ADD COLUMN IF NOT EXISTS segmento TEXT"
-        ))
+        conn.execute(text(f"ALTER TABLE {schema}.entidades ADD COLUMN IF NOT EXISTS segmento TEXT"))
         # DT-050: membresías sectoriales (multi-sector). Único por (entidad, sector, sub_gics) para
         # idempotencia; COALESCE del sub para tratar NULL como valor en el índice.
-        conn.execute(text(
-            f"CREATE TABLE IF NOT EXISTS {schema}.entidad_sectores ("
-            " id BIGSERIAL PRIMARY KEY,"
-            " entidad_id BIGINT NOT NULL,"
-            " sector_gics TEXT NOT NULL,"
-            " sub_gics TEXT,"
-            " vertical TEXT,"
-            " alcance TEXT,"
-            " fuente TEXT NOT NULL,"
-            " estado TEXT NOT NULL DEFAULT 'candidato',"
-            " created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
-            ")"
-        ))
-        conn.execute(text(
-            f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_sector "
-            f"ON {schema}.entidad_sectores (entidad_id, sector_gics, COALESCE(sub_gics, ''))"
-        ))
-        conn.execute(text(
-            f"CREATE INDEX IF NOT EXISTS ix_entidad_sector_gics "
-            f"ON {schema}.entidad_sectores (sector_gics)"
-        ))
-        conn.execute(text(
-            f"CREATE TABLE IF NOT EXISTS {schema}.entidad_atributos ("
-            " id BIGSERIAL PRIMARY KEY,"
-            " entidad_id BIGINT NOT NULL,"
-            " clave TEXT NOT NULL,"
-            " valor TEXT,"
-            " fuente TEXT NOT NULL,"
-            " confianza REAL,"
-            " fecha DATE,"
-            " documento_id UUID,"
-            " estado TEXT NOT NULL DEFAULT 'candidato',"
-            " created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
-            ")"
-        ))
-        conn.execute(text(
-            f"CREATE INDEX IF NOT EXISTS ix_entidad_atributo_entidad "
-            f"ON {schema}.entidad_atributos (entidad_id, clave)"
-        ))
+        conn.execute(
+            text(
+                f"CREATE TABLE IF NOT EXISTS {schema}.entidad_sectores ("
+                " id BIGSERIAL PRIMARY KEY,"
+                " entidad_id BIGINT NOT NULL,"
+                " sector_gics TEXT NOT NULL,"
+                " sub_gics TEXT,"
+                " vertical TEXT,"
+                " alcance TEXT,"
+                " fuente TEXT NOT NULL,"
+                " estado TEXT NOT NULL DEFAULT 'candidato',"
+                " created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+                ")"
+            )
+        )
+        conn.execute(
+            text(
+                f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_sector "
+                f"ON {schema}.entidad_sectores (entidad_id, sector_gics, COALESCE(sub_gics, ''))"
+            )
+        )
+        conn.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS ix_entidad_sector_gics "
+                f"ON {schema}.entidad_sectores (sector_gics)"
+            )
+        )
+        conn.execute(
+            text(
+                f"CREATE TABLE IF NOT EXISTS {schema}.entidad_atributos ("
+                " id BIGSERIAL PRIMARY KEY,"
+                " entidad_id BIGINT NOT NULL,"
+                " clave TEXT NOT NULL,"
+                " valor TEXT,"
+                " fuente TEXT NOT NULL,"
+                " confianza REAL,"
+                " fecha DATE,"
+                " documento_id UUID,"
+                " estado TEXT NOT NULL DEFAULT 'candidato',"
+                " created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+                ")"
+            )
+        )
+        conn.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS ix_entidad_atributo_entidad "
+                f"ON {schema}.entidad_atributos (entidad_id, clave)"
+            )
+        )
         # Idempotencia: una valor actual por (entidad, clave, fuente). El lineage entre fuentes
         # distintas se conserva en filas separadas → la prioridad de conflicto (usuario > emis >
         # web) se resuelve en consulta, sin borrar procedencia.
-        conn.execute(text(
-            f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_atributo_clave_fuente "
-            f"ON {schema}.entidad_atributos (entidad_id, clave, fuente)"
-        ))
+        conn.execute(
+            text(
+                f"CREATE UNIQUE INDEX IF NOT EXISTS ux_entidad_atributo_clave_fuente "
+                f"ON {schema}.entidad_atributos (entidad_id, clave, fuente)"
+            )
+        )

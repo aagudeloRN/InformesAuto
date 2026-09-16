@@ -59,9 +59,15 @@ def test_save_revision_mapea_campos():
 
     db = _FakeSession()
     RevisionRepository(db).save_revision(
-        run_key="rk", capitulo="Cap 2 — Análisis Competitivo", sabor="web",
-        n_iteraciones=2, iter_ganadora=2, score_inicial=8, score_final=13,
-        motivo_parada="umbral", dimensiones={"E": 3, "P": 2, "V": 3, "F": 2, "T": 3},
+        run_key="rk",
+        capitulo="Cap 2 — Análisis Competitivo",
+        sabor="web",
+        n_iteraciones=2,
+        iter_ganadora=2,
+        score_inicial=8,
+        score_final=13,
+        motivo_parada="umbral",
+        dimensiones={"E": 3, "P": 2, "V": 3, "F": 2, "T": 3},
         faltantes=[],
     )
     assert db.commits == 1
@@ -82,7 +88,8 @@ def test_persist_trace_desde_hook_es_best_effort(monkeypatch):
 
     trace = RevisionTrace(
         intentos=[RubricScore(dimensiones={"E": 1, "P": 1, "V": 1, "F": 1, "T": 1})],
-        iter_ganadora=0, motivo_parada="max_iter",
+        iter_ganadora=0,
+        motivo_parada="max_iter",
     )
     # Simula fallo de BD: ensure_revisiones_tables inaccesible → no debe propagar.
 

@@ -16,8 +16,12 @@ from ic.shared.types import ChunkResult
 
 def _chunk(i: int) -> ChunkResult:
     return ChunkResult(
-        chunk_texto=f"evidencia {i}", fuente_tipo="pdf", fuente_url=f"https://d/{i}",
-        score=0.9, metadatos={"titulo": "Doc", "año": "2025"}, chunk_id=f"id-{i}",
+        chunk_texto=f"evidencia {i}",
+        fuente_tipo="pdf",
+        fuente_url=f"https://d/{i}",
+        score=0.9,
+        metadatos={"titulo": "Doc", "año": "2025"},
+        chunk_id=f"id-{i}",
     )
 
 
