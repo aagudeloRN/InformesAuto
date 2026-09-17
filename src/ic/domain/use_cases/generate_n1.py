@@ -1,8 +1,4 @@
-"""Paralelizacion N1: Caps 2 (Benchmarking), 3 (Tendencias) y 4 (Ecosistema).
-
-Extraido de generate_informe.py (DT-004) para mantener archivos < 300 lineas.
-El orquestador (GenerateInforme._run_n1) delega aqui sin cambiar la interfaz publica.
-"""
+"""Fase N1: Generacion paralela de Caps 2/3/4 e intros N1 (DT-039)."""
 
 from __future__ import annotations
 
@@ -90,7 +86,13 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
                     tiers_ancla,
                     fichas_kb,
                 ) = cargar_kb_competidores_ancla(
-                    db_kb, s, g_code, sectores_local, productos_terms, e
+                    db_kb,
+                    s,
+                    g_code,
+                    sectores_local,
+                    productos_terms,
+                    e,
+                    competidores_curados=ctx.params.competidores_curados,
                 )
         except Exception:
             logger.warning("No se pudo consultar el KB de competidores (sector %s)", g_code)

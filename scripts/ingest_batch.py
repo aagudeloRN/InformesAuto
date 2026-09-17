@@ -71,7 +71,7 @@ def main() -> int:
             # La ruta puede ser relativa al base_dir o relativa al root del repo
             pdf_path = base_dir / archivo
             if not pdf_path.exists():
-                pdf_path = (_ROOT / archivo)
+                pdf_path = _ROOT / archivo
             if not pdf_path.exists():
                 logger.error("Archivo no encontrado: %s — se omite", pdf_path)
                 errores += 1
@@ -89,7 +89,8 @@ def main() -> int:
             sectores_add_raw = (fila.get("sectores_adicionales") or "").strip()
             sectores_adicionales = (
                 [s.strip() for s in sectores_add_raw.split("|") if s.strip()]
-                if sectores_add_raw else None
+                if sectores_add_raw
+                else None
             )
 
             total_docs += 1
@@ -112,7 +113,9 @@ def main() -> int:
 
     logger.info(
         "Lote completado: %d documentos, %d chunks nuevos, %d errores",
-        total_docs, total_chunks, errores,
+        total_docs,
+        total_chunks,
+        errores,
     )
     return 0 if errores == 0 else 2
 

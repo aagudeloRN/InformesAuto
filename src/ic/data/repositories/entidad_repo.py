@@ -12,6 +12,7 @@ Las implementaciones de las queries más pesadas viven en ``_entidad_queries.py`
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ from ic.data.models.entidad import (
     EntidadAtributo,
     EntidadSector,
 )
+from ic.data.repositories._entidad_locales import LocalRow
 from ic.data.repositories._entidad_queries import (
     EntidadRow,
     _clave_exclusion,
@@ -38,12 +40,11 @@ from ic.data.repositories._entidad_queries import (
     list_locales_by_sector as _list_locales,
 )
 from ic.data.repositories._entidad_queries import (
-    upsert_entidad as _upsert_entidad,
+    upsert_entidad as upsert_entidad_sql,
 )
-from ic.domain.kb.relevance import LocalRow, es_ruido_competidor
+from ic.domain.kb.relevance import es_ruido_competidor
 
-# Re-exports: los callers importan EntidadRow y _clave_exclusion desde este módulo.
-__all__ = ["EntidadRepository", "EntidadRow", "_clave_exclusion"]
+__all__ = ["EntidadRepository", "_clave_exclusion"]
 
 
 class EntidadRepository:
@@ -51,32 +52,22 @@ class EntidadRepository:
         self._db = db
 
     def upsert_entidad(self, fila: EntidadRow) -> int:
-        """Inserta/actualiza una entidad y devuelve su id. Idempotente; no degrada estado."""
-        return _upsert_entidad(self._db, fila)
+        """Upsert idempotente (DT-056/T3/T4). No degrada estado verificado; une aliases."""
+        return upsert_entidad_sql(self._db, fila)
 
     def get_id_by_nombre_sector(
-        self, nombre_normalizado: str, sector_gics: str | None
+        self, nombre_norm: str, sector_gics: str | None = None
     ) -> int | None:
-        """Id de una entidad ya consolidada por nombre normalizado (+sector). None si no existe.
-
-        Solo LOOKUP (DT-064/T3): las fichas se persisten únicamente sobre entidades **ya ancladas**
-        (globales/locales del KB); no se crea nada aquí. Si hay sector se restringe a él (evita
-        casar un homónimo de otro grupo); si no, casa por nombre. Prefiere no-descartado/verificado.
-        """
-        if not nombre_normalizado:
+        """Busca ID por `nombre_normalizado` y sector opcional. Devuelve None si no existe."""
+        if not nombre_norm:
             return None
         tabla = Entidad.__table__.fullname
         cond_sector = " AND sector_gics = :sector" if sector_gics else ""
         sql = text(
-            f"SELECT id FROM {tabla} "
-            "WHERE nombre_normalizado = :norm AND estado <> :descartado" + cond_sector + " "
-            "ORDER BY (estado = :verificado) DESC, id ASC LIMIT 1"
+            f"SELECT id FROM {tabla} WHERE nombre_normalizado = :norm{cond_sector} "
+            "ORDER BY (estado = :verificado) DESC, id DESC LIMIT 1"
         )
-        params = {
-            "norm": nombre_normalizado,
-            "descartado": ESTADO_DESCARTADO,
-            "verificado": ESTADO_VERIFICADO,
-        }
+        params: dict[str, Any] = {"norm": nombre_norm, "verificado": ESTADO_VERIFICADO}
         if sector_gics:
             params["sector"] = sector_gics
         row = self._db.execute(sql, params).fetchone()
@@ -135,10 +126,7 @@ class EntidadRepository:
         fuente: str = "",
         estado: str = ESTADO_CANDIDATO,
     ) -> None:
-        """Registra/actualiza una membresía sectorial (DT-050). Idempotente; no degrada verificado.
-
-        Único por (entidad, sector, sub_gics). Re-ejecutar la siembra no duplica membresías.
-        """
+        """Registra/actualiza una membresía sectorial (DT-050). Idempotente."""
         tabla = EntidadSector.__table__.fullname
         sql = text(
             f"INSERT INTO {tabla} (entidad_id, sector_gics, sub_gics, vertical, alcance, fuente, "
@@ -200,13 +188,7 @@ class EntidadRepository:
         )
 
     def descartar_ruido_competidores(self, dry_run: bool = False) -> list[str]:
-        """Marca `descartado` el ruido residual del KB (medios/métricas) — curación DT-061/T3.
-
-        Idempotente (re-run no re-marca: excluye ya-descartados) y **no degrada** `verificado`
-        (guard `estado <> verificado` en el UPDATE, RN-001). El criterio de ruido es el predicado
-        puro `es_ruido_competidor`; devuelve los nombres normalizados marcados (o los que se
-        marcarían en `dry_run`).
-        """
+        """Marca `descartado` el ruido residual del KB (medios/métricas) — curación DT-061/T3."""
         tabla = Entidad.__table__.fullname
         sel = text(
             f"SELECT id, nombre_normalizado FROM {tabla} "
@@ -239,12 +221,7 @@ class EntidadRepository:
         return marcados
 
     def backfill_memberships_from_entidades(self, fuente: str = "backfill") -> int:
-        """Deriva membresías en `entidad_sectores` desde entidades con `sector_gics` (DT-050/T4).
-
-        Unifica el KB preexistente (global/candidatos NER) en el modelo de membresías. Idempotente
-        (ON CONFLICT DO NOTHING sobre el único (entidad, sector, sub)); re-run no duplica. Conserva
-        sub_gics/alcance/estado de la entidad. Devuelve nº de membresías insertadas.
-        """
+        """Deriva membresías en `entidad_sectores` desde entidades con `sector_gics` (DT-050/T4)."""
         ent = Entidad.__table__.fullname
         sec = EntidadSector.__table__.fullname
         sql = text(
@@ -269,6 +246,20 @@ class EntidadRepository:
         n = self._db.execute(sql).rowcount
         self._db.commit()
         return int(n or 0)
+
+    def list_duplicados_por_nit(self) -> list[dict[str, Any]]:
+        """Devuelve grupos de entidades duplicadas que comparten el mismo NIT no nulo."""
+        from ic.data.repositories._entidad_reconciliation import find_duplicate_nits
+
+        return find_duplicate_nits(self._db)
+
+    def merge_entidades_por_nit(self, canonical_id: int, duplicate_ids: list[int]) -> None:
+        """Fusiona entidades duplicadas en canonical_id consolidando relaciones y aliases."""
+        from ic.data.repositories._entidad_reconciliation import (
+            merge_entidades_por_nit as _merge_nit,
+        )
+
+        _merge_nit(self._db, canonical_id, duplicate_ids)
 
     def count(self) -> int:
         tabla = Entidad.__table__.fullname

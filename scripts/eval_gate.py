@@ -42,9 +42,7 @@ def _check(label: str, value: float, limit: float, direction: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Gate de latencia/costo/calidad (T15.4)")
     parser.add_argument("--snapshot", required=True, help="Ruta al snapshot JSON del harness")
-    parser.add_argument(
-        "--budget", default=str(_DEFAULT_BUDGET), help="Ruta al presupuesto JSON"
-    )
+    parser.add_argument("--budget", default=str(_DEFAULT_BUDGET), help="Ruta al presupuesto JSON")
     args = parser.parse_args()
 
     snapshot = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))

@@ -61,20 +61,31 @@ def _nombre_sector(sector_code: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Descubrimiento LLM de globales (DT-062)")
-    parser.add_argument("--sector", nargs="+", required=True,
-                        help="Uno o más códigos de grupo GICS (ej. --sector 3020 2020)")
+    parser.add_argument(
+        "--sector",
+        nargs="+",
+        required=True,
+        help="Uno o más códigos de grupo GICS (ej. --sector 3020 2020)",
+    )
     parser.add_argument("--sub", default=None, help="Sub-código GICS 6 díg (ej. 302020)")
-    parser.add_argument("--ddg-only", action="store_true",
-                        help="Forzar DuckDuckGo (no gasta Tavily) — pre-warm por lotes (DT-065)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="No siembra ni ingiere; solo reporta recomendados/corroborados")
+    parser.add_argument(
+        "--ddg-only",
+        action="store_true",
+        help="Forzar DuckDuckGo (no gasta Tavily) — pre-warm por lotes (DT-065)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="No siembra ni ingiere; solo reporta recomendados/corroborados",
+    )
     args = parser.parse_args()
 
     settings = get_settings()
     tracker = CostTracker(budget_limit=settings.llm_budget_limit_usd)
     api_llm = (
         build_resilient_api_llm(settings, cost_tracker=tracker)
-        if settings.openrouter_api_key else None
+        if settings.openrouter_api_key
+        else None
     )
     llm = build_llm(settings, cost_tracker=tracker)
     embedder = Embedder(settings)
@@ -98,28 +109,42 @@ def main() -> int:
                 logger.info("  %-22s hits=%d → %s", nombre, hits, marca)
                 if args.dry_run:
                     return
-                eid = repo.upsert_entidad(EntidadRow(
-                    nombre=nombre, nombre_normalizado=normalize_entity(nombre),
-                    tipo=TIPO_COMPETIDOR, sector_gics=_sector, sub_gics=args.sub,
-                    alcance=ALCANCE_GLOBAL if corroborado else None,
-                    estado=ESTADO_CANDIDATO,
-                ))
+                eid = repo.upsert_entidad(
+                    EntidadRow(
+                        nombre=nombre,
+                        nombre_normalizado=normalize_entity(nombre),
+                        tipo=TIPO_COMPETIDOR,
+                        sector_gics=_sector,
+                        sub_gics=args.sub,
+                        alcance=ALCANCE_GLOBAL if corroborado else None,
+                        estado=ESTADO_CANDIDATO,
+                    )
+                )
                 repo.add_atributo(
-                    eid, "origen", "llm-corroborado" if corroborado else "llm",
-                    FUENTE_LLM, estado=ESTADO_CANDIDATO,
+                    eid,
+                    "origen",
+                    "llm-corroborado" if corroborado else "llm",
+                    FUENTE_LLM,
+                    estado=ESTADO_CANDIDATO,
                 )
 
             conteos = DiscoverGlobales(
-                chain=chain, web_connector=web, store=store_efectivo,
+                chain=chain,
+                web_connector=web,
+                store=store_efectivo,
                 min_corrob=settings.discover_globales_min_corrob,
                 force_ddg=args.ddg_only,
             ).discover(sector_gics=sector_nombre, productos="", seed_repo_fn=_seed)
 
             logger.info(
                 "Sector %s (%s)%s%s: recomendados=%d corroborados=%d no_corroborados=%d",
-                sector_code, sector_nombre, " [DRY-RUN]" if args.dry_run else "",
+                sector_code,
+                sector_nombre,
+                " [DRY-RUN]" if args.dry_run else "",
                 " [DDG]" if args.ddg_only else "",
-                conteos["recomendados"], conteos["corroborados"], conteos["no_corroborados"],
+                conteos["recomendados"],
+                conteos["corroborados"],
+                conteos["no_corroborados"],
             )
     return 0
 

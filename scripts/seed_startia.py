@@ -73,23 +73,36 @@ def main() -> int:
             if total <= 5:
                 logger.info(
                     "ej %-28s nit=%s GICS=%s",
-                    parsed.nombre[:28], parsed.nit,
+                    parsed.nombre[:28],
+                    parsed.nit,
                     [(m.sector_gics, m.vertical) for m in parsed.memberships],
                 )
             if args.dry_run:
                 continue
 
             primaria = parsed.memberships[0] if parsed.memberships else None
-            eid = repo.upsert_entidad(EntidadRow(
-                nombre=parsed.nombre, nombre_normalizado=parsed.nombre_normalizado,
-                tipo=TIPO_EMPRESA, nit=parsed.nit, ciudad=parsed.ciudad,
-                sector_gics=primaria.sector_gics if primaria else None,
-                alcance=ALCANCE_LOCAL, segmento=SEGMENTO_STARTUP, estado=ESTADO_CANDIDATO,
-            ))
+            eid = repo.upsert_entidad(
+                EntidadRow(
+                    nombre=parsed.nombre,
+                    nombre_normalizado=parsed.nombre_normalizado,
+                    tipo=TIPO_EMPRESA,
+                    nit=parsed.nit,
+                    ciudad=parsed.ciudad,
+                    sector_gics=primaria.sector_gics if primaria else None,
+                    alcance=ALCANCE_LOCAL,
+                    segmento=SEGMENTO_STARTUP,
+                    estado=ESTADO_CANDIDATO,
+                )
+            )
             for m in parsed.memberships:
                 repo.upsert_sector_membership(
-                    eid, m.sector_gics, sub_gics=m.sub_gics, vertical=m.vertical,
-                    alcance=ALCANCE_LOCAL, fuente=FUENTE_DB_EXTERNA, estado=ESTADO_CANDIDATO,
+                    eid,
+                    m.sector_gics,
+                    sub_gics=m.sub_gics,
+                    vertical=m.vertical,
+                    alcance=ALCANCE_LOCAL,
+                    fuente=FUENTE_DB_EXTERNA,
+                    estado=ESTADO_CANDIDATO,
                 )
             for a in parsed.atributos:
                 repo.add_atributo(eid, a.clave, a.valor, FUENTE_DB_EXTERNA, estado=ESTADO_CANDIDATO)

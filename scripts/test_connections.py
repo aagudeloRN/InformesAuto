@@ -130,8 +130,8 @@ def check_openrouter(base_url: str, api_key: str, model: str, tier: str) -> bool
         ok(
             f"OpenRouter [{tier}] — {model}\n"
             f"       Respuesta: '{content}' | "
-            f"tokens in={usage.get('prompt_tokens','?')} "
-            f"out={usage.get('completion_tokens','?')} | "
+            f"tokens in={usage.get('prompt_tokens', '?')} "
+            f"out={usage.get('completion_tokens', '?')} | "
             f"{elapsed:.1f}s"
         )
         return True
@@ -167,7 +167,7 @@ def check_tavily(api_key: str) -> bool:
         elapsed = time.time() - t0
         ok(f"{len(results)} resultados en {elapsed:.1f}s (1 crédito Tavily consumido)")
         for r in results:
-            print(f"       · {r.get('title','?')[:60]}")
+            print(f"       · {r.get('title', '?')[:60]}")
         return True
     except httpx.HTTPStatusError as e:
         err(f"Tavily HTTP {e.response.status_code}: {e.response.text[:200]}")
@@ -203,7 +203,7 @@ def check_openalex(email: str) -> bool:
         elapsed = time.time() - t0
         pool = "polite pool ✅" if email else "anonymous pool"
         ok(
-            f"{len(works)} trabajos devueltos de {meta.get('count','?')} totales "
+            f"{len(works)} trabajos devueltos de {meta.get('count', '?')} totales "
             f"| {pool} | {elapsed:.1f}s"
         )
         for w in works:
@@ -224,6 +224,7 @@ def main() -> None:
     print("═" * 55)
 
     from ic.shared.config import get_settings
+
     s = get_settings()
 
     resultados: dict[str, bool] = {}

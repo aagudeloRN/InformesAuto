@@ -57,10 +57,7 @@ def _es_emis_individual(meta: dict | None) -> bool:
     """EMIS individual: chunk de PDF con sector_gics seteado y tipo_fuente != informe_compilado."""
     if not meta:
         return False
-    return (
-        meta.get("sector_gics") is not None
-        and meta.get("tipo_fuente") != "informe_compilado"
-    )
+    return meta.get("sector_gics") is not None and meta.get("tipo_fuente") != "informe_compilado"
 
 
 def _metricas(cap) -> dict:
@@ -99,11 +96,16 @@ def _run_once(caso: dict, settings, api_llm, llm, embedder, web, con_entidades: 
         cached_web = CachedWebConnector(web, db, settings)
         entidades_chain = build_chain_entidades(api_llm or llm) if con_entidades else None
         cap = GenerateBenchmarking(
-            chain=build_chain_03(api_llm or llm), store=store, web_connector=cached_web,
+            chain=build_chain_03(api_llm or llm),
+            store=store,
+            web_connector=cached_web,
             entidades_chain=entidades_chain,
         ).execute(
-            nombre_empresa=caso["empresa"], descripcion_empresa=caso["descripcion"],
-            sector_gics=grupo, sector_gics_code=g_code, empresa_id=None,
+            nombre_empresa=caso["empresa"],
+            descripcion_empresa=caso["descripcion"],
+            sector_gics=grupo,
+            sector_gics_code=g_code,
+            empresa_id=None,
         )
     res = {"empresa": caso["empresa"], "gics": g_code, "segundos": round(time.time() - t0, 1)}
     res.update(_metricas(cap))
@@ -114,7 +116,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Mide evidencia de competidores (DT-054, T22.4)")
     parser.add_argument("--n", type=int, default=2, help="Número de corridas (default 2)")
     parser.add_argument(
-        "--before", action="store_true",
+        "--before",
+        action="store_true",
         help="Baseline sin entidades_chain (búsqueda solo por sector)",
     )
     parser.add_argument("--out", default=None, help="Ruta del snapshot JSON")
@@ -133,7 +136,8 @@ def main() -> None:
     tracker = CostTracker(budget_limit=settings.llm_budget_limit_usd)
     api_llm = (
         build_resilient_api_llm(settings, cost_tracker=tracker)
-        if settings.openrouter_api_key else None
+        if settings.openrouter_api_key
+        else None
     )
     llm = build_llm(settings, cost_tracker=tracker)
     embedder = Embedder(settings)

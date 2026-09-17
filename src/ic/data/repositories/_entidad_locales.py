@@ -30,9 +30,7 @@ def _clave_exclusion(nombre: str) -> str:
     import unicodedata
 
     base = normalize_entity(nombre)
-    return "".join(
-        c for c in unicodedata.normalize("NFD", base) if unicodedata.category(c) != "Mn"
-    )
+    return "".join(c for c in unicodedata.normalize("NFD", base) if unicodedata.category(c) != "Mn")
 
 
 def list_locales_by_sector(

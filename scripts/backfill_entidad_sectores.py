@@ -53,7 +53,9 @@ def main() -> int:
         actualizadas = repo.recompute_n_sectores()
         logger.info(
             "Backfill: %d membresías nuevas, n_sectores recalculado en %d entidades (total %d).",
-            insertadas, actualizadas, total,
+            insertadas,
+            actualizadas,
+            total,
         )
     return 0
 

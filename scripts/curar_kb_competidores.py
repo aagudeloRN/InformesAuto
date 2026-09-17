@@ -73,9 +73,12 @@ def main() -> int:
 
         # 1. Purga de ruido (global; el ruido no es sector-específico).
         marcados = repo.descartar_ruido_competidores(dry_run=args.dry_run)
-        logger.info("Ruido %s: %d entidades (%s)",
-                    "detectado" if args.dry_run else "descartado", len(marcados),
-                    ", ".join(marcados[:12]) + ("…" if len(marcados) > 12 else ""))
+        logger.info(
+            "Ruido %s: %d entidades (%s)",
+            "detectado" if args.dry_run else "descartado",
+            len(marcados),
+            ", ".join(marcados[:12]) + ("…" if len(marcados) > 12 else ""),
+        )
 
         # 2. Siembra de pares verificados por sector.
         n_sembrados = 0
@@ -84,21 +87,23 @@ def main() -> int:
             logger.info("Sector %s: %d pares verificados a sembrar", sector, len(filas))
             if args.dry_run:
                 for f in filas:
-                    logger.info("  seed %-24s sub_gics=%s alcance=%s",
-                                f.nombre, f.sub_gics, f.alcance)
+                    logger.info(
+                        "  seed %-24s sub_gics=%s alcance=%s", f.nombre, f.sub_gics, f.alcance
+                    )
                 continue
             for f in filas:
                 eid = repo.upsert_entidad(f)
-                repo.add_atributo(
-                    eid, "origen", "curado", FUENTE_USUARIO, estado=ESTADO_VERIFICADO
-                )
+                repo.add_atributo(eid, "origen", "curado", FUENTE_USUARIO, estado=ESTADO_VERIFICADO)
                 n_sembrados += 1
 
         if args.dry_run:
             logger.info("DRY-RUN: no se escribió nada.")
         else:
-            logger.info("Curación completada: ruido descartado=%d, pares sembrados=%d",
-                        len(marcados), n_sembrados)
+            logger.info(
+                "Curación completada: ruido descartado=%d, pares sembrados=%d",
+                len(marcados),
+                n_sembrados,
+            )
     return 0
 
 

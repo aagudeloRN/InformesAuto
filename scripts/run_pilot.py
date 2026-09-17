@@ -83,7 +83,7 @@ def main() -> None:
     parser.add_argument(
         "--salida",
         default=None,
-        help='Ruta de salida del .docx (default: ./output/<empresa>.docx)',
+        help="Ruta de salida del .docx (default: ./output/<empresa>.docx)",
     )
     parser.add_argument(
         "--resume",
@@ -117,7 +117,9 @@ def main() -> None:
     print(f"  PostgreSQL ({settings.database_url[:40]}...): {pg_status}")
 
     if not ollama_ok:
-        print("\nError: Ollama no está corriendo. Verifica con: curl http://127.0.0.1:11434/api/tags")
+        print(
+            "\nError: Ollama no está corriendo. Verifica con: curl http://127.0.0.1:11434/api/tags"
+        )
         sys.exit(1)
     if not pg_ok:
         print("\nError: PostgreSQL no responde. Verifica que repositorio_postgres esté activo.")
@@ -132,8 +134,12 @@ def main() -> None:
 
     uc = GenerateInforme(settings)
     params = InformeParams(
-        empresa=args.empresa, ciiu=args.ciiu, output_path=output_path, resume=args.resume,
-        refresh=args.refresh, use_cache=not args.no_cache,
+        empresa=args.empresa,
+        ciiu=args.ciiu,
+        output_path=output_path,
+        resume=args.resume,
+        refresh=args.refresh,
+        use_cache=not args.no_cache,
     )
 
     global _step_times, _step_start, _last_step_label

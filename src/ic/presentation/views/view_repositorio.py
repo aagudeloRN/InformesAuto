@@ -75,7 +75,7 @@ def render_repositorio() -> None:
                             pdf_path=str(tmp_path),
                             titulo=titulo_doc.strip() or None,
                             autor=autor_doc.strip() or None,
-                            **{'a\u00f1o': int(anio_doc)},
+                            **{"a\u00f1o": int(anio_doc)},
                             sector_gics=sector_code,
                             tipo=tipo_doc,
                             empresa_id=empresa_id,

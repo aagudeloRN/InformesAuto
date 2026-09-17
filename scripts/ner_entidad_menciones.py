@@ -91,15 +91,17 @@ def main() -> int:
             for row in filas_chunk:
                 after_id = row.id
                 for m in recognizer.extract(row.chunk_texto or ""):
-                    lote.append(MencionRow(
-                        entidad_normalizada=m.normalizada,
-                        entidad_texto=m.texto,
-                        tipo=m.tipo,
-                        chunk_id=str(row.id),
-                        documento_id=str(row.documento_id) if row.documento_id else None,
-                        sector=row.sector,
-                        fuente_tipo=row.fuente_tipo,
-                    ))
+                    lote.append(
+                        MencionRow(
+                            entidad_normalizada=m.normalizada,
+                            entidad_texto=m.texto,
+                            tipo=m.tipo,
+                            chunk_id=str(row.id),
+                            documento_id=str(row.documento_id) if row.documento_id else None,
+                            sector=row.sector,
+                            fuente_tipo=row.fuente_tipo,
+                        )
+                    )
             insertadas += repo.upsert_many(lote)
             procesados += len(filas_chunk)
             logger.info("Procesados %d chunks; %d menciones nuevas", procesados, insertadas)
@@ -108,7 +110,10 @@ def main() -> int:
 
     logger.info(
         "NER completado: %d chunks procesados, %d menciones nuevas (tabla: %d → %d).",
-        procesados, insertadas, n_inicial, n_final,
+        procesados,
+        insertadas,
+        n_inicial,
+        n_final,
     )
     return 0
 

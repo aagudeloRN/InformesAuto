@@ -69,7 +69,9 @@ def _time_sql(repo, query_vec, settings, sector_arg) -> float:
     """Cronometra una sola llamada a search_similar (SQL puro, sin embedding)."""
     t0 = time.perf_counter()
     repo.search_similar(
-        query_vec, settings.rag_top_k, settings.rag_similarity_threshold,
+        query_vec,
+        settings.rag_top_k,
+        settings.rag_similarity_threshold,
         sector_gics=sector_arg,
         max_chunks_per_doc=settings.rag_max_chunks_per_doc,
         mmr_lambda=getattr(settings, "rag_mmr_lambda", 0.7),
@@ -88,22 +90,28 @@ def _fmt_row(m) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Harness de evaluación de retrieval (T14.1)")
     parser.add_argument(
-        "--mode", choices=["filtered", "raw"], default="filtered",
+        "--mode",
+        choices=["filtered", "raw"],
+        default="filtered",
         help="filtered = con filtro sectorial (ADR-012); raw = sin filtro (contraste)",
     )
     parser.add_argument("--save", default=None, help="Ruta para guardar el snapshot JSON")
     parser.add_argument("--bench", action="store_true", help="Cronometrar latencia de search()")
     parser.add_argument(
-        "--bench-sql", action="store_true",
+        "--bench-sql",
+        action="store_true",
         help="Cronometrar SOLO el SQL (embebe una vez por consulta; aísla el efecto del índice)",
     )
     parser.add_argument("--gold", default=str(_GOLD_SET), help="Ruta del gold set")
     parser.add_argument(
-        "--mmr-lambda", type=float, default=None,
+        "--mmr-lambda",
+        type=float,
+        default=None,
         help="Override de rag_mmr_lambda (1.0 = sin MMR; 0.7 = MMR). Para A/B antes/después.",
     )
     parser.add_argument(
-        "--warm", action="store_true",
+        "--warm",
+        action="store_true",
         help="Ejecutar en batch_mode (keep_alive positivo). Mide colapso de latencia en lotes.",
     )
     args = parser.parse_args()
@@ -134,9 +142,7 @@ def main() -> int:
 
             if args.bench_sql:
                 qv = embedder.embed(query)
-                best = min(
-                    _time_sql(repo, qv, settings, sector_arg) for _ in range(3)
-                )
+                best = min(_time_sql(repo, qv, settings, sector_arg) for _ in range(3))
                 sql_latencies.append(best)
 
     with SessionLocal() as db:
@@ -163,19 +169,24 @@ def main() -> int:
         p95 = lat_sorted[min(len(lat_sorted) - 1, int(len(lat_sorted) * 0.95))]
         warm_tag = " [warm/batch]" if args.warm else " [cold/default]"
         print(f"\n--- Latencia search() (embed + SQL){warm_tag} ---")
-        print(f"  media={sum(latencies) / len(latencies) * 1000:.1f}ms  "
-              f"p50={p50 * 1000:.1f}ms  p95={p95 * 1000:.1f}ms")
+        print(
+            f"  media={sum(latencies) / len(latencies) * 1000:.1f}ms  "
+            f"p50={p50 * 1000:.1f}ms  p95={p95 * 1000:.1f}ms"
+        )
     if args.bench_sql and sql_latencies:
         sl = sorted(sql_latencies)
         print("\n--- Latencia SQL-only (search_similar, sin embed) ---")
-        print(f"  media={sum(sql_latencies) / len(sql_latencies) * 1000:.2f}ms  "
-              f"p50={sl[len(sl) // 2] * 1000:.2f}ms  "
-              f"max={sl[-1] * 1000:.2f}ms")
+        print(
+            f"  media={sum(sql_latencies) / len(sql_latencies) * 1000:.2f}ms  "
+            f"p50={sl[len(sl) // 2] * 1000:.2f}ms  "
+            f"max={sl[-1] * 1000:.2f}ms"
+        )
 
     if args.save:
         import inspect
 
         from ic.infrastructure.retrieval import chunker as _chunker
+
         _sig = inspect.signature(_chunker.chunk_text)
         snapshot = {
             "mode": args.mode,
@@ -189,17 +200,20 @@ def main() -> int:
                 "rag_sector_reserve": settings.rag_sector_reserve,
                 "rag_sector_reserve_threshold": settings.rag_sector_reserve_threshold,
                 "rag_mmr_lambda": (
-                    args.mmr_lambda if args.mmr_lambda is not None
+                    args.mmr_lambda
+                    if args.mmr_lambda is not None
                     else getattr(settings, "rag_mmr_lambda", None)
                 ),
             },
             "aggregate": agg,
             "per_query": [
                 {
-                    "sector": m.expected_sector, "query": m.query,
+                    "sector": m.expected_sector,
+                    "query": m.query,
                     "precision": round(m.precision, 4),
                     "contamination": round(m.contamination, 4),
-                    "hit": m.hit, "n_correct": m.n_correct,
+                    "hit": m.hit,
+                    "n_correct": m.n_correct,
                     "mean_score": round(m.mean_score, 4),
                 }
                 for m in per_query

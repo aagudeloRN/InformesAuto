@@ -84,7 +84,9 @@ def main() -> int:
 
     logger.info(
         "Backfill aplicado: %d chunks + %d documentos etiquetados como '%s'",
-        n_chunks, n_docs, TipoFuente.INFORME_EMIS.value,
+        n_chunks,
+        n_docs,
+        TipoFuente.INFORME_EMIS.value,
     )
     logger.info("Chunks EMIS sin tipo_fuente DESPUÉS: %d (idempotente si se re-ejecuta)", despues)
     return 0

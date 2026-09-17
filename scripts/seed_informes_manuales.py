@@ -161,7 +161,11 @@ def main() -> int:
             tiers = Counter(f.tier for f in fichas)
             logger.info(
                 "%-9s GICS=%s fichas=%d tiers=%s escritas=%d",
-                nombre_informe, sector, len(fichas), dict(tiers), escritas,
+                nombre_informe,
+                sector,
+                len(fichas),
+                dict(tiers),
+                escritas,
             )
             eval_set.setdefault(sector, []).extend(
                 {"nombre": f.nombre, "tier": f.tier, "campos": f.campos, "informe": nombre_informe}
@@ -171,8 +175,9 @@ def main() -> int:
         if db is not None:
             db.close()
 
-    logger.info("TOTAL fichas=%d escritas=%d sectores=%s",
-                total_fichas, total_escritas, sorted(eval_set))
+    logger.info(
+        "TOTAL fichas=%d escritas=%d sectores=%s", total_fichas, total_escritas, sorted(eval_set)
+    )
     if not args.dry_run:
         out = Path(args.eval_out)
         out.parent.mkdir(parents=True, exist_ok=True)

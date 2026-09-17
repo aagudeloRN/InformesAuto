@@ -75,10 +75,15 @@ def _fetch_menciones(db, schema: str) -> list[MencionCruda]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Merge entidad_menciones → KB entidades (DT-056)")
-    parser.add_argument("--sector", default=None,
-                        help="Acota los competidores persistidos a este sector dominante")
-    parser.add_argument("--min-sectores", type=int, default=PUBLISHER_MIN_SECTORES,
-                        help=f"Umbral de dispersión publisher (default {PUBLISHER_MIN_SECTORES})")
+    parser.add_argument(
+        "--sector", default=None, help="Acota los competidores persistidos a este sector dominante"
+    )
+    parser.add_argument(
+        "--min-sectores",
+        type=int,
+        default=PUBLISHER_MIN_SECTORES,
+        help=f"Umbral de dispersión publisher (default {PUBLISHER_MIN_SECTORES})",
+    )
     parser.add_argument("--dry-run", action="store_true", help="No escribe; solo reporta números")
     args = parser.parse_args()
 
@@ -94,22 +99,32 @@ def main() -> int:
         por_signal = Counter(c.signal for c in candidatas)
         logger.info(
             "Entidades consolidadas: %d (competidor=%d, publisher=%d, ruido=%d)",
-            len(candidatas), por_signal.get(SIGNAL_COMPETIDOR, 0),
-            por_signal.get("publisher", 0), por_signal.get("ruido", 0),
+            len(candidatas),
+            por_signal.get(SIGNAL_COMPETIDOR, 0),
+            por_signal.get("publisher", 0),
+            por_signal.get("ruido", 0),
         )
 
         competidores = [c for c in candidatas if c.signal == SIGNAL_COMPETIDOR]
         if args.sector:
             competidores = [c for c in competidores if c.sector_dominante == args.sector]
         competidores = rank_candidatos(competidores)
-        logger.info("Competidores a persistir%s: %d",
-                    f" (sector {args.sector})" if args.sector else "", len(competidores))
+        logger.info(
+            "Competidores a persistir%s: %d",
+            f" (sector {args.sector})" if args.sector else "",
+            len(competidores),
+        )
 
         # Muestra top-15 para inspección humana (verificación del cierre).
         for c in competidores[:15]:
-            logger.info("  %-42s sector=%-6s chunks=%d sectores=%d conc=%.2f",
-                        c.nombre[:42], c.sector_dominante, c.n_chunks, c.n_sectores,
-                        c.concentracion)
+            logger.info(
+                "  %-42s sector=%-6s chunks=%d sectores=%d conc=%.2f",
+                c.nombre[:42],
+                c.sector_dominante,
+                c.n_chunks,
+                c.n_sectores,
+                c.concentracion,
+            )
 
         if args.dry_run:
             logger.info("DRY-RUN: no se escribió nada.")
@@ -118,27 +133,32 @@ def main() -> int:
         repo = EntidadRepository(db)
         n_antes = repo.count()
         for c in competidores:
-            eid = repo.upsert_entidad(EntidadRow(
-                nombre=c.nombre,
-                nombre_normalizado=c.nombre_normalizado,
-                tipo=TIPO_COMPETIDOR,
-                sector_gics=c.sector_dominante,
-                estado=ESTADO_CANDIDATO,
-                aliases=c.aliases,
-                n_menciones=c.n_menciones,
-                n_chunks=c.n_chunks,
-                n_sectores=c.n_sectores,
-            ))
+            eid = repo.upsert_entidad(
+                EntidadRow(
+                    nombre=c.nombre,
+                    nombre_normalizado=c.nombre_normalizado,
+                    tipo=TIPO_COMPETIDOR,
+                    sector_gics=c.sector_dominante,
+                    estado=ESTADO_CANDIDATO,
+                    aliases=c.aliases,
+                    n_menciones=c.n_menciones,
+                    n_chunks=c.n_chunks,
+                    n_sectores=c.n_sectores,
+                )
+            )
             # Lineage: de dónde salió la entidad (candidato, no hecho verificado).
             repo.add_atributo(
-                eid, "origen_ner",
+                eid,
+                "origen_ner",
                 f"n_chunks={c.n_chunks};n_menciones={c.n_menciones};concentracion={c.concentracion}",
-                FUENTE_INFORME, estado=ESTADO_CANDIDATO,
+                FUENTE_INFORME,
+                estado=ESTADO_CANDIDATO,
             )
         n_despues = repo.count()
 
-    logger.info("Merge completado: entidades %d → %d (nuevas=%d).",
-                n_antes, n_despues, n_despues - n_antes)
+    logger.info(
+        "Merge completado: entidades %d → %d (nuevas=%d).", n_antes, n_despues, n_despues - n_antes
+    )
     return 0
 
 

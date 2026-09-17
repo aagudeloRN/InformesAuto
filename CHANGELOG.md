@@ -5,6 +5,21 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.9.7] — 2026-09-17 (Spec 007: HITL + Reconciliación por NIT)
+
+### Added
+- **Reconciliación Canónica de Entidades por NIT (DT-050b)**:
+  - Módulo helper `_entidad_reconciliation.py` y métodos `list_duplicados_por_nit()` / `merge_entidades_por_nit()` en `EntidadRepository`.
+  - Caso de uso `ReconcileEntidades` (< 250L) en `src/ic/domain/use_cases/reconcile_entidades.py` con algoritmo determinista de selección canónica.
+  - Script CLI `scripts/reconciliar_entidades_nit.py` (--dry-run / --execute) y migración DDL idempotente de `aliases JSONB`.
+  - Pruebas unitarias completas en `tests/test_reconcile_entidades.py`.
+- **Curación Interactiva HITL Pre-Generación**:
+  - Vista Streamlit `src/ic/presentation/views/view_hitl.py` (< 250L) con panel interactivo multi-tier y adición manual.
+  - Integración en `view_generar.py` inyectando competidores curados en `InformeParams`.
+  - Desglose de competidores utilizados por tier en `view_historial.py`.
+
+---
+
 ## [0.9.1] — 2026-07-07
 
 ### Fixed

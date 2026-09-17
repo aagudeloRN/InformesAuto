@@ -48,7 +48,9 @@ def _provider_base_and_key(
         return getattr(settings, "ollama_base_url", "http://localhost:11434"), "ollama"
 
     if provider in ("google", "gemini"):
-        base_url = getattr(settings, "gemini_base_url", "https://generativelanguage.googleapis.com/v1beta/openai/")
+        base_url = getattr(
+            settings, "gemini_base_url", "https://generativelanguage.googleapis.com/v1beta/openai/"
+        )
         api_key = getattr(settings, "gemini_api_key", "") or ""
         return base_url, api_key
 
@@ -101,22 +103,21 @@ def build_api_llm(
         model = getattr(settings, "llm_api_free_model", "")
         provider = getattr(settings, "llm_api_free_provider", "openrouter")
 
-
     if not model or not isinstance(model, str):
         raise ValueError(f"Tier {tier!r} no configurado en .env")
 
-    base_url, api_key = _provider_base_and_key(
-        provider, settings, model=model
-    )
+    base_url, api_key = _provider_base_and_key(provider, settings, model=model)
     headers_str: str | None = None
     if provider == "openrouter":
         hdrs: dict[str, str] = {}
-        ref = (getattr(settings, "llm_openrouter_referer", "")
-           or getattr(settings, "openrouter_referer", ""))
+        ref = getattr(settings, "llm_openrouter_referer", "") or getattr(
+            settings, "openrouter_referer", ""
+        )
         if ref:
             hdrs["HTTP-Referer"] = ref
-        title = (getattr(settings, "llm_openrouter_title", "")
-             or getattr(settings, "openrouter_title", ""))
+        title = getattr(settings, "llm_openrouter_title", "") or getattr(
+            settings, "openrouter_title", ""
+        )
         if title:
             hdrs["X-Title"] = title
         if hdrs:
@@ -190,7 +191,6 @@ def build_resilient_api_llm(
         fb_tier = build_api_llm(settings, tier="fallback", cost_tracker=cost_tracker)
         if not any(t.model == fallback_model for t in constructed_tiers):
             constructed_tiers.append(fb_tier)
-
 
     if fallback is not None and not any(t.model == fallback.model for t in constructed_tiers):
         constructed_tiers.append(fallback)

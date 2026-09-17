@@ -15,7 +15,8 @@ from ic.data.models.entidad import (
     TIPO_COMPETIDOR,
     ensure_entidades_tables,
 )
-from ic.data.repositories.entidad_repo import EntidadRepository, EntidadRow
+from ic.data.repositories._entidad_queries import EntidadRow
+from ic.data.repositories.entidad_repo import EntidadRepository
 from ic.domain.chains.chain_02c_pares_globales import build_chain_pares_globales
 from ic.domain.kb.ficha_parser import parse_fichas_competidores
 from ic.domain.use_cases.discover_globales import DiscoverGlobales
@@ -130,8 +131,9 @@ def cargar_kb_competidores_ancla(
     sectores_local: list[str],
     productos_terms: set[str],
     e: str,
+    competidores_curados: dict[str, list[str]] | list[str] | set[str] | None = None,
 ):
-    """Consulta y estructura los competidores ancla del KB."""
+    """Consulta y estructura los competidores ancla del KB (con soporte HITL Spec 007)."""
     from ic.data.models.entidad import ALCANCE_GLOBAL, SEGMENTO_STARTUP, ensure_entidades_tables
     from ic.data.repositories.entidad_repo import EntidadRepository
     from ic.domain.kb.ficha_parser import TIER_GLOBAL, TIER_REGIONAL, TIER_STARTUP
@@ -165,8 +167,32 @@ def cargar_kb_competidores_ancla(
             limit=n,
             exclude_nombre=e,
         )
-        jugadores_locales_ctx = format_jugadores_locales(regionales, startups)
-        kb_locales = [r.nombre for r in (*regionales, *startups)]
+
+    if competidores_curados:
+        if isinstance(competidores_curados, dict):
+            g_sel = set(
+                competidores_curados.get(TIER_GLOBAL, competidores_curados.get("globales", []))
+            )
+            r_sel = set(
+                competidores_curados.get(TIER_REGIONAL, competidores_curados.get("regionales", []))
+            )
+            s_sel = set(
+                competidores_curados.get(TIER_STARTUP, competidores_curados.get("startups", []))
+            )
+            if g_sel:
+                kb_competidores = [c for c in kb_competidores if c in g_sel] or list(g_sel)
+            if r_sel:
+                regionales = [r for r in regionales if r.nombre in r_sel]
+            if s_sel:
+                startups = [st for st in startups if st.nombre in s_sel]
+        elif isinstance(competidores_curados, (list, set)):
+            curados_set = set(competidores_curados)
+            kb_competidores = [c for c in kb_competidores if c in curados_set]
+            regionales = [r for r in regionales if r.nombre in curados_set]
+            startups = [st for st in startups if st.nombre in curados_set]
+
+    jugadores_locales_ctx = format_jugadores_locales(regionales, startups)
+    kb_locales = [r.nombre for r in (*regionales, *startups)]
 
     fichas_kb: dict[str, dict[str, str]] = {}
     fichas_conocidas_ctx = ""

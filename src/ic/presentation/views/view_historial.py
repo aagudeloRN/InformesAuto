@@ -1,4 +1,4 @@
-"""Vista del historial de informes generados."""
+"""Vista del historial de informes generados con desglose de competidores y feedback (US3)."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def render_historial() -> None:
         return
 
     if not rows and page == 1:
-        msg = "A?n no se han generado informes." if not filtro else "Sin resultados para el filtro."
+        msg = "Aún no se han generado informes." if not filtro else "Sin resultados para el filtro."
         st.info(msg)
         return
 
@@ -46,41 +46,48 @@ def render_historial() -> None:
             fieldnames=["empresa", "fecha", "estado", "costo_usd", "tiempo_s", "n_fuentes"],
         )
         writer.writeheader()
-        for inf, emp in rows:
+        for r in rows:
+            emp = r["empresa_nombre"]
+            fecha = r["fecha"]
             writer.writerow(
                 {
                     "empresa": emp,
-                    "fecha": inf.created_at.strftime("%Y-%m-%d %H:%M") if inf.created_at else "",
-                    "estado": inf.estado,
-                    "costo_usd": f"{inf.costo_usd:.4f}" if inf.costo_usd is not None else "",
-                    "tiempo_s": f"{inf.tiempo_generacion_s:.0f}" if inf.tiempo_generacion_s else "",
-                    "n_fuentes": (inf.metricas_fiabilidad or {}).get("n_fuentes_total", ""),
+                    "fecha": fecha,
+                    "estado": r["estado"],
+                    "costo_usd": f"{r['costo_usd']:.4f}" if r.get("costo_usd") is not None else "",
+                    "tiempo_s": f"{r['tiempo_generacion_s']:.0f}"
+                    if r.get("tiempo_generacion_s")
+                    else "",
+                    "n_fuentes": (r.get("metricas_fiabilidad") or {}).get("n_fuentes_total", ""),
                 }
             )
         st.download_button(
-            label="?? Exportar p?gina a CSV",
+            label="📊 Exportar página a CSV",
             data=buf.getvalue().encode(),
             file_name="historial_informes.csv",
             mime="text/csv",
         )
 
-    from ic.shared.constants import EstadoInforme
+    for r in rows:
+        inf_id = r["id"]
+        empresa_nombre = r["empresa_nombre"]
+        fecha = r["fecha"]
+        estado_str = str(r["estado"])
 
-    for informe, empresa_nombre in rows:
-        fecha = informe.created_at.strftime("%Y-%m-%d %H:%M") if informe.created_at else "?"
-        with st.expander(f"{empresa_nombre} ? {fecha}"):
+        with st.expander(f"{empresa_nombre} — {fecha}"):
             col1, col2, col3 = st.columns(3)
-            col1.metric("Estado", informe.estado)
-            costo = f"${informe.costo_usd:.4f}" if informe.costo_usd is not None else "?"
+            col1.metric("Estado", estado_str)
+            costo = f"${r['costo_usd']:.4f}" if r.get("costo_usd") is not None else "?"
             col2.metric("Costo", costo)
             tiempo = (
-                f"{informe.tiempo_generacion_s:.0f}s"
-                if informe.tiempo_generacion_s is not None
+                f"{r['tiempo_generacion_s']:.0f}s"
+                if r.get("tiempo_generacion_s") is not None
                 else "?"
             )
             col3.metric("Tiempo", tiempo)
 
-            if metricas := informe.metricas_fiabilidad:
+            metricas = r.get("metricas_fiabilidad") or {}
+            if metricas:
                 n_ok = metricas.get("n_caps_ok", "?")
                 n_total = metricas.get("n_caps_total", "?")
                 n_fuentes = metricas.get("n_fuentes_total", "?")
@@ -88,36 +95,70 @@ def render_historial() -> None:
                 col_f1, col_f2, col_f3 = st.columns(3)
                 col_f1.metric("Caps con evidencia", f"{n_ok}/{n_total}")
                 col_f2.metric("Fuentes citadas", n_fuentes)
-                col_f3.metric("Citas hu?rfanas", n_huerfanas)
-                ausencia = metricas.get("caps_ausencia", [])
-                if ausencia:
-                    st.caption(f"Sin evidencia suficiente: {', '.join(ausencia)}")
+                col_f3.metric("Citas huérfanas", n_huerfanas)
 
-            if informe.estado == EstadoInforme.COMPLETADO and informe.ruta_documento_final:
-                docx_path = Path(informe.ruta_documento_final)
+                if comp_used := metricas.get("competidores_utilizados"):
+                    st.markdown("**Competidores anclados en Cap 2.1:**")
+                    if isinstance(comp_used, dict):
+                        for tier_name, lst in comp_used.items():
+                            st.caption(f"• **{tier_name.capitalize()}**: {', '.join(lst)}")
+                    elif isinstance(comp_used, list):
+                        st.caption(f"• {', '.join(comp_used)}")
+
+            if r.get("ruta_documento_final"):
+                docx_path = Path(r["ruta_documento_final"])
                 if docx_path.exists():
                     with open(docx_path, "rb") as f:
                         st.download_button(
-                            label="?? Descargar .docx",
+                            label="📄 Descargar .docx",
                             data=f,
                             file_name=docx_path.name,
-                            mime=(
-                                "application/vnd.openxmlformats-"
-                                "officedocument.wordprocessingml.document"
-                            ),
-                            key=str(informe.id),
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            key=inf_id,
                         )
                 else:
-                    st.caption(f"Archivo no encontrado: `{informe.ruta_documento_final}`")
+                    st.caption(f"Archivo no encontrado: `{r['ruta_documento_final']}`")
+
+            # Feedback de calidad / relevancia (US3 / T019)
+            st.markdown("---")
+            user_fb = metricas.get("user_feedback") or {}
+            if current_rating := user_fb.get("rating"):
+                comm = f" — {user_fb.get('comentario')}" if user_fb.get("comentario") else ""
+                st.info(f"Feedback guardado: **{current_rating}**{comm}")
+            else:
+                st.caption("Calificación de calidad:")
+                fb_col1, fb_col2 = st.columns(2)
+                with fb_col1:
+                    if st.button("👍 Relevante", key=f"fb_rel_{inf_id}"):
+                        from ic.domain.use_cases.ui_query_services import save_informe_feedback
+
+                        save_informe_feedback(inf_id, "Relevante")
+                        st.success("Feedback guardado: Relevante")
+                        st.rerun()
+                with fb_col2:
+                    if st.button("⚠️ Con observaciones", key=f"fb_obs_{inf_id}"):
+                        st.session_state[f"show_obs_form_{inf_id}"] = True
+
+                if st.session_state.get(f"show_obs_form_{inf_id}"):
+                    with st.form(key=f"form_obs_{inf_id}"):
+                        comentario = st.text_area("Observaciones sobre el informe")
+                        if st.form_submit_button("Guardar observaciones"):
+                            from ic.domain.use_cases.ui_query_services import (
+                                save_informe_feedback,
+                            )
+
+                            save_informe_feedback(inf_id, "Con observaciones", comentario)
+                            st.success("Observaciones guardadas exitosamente.")
+                            st.rerun()
 
     col_prev, col_info, col_next = st.columns([1, 2, 1])
     with col_prev:
-        if st.button("? Anterior", disabled=(page <= 1), key="hist_prev"):
+        if st.button("⬅️ Anterior", disabled=(page <= 1), key="hist_prev"):
             st.session_state["hist_page"] = page - 1
             st.rerun()
     with col_info:
-        st.caption(f"P?gina {page}")
+        st.caption(f"Página {page}")
     with col_next:
-        if st.button("Siguiente ?", disabled=(len(rows) < _PAGE_SIZE), key="hist_next"):
+        if st.button("Siguiente ➡️", disabled=(len(rows) < _PAGE_SIZE), key="hist_next"):
             st.session_state["hist_page"] = page + 1
             st.rerun()

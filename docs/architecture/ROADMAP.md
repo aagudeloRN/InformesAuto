@@ -190,7 +190,23 @@ web más específicas por empresa+sector en el paso de retrieval de benchmarking
 - **HITL (F24/F25):** captura/aprobación humana; depende de **DT-050b** (reconciliación EMIS↔NER por NIT).
 - **Estilo/documento (F26):** coherencia, Cap 5/6, numeración, estilo.
 
+## Secuenciaci?n Estrat?gica de Frentes (2026-09-16)
+
+1. **Spec 007 (EN CURSO ? Opci?n A: Negocio & Precisi?n)**:
+   - **Frente HITL Interactivo (Fases 24/25)**: Panel de curaci?n, revisi?n y descarte de competidores previo a la redacci?n de Cap?tulos N1/N2 en Streamlit.
+   - **Reconciliaci?n de Entidades por NIT (DT-050b)**: Deduplicaci?n y consolidaci?n de atributos/membres?as en el KB relacional (`entidades`, `entidad_sectores`, `entidad_atributos`).
+2. **Spec 008 (EN COLA ? Opci?n B: Infraestructura & Ingesta Masiva)**:
+   - **Paralelizaci?n de Ingesta entre PDFs (`scripts/ingest_batch.py`)**: Procesamiento concurrente de lotes masivos de PDFs con pool de conexiones aisladas por hilo e inserci?n vectorial por lotes.
+   - **Cobertura y Mitigaci?n de Ausencias en Sectores Secundarios (DT-UI04e / DT-049)**: Expansi?n de fuentes para sectores con baja densidad documental previa.
+
 ## Deuda estructural y Estado de Calidad
+
+### Deudas Saldadas en Spec 006 (Estabilizaci?n, Alineaci?n IC y Refactor <300L)
+| DT | Deuda | Resoluci?n (Spec 006) | Estado |
+|----|-------|------------------------|:------:|
+| **DT-042** | Eliminaci?n de radar chart | Reemplazado por prosa anal?tica y matriz comparativa tabular enriquecida en `.docx` | **CERRADA** |
+| **DT-043** | Gateway Gemini 2.5 Flash + OpenRouter | Tier primario de s?ntesis y fallback resiliente configurados (ADR-017) | **CERRADA** |
+| **DT-044** | Deuda >300L en 5 m?dulos (`generate_benchmarking`, `generate_n1`, `_entidad_queries`, `ciiu_gics`, `app.py`) | 100% de los archivos de `src/` modularizados por debajo de 300 l?neas | **CERRADA** |
 
 ### Deudas Saldadas en Spec 005 (Fase 31 ? QA, Integraci?n E2E y Deuda Estructural)
 | DT | Deuda | Resoluci?n (Spec 005) | Estado |

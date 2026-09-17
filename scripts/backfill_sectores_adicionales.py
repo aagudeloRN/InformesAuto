@@ -79,7 +79,8 @@ def _backfill_doc_metadatos(db, schema: str, titulo: str, sectores: list[str]) -
 def main() -> int:
     parser = argparse.ArgumentParser(description="Backfill sectores_adicionales → sectores")
     parser.add_argument(
-        "--csv", default="documentos_sectoriales/FuentesEMIS/indice_emis.csv",
+        "--csv",
+        default="documentos_sectoriales/FuentesEMIS/indice_emis.csv",
         help="Índice CSV con la columna sectores_adicionales",
     )
     args = parser.parse_args()
@@ -112,7 +113,9 @@ def main() -> int:
     logger.info(
         "Backfill multi-sector: %d docs declaran adicionales en el CSV; %d activados "
         "(%d chunks actualizados).",
-        docs_declarados, docs_activados, chunks_actualizados,
+        docs_declarados,
+        docs_activados,
+        chunks_actualizados,
     )
     if docs_declarados == 0:
         logger.warning(

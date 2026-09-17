@@ -67,11 +67,13 @@ def _parse_filename(stem: str) -> tuple[str, str, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Genera índice CSV del corpus EMIS")
     parser.add_argument(
-        "--dir", default="documentos_sectoriales/FuentesEMIS",
+        "--dir",
+        default="documentos_sectoriales/FuentesEMIS",
         help="Carpeta raíz con subcarpetas por sector",
     )
     parser.add_argument(
-        "--out", default="documentos_sectoriales/FuentesEMIS/indice_emis.csv",
+        "--out",
+        default="documentos_sectoriales/FuentesEMIS/indice_emis.csv",
         help="Ruta de salida del CSV",
     )
     args = parser.parse_args()
@@ -101,23 +103,33 @@ def main() -> int:
             autor, año, titulo = _parse_filename(pdf.stem)
             # ruta relativa desde la raíz del repo (sin prefijo documentos_sectoriales/)
             rel = pdf.relative_to(root.parent)
-            filas.append({
-                "archivo": str(rel),
-                "sector_gics": gics,
-                "sectores_adicionales": "",  # editable a mano para docs multi-sector
-                "tipo": "INFORME_EMIS",
-                "autor": autor,
-                "año": año,
-                "titulo": titulo,
-                "empresa": "",
-            })
+            filas.append(
+                {
+                    "archivo": str(rel),
+                    "sector_gics": gics,
+                    "sectores_adicionales": "",  # editable a mano para docs multi-sector
+                    "tipo": "INFORME_EMIS",
+                    "autor": autor,
+                    "año": año,
+                    "titulo": titulo,
+                    "empresa": "",
+                }
+            )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["archivo", "sector_gics", "sectores_adicionales",
-                        "tipo", "autor", "año", "titulo", "empresa"],
+            fieldnames=[
+                "archivo",
+                "sector_gics",
+                "sectores_adicionales",
+                "tipo",
+                "autor",
+                "año",
+                "titulo",
+                "empresa",
+            ],
         )
         writer.writeheader()
         writer.writerows(filas)

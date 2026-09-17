@@ -1,4 +1,4 @@
-"""Contexto, par?metros y preparaci?n de infraestructura del informe (DT-039)."""
+"""Contexto, parametros y preparacion de infraestructura del informe (DT-039)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 StepCallback = Callable[[int, int, str], None]
 
-# Estimaci?n de latencia de una b?squeda web (ms) para reportar el ahorro de cach? (T17.1).
+# Estimacion de latencia de una busqueda web (ms) para reportar el ahorro de cache (T17.1).
 _AVG_WEB_MS = 800.0
 
 
@@ -32,6 +32,7 @@ class InformeParams:
     anclaje_local: bool | None = None
     seccion21_determinista: bool | None = None
     caps_incluidos: set[str] | None = None
+    competidores_curados: dict[str, list[str]] | list[str] | set[str] | None = None
 
 
 @dataclass
@@ -97,7 +98,7 @@ def setup_pipeline_infra(
     from ic.infrastructure.sources.cached_connector import CacheCounter
     from ic.infrastructure.sources.web_connector import WebConnector
 
-    # Aplicar overrides de módulos desde InformeParams (None = respetar el .env/Settings).
+    # Aplicar overrides de modulos desde InformeParams (None = respetar el .env/Settings).
     _overrides = {
         k: v
         for k, v in {
@@ -110,14 +111,9 @@ def setup_pipeline_infra(
     }
     s = settings.model_copy(update=_overrides) if _overrides else settings
     tracker = CostTracker(budget_limit=s.llm_budget_limit_usd)
-    # T16.0-A: modelo resiliente analítico (free→free_alt→synth→paid→fallback) para Caps 2/3/4.
     resilient_llm = (
         build_resilient_api_llm(s, cost_tracker=tracker) if s.openrouter_api_key else None
     )
-    # 2026-08-03: cadena dedicada de SÍNTESIS (Cap 5/6/Resumen) = synth (Gemini 2.5 Flash) +
-    # fallback (openrouter/free). Reserva la cuota diaria de Gemini para los POCOS llamados de
-    # síntesis; los ~40 analíticos siguen en Nemotron. Sin synth/fallback → usa la general.
-    # Invariante: solo se separa si la síntesis va a Gemini (provider+key); si no, la general.
     resilient_synth_llm = resilient_llm
     if s.llm_api_synth_provider == "gemini" and s.gemini_api_key:
         try:
@@ -142,7 +138,7 @@ def setup_pipeline_infra(
         llm=llm,
         api_llm=resilient_llm,
         api_llm_alt=None,
-        api_llm_synth=resilient_synth_llm,  # síntesis: Gemini + fallback openrouter/free
+        api_llm_synth=resilient_synth_llm,
         cap1_llms=cap1_llms,
         embedder=Embedder(s),
         web=WebConnector(s),
@@ -156,7 +152,7 @@ def setup_pipeline_infra(
 
 
 def sweep_stale_web(ctx: _PipelineContext) -> None:
-    """Barre chunks web huérfanos de corridas previas (crash) antes de empezar (T14.5)."""
+    """Barre chunks web meurfanot de corridas previas (crash) antes de empezar (T14.5)."""
     from ic.data.database import SessionLocal
     from ic.data.repositories.embedding_repo import EmbeddingRepository
 
@@ -164,13 +160,13 @@ def sweep_stale_web(ctx: _PipelineContext) -> None:
         with SessionLocal() as db:
             n = EmbeddingRepository(db).sweep_stale_web_sessions(ctx.session_id)
             if n:
-                logger.info("Barrido de %d chunks web huérfanos de sesiones previas", n)
+                logger.info("Barrido de %d chunks web meurfanot de sesiones previas", n)
     except Exception:
-        logger.warning("No se pudo barrer chunks web huérfanos", exc_info=True)
+        logger.warning("No se pudo barrer chunks web meurfanot", exc_info=True)
 
 
 def promote_cited_web(ctx: _PipelineContext, chunks_usados: list) -> None:
-    """Promueve solo los chunks web citados; borra el resto de la sesión (T14.5)."""
+    """Promueve solo los chunks web citados; borra el resto de la sesion (T14.5)."""
     from ic.data.database import SessionLocal
     from ic.data.repositories.embedding_repo import EmbeddingRepository
 
@@ -190,4 +186,4 @@ def promote_cited_web(ctx: _PipelineContext, chunks_usados: list) -> None:
                 borrados,
             )
     except Exception:
-        logger.warning("No se pudo promover/purgar chunks web de la sesión", exc_info=True)
+        logger.warning("No se pudo promover/purgar chunks web de la sesion", exc_info=True)

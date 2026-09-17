@@ -89,24 +89,38 @@ def main() -> int:
                 if total <= 5:
                     logger.info(
                         "ej %-32s nit=%s GICS=%s ciudad=%s",
-                        parsed.nombre[:32], parsed.nit,
-                        [m.sector_gics for m in parsed.memberships], parsed.ciudad,
+                        parsed.nombre[:32],
+                        parsed.nit,
+                        [m.sector_gics for m in parsed.memberships],
+                        parsed.ciudad,
                     )
                 if args.dry_run:
                     continue
 
                 primaria = parsed.memberships[0] if parsed.memberships else None
-                eid = repo.upsert_entidad(EntidadRow(
-                    nombre=parsed.nombre, nombre_normalizado=parsed.nombre_normalizado,
-                    tipo=TIPO_EMPRESA, nit=parsed.nit, ciudad=parsed.ciudad, pais=parsed.pais,
-                    sector_gics=primaria.sector_gics if primaria else None,
-                    sub_gics=primaria.sub_gics if primaria else None,
-                    alcance=ALCANCE_LOCAL, estado=ESTADO_CANDIDATO,
-                ))
+                eid = repo.upsert_entidad(
+                    EntidadRow(
+                        nombre=parsed.nombre,
+                        nombre_normalizado=parsed.nombre_normalizado,
+                        tipo=TIPO_EMPRESA,
+                        nit=parsed.nit,
+                        ciudad=parsed.ciudad,
+                        pais=parsed.pais,
+                        sector_gics=primaria.sector_gics if primaria else None,
+                        sub_gics=primaria.sub_gics if primaria else None,
+                        alcance=ALCANCE_LOCAL,
+                        estado=ESTADO_CANDIDATO,
+                    )
+                )
                 for m in parsed.memberships:
                     repo.upsert_sector_membership(
-                        eid, m.sector_gics, sub_gics=m.sub_gics, vertical=m.vertical,
-                        alcance=ALCANCE_LOCAL, fuente=FUENTE_EMIS, estado=ESTADO_CANDIDATO,
+                        eid,
+                        m.sector_gics,
+                        sub_gics=m.sub_gics,
+                        vertical=m.vertical,
+                        alcance=ALCANCE_LOCAL,
+                        fuente=FUENTE_EMIS,
+                        estado=ESTADO_CANDIDATO,
                     )
                 for a in parsed.atributos:
                     repo.add_atributo(eid, a.clave, a.valor, FUENTE_EMIS, estado=ESTADO_CANDIDATO)
@@ -119,7 +133,11 @@ def main() -> int:
 
     logger.info(
         "Total=%d con_membresía=%d sin_membresía=%d sin_NIT=%d escritas=%d",
-        total, con_membresia, sin_membresia, sin_nit, escritas,
+        total,
+        con_membresia,
+        sin_membresia,
+        sin_nit,
+        escritas,
     )
     logger.info("Distribución GICS (membresías): %s", dict(gics_dist.most_common()))
     if args.dry_run:
