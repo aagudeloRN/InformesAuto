@@ -5,6 +5,20 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [0.9.8] — 2026-09-17 (Spec 008: Ingesta Masiva Paralela e Infraestructura de Evidencia)
+
+### Added
+- **Ingesta Paralela entre PDFs (US1)**:
+  - Coordinador multihilo ParallelIngestor (ThreadPoolExecutor) en src/ic/infrastructure/sources/parallel_ingestor.py con sesiones BD aisladas por worker y JSON lines a stdout.
+  - Script CLI scripts/ingest_batch.py actualizado con soporte para --workers N (default: 1).
+  - Cobertura de pruebas unitarias en 	ests/test_parallel_ingestor.py (3/3 passed).
+- **Auto-Enriquecimiento de Evidencia para Sectores Pobres (US2)**:
+  - Caso de uso AutoEnrich en src/ic/domain/use_cases/auto_enrich.py y conector EnrichmentConnector con OpenAlex y WebSearch fallback.
+  - Integración en _PipelineContext (_enriched_sectors) y en sub-orquestadores de capítulos _n1_chapter_builders.py.
+  - Cobertura de pruebas unitarias en 	ests/test_auto_enrich.py (3/3 passed).
+
+---
+
 ## [0.9.7] — 2026-09-17 (Spec 007: HITL + Reconciliación por NIT)
 
 ### Added

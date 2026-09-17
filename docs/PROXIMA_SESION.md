@@ -1,22 +1,20 @@
-﻿# Handoff — próxima sesión (arranque en chat limpio)
+# Handoff — próxima sesión (arranque en chat limpio)
 
-> Estado al cierre 2026-09-17. Rama `007-hitl-curacion-reconciliacion-entidades` / `spec-driven-experiment` (Spec 007 completado).
+> Estado al cierre 2026-09-17. Rama `008-ingesta-paralela-evidencia` (Spec 008 completado).
 > Copia el bloque "PROMPT DE ARRANQUE" de abajo en un chat nuevo.
 
 ## Dónde quedamos
-- **Spec 007 (Curación Interactiva HITL y Reconciliación de Entidades por NIT) COMPLETADO**:
-  - **US1 — Reconciliación por NIT (`DT-050b`)**:
-    - Módulo `_entidad_reconciliation.py` y métodos `list_duplicados_por_nit()` / `merge_entidades_por_nit()` en `EntidadRepository`.
-    - Caso de uso determinista `ReconcileEntidades` (< 250L) en `src/ic/domain/use_cases/reconcile_entidades.py`.
-    - Script ejecutable `scripts/reconciliar_entidades_nit.py` con soporte `--dry-run` y `--execute` y migración DDL idempotente de `aliases JSONB`.
-  - **US2 — Panel Interactivo HITL Pre-Generación**:
-    - Módulo Streamlit `src/ic/presentation/views/view_hitl.py` (< 250L) con selector multi-tier y edición en vivo.
-    - Integración de dos pasos en `view_generar.py`.
-    - Inyección de `competidores_curados` en `InformeParams` respetado en `cargar_kb_competidores_ancla`.
-  - **US3 — Auditoría Post-Generación**:
-    - Vista de historial `view_historial.py` actualizada con el desglose de competidores utilizados.
-  - **Regla < 300 Líneas (Constitución I)**: 100% de los archivos en `src/` estrictamente `< 300L` (máximo 297L).
-  - **Calidad y Cobertura**: Linter `ruff check .` con 0 errores; suite completa rápida `pytest` verde (706 passed).
+- **Spec 008 (Ingesta Masiva Paralela de PDFs e Infraestructura de Evidencia) COMPLETADO**:
+  - **US1 — Ingesta Paralela entre PDFs**:
+    - Coordinador `ParallelIngestor` (`ThreadPoolExecutor`) con aislamiento de fallos por PDF y JSON lines a `stdout`.
+    - Script `scripts/ingest_batch.py` actualizado con parámetro `--workers N` (default: 1).
+    - Tests unitarios en `tests/test_parallel_ingestor.py` (100% passed).
+  - **US2 — Auto-Enriquecimiento de Evidencia para Sectores Pobres**:
+    - Caso de uso `AutoEnrich` y conector `EnrichmentConnector` (OpenAlex + Web fallback).
+    - Integrado en `_PipelineContext` (`_enriched_sectors`) y `_n1_chapter_builders.py`.
+    - Tests unitarios en `tests/test_auto_enrich.py` (100% passed).
+  - **Regla < 300 Líneas (Constitución I)**: 100% de los archivos en `src/` estrictamente `< 300L`.
+  - **Calidad y Cobertura**: Linter `ruff check .` con 0 errores; suite completa `pytest` verde (713 passed).
 
 ---
 
@@ -26,13 +24,9 @@
 ROL: Claude Code / Antigravity, ingeniero senior de InformesAuto.
 Proyecto en /home/aagudelo/Test/InformesAuto. Localhost/dev (WSL2).
 
-CONTEXTO (sesión previa 2026-09-17, Spec 007 completado):
-- Spec 007 (Curación Interactiva HITL y Reconciliación por NIT) cerrado con 0 errores de ruff y 706 tests verdes:
-  * Script CLI scripts/reconciliar_entidades_nit.py (--dry-run / --execute) y uso de caso ReconcileEntidades.
-  * Interfaz de curación previa HITL en Streamlit (view_hitl.py) e integración con InformeParams.
-  * Historial actualizado con competidores anclados por tier.
+CONTEXTO (sesión previa 2026-09-17, Spec 008 completado):
+- Spec 008 (Ingesta Masiva Paralela y Auto-Enriquecimiento de Evidencia) cerrado con 0 errores de ruff y 713 tests verdes:
+  * Ingesta paralela multihilo con `scripts/ingest_batch.py --workers N` y `ParallelIngestor`.
+  * Auto-enriquecimiento de sectores pobres con OpenAlex/Web fallback vía `AutoEnrich`.
   * Todos los archivos de src/ estrictamente < 300 líneas.
-
-SIGUIENTE PASO:
-- Arrancar Spec 008 (Opción B: Ingesta Masiva Paralela de PDFs y Paralelización Multi-Worker).
 ```

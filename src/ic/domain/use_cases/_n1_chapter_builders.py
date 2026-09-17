@@ -17,6 +17,24 @@ if TYPE_CHECKING:
     from ic.domain.use_cases.generate_informe import _PipelineContext
 
 
+def _maybe_auto_enrich(ctx: _PipelineContext, g_code: str, query_text: str) -> bool:
+    """Intenta auto-enriquecer evidencia si el sector no ha sido procesado."""
+    if not g_code or g_code in ctx._enriched_sectors:
+        return False
+    ctx._enriched_sectors.add(g_code)
+    try:
+        from ic.domain.use_cases.auto_enrich import AutoEnrich
+
+        auto_enrich = AutoEnrich(settings=ctx.settings, embedder=ctx.embedder)
+        return auto_enrich.try_enrich(
+            sector_gics=g_code,
+            query_text=query_text,
+            threshold=getattr(ctx.settings, "rag_sector_reserve_threshold", 0.5),
+        )
+    except Exception:
+        return False
+
+
 def build_fn_mercado_impl(ctx: _PipelineContext, g_code: str):
     """Construye el ejecutor para Mercado (Cap 2.2)."""
     e, g = ctx.params.empresa, ctx.gics.grupo_gics
@@ -24,15 +42,24 @@ def build_fn_mercado_impl(ctx: _PipelineContext, g_code: str):
     def _fn_mercado(store: Any, web: Any, _oal: Any):
         if ctx.api_llm is None:
             return None
-        return GenerateMercado(
-            chain=build_chain_03b(ctx.api_llm), store=store, web_connector=web
-        ).execute(
+        gen = GenerateMercado(chain=build_chain_03b(ctx.api_llm), store=store, web_connector=web)
+        cap = gen.execute(
             nombre_empresa=e,
             descripcion_empresa=ctx.empresa.texto,
             sector_gics=g,
             sector_gics_code=g_code,
             empresa_id=ctx.empresa_id,
         )
+        if cap and not getattr(cap, "retrieval_suficiente", False):
+            if _maybe_auto_enrich(ctx, g_code, f"{g} mercado industria {e}"):
+                cap = gen.execute(
+                    nombre_empresa=e,
+                    descripcion_empresa=ctx.empresa.texto,
+                    sector_gics=g,
+                    sector_gics_code=g_code,
+                    empresa_id=ctx.empresa_id,
+                )
+        return cap
 
     return _fn_mercado
 
@@ -44,23 +71,35 @@ def build_fn_cap3_impl(ctx: _PipelineContext, g_code: str):
     def _fn_cap3(store: Any, web: Any, oal: Any):
         if ctx.api_llm is None:
             return None
-        cap = GenerateTendencias(
+        gen = GenerateTendencias(
             chain=build_chain_04(ctx.api_llm),
             store=store,
             web_connector=web,
             openalex_connector=oal,
-        ).execute(
+        )
+        query = f"{g} tendencias sectoriales tecnologicas {e}"
+        cap = gen.execute(
             nombre_empresa=e,
             descripcion_empresa=ctx.empresa.texto,
             sector_gics=g,
             sector_gics_code=g_code,
             empresa_id=ctx.empresa_id,
         )
+        if cap and not getattr(cap, "retrieval_suficiente", False):
+            if _maybe_auto_enrich(ctx, g_code, query):
+                cap = gen.execute(
+                    nombre_empresa=e,
+                    descripcion_empresa=ctx.empresa.texto,
+                    sector_gics=g,
+                    sector_gics_code=g_code,
+                    empresa_id=ctx.empresa_id,
+                )
+
         return review_web_cap(
             settings=s,
             llm=ctx.api_llm,
-            capitulo_nombre="Cap 3 ? An?lisis Sectorial Tendencial",
-            criterios=CRITERIOS_CAPITULO["Cap 3 ? An?lisis Sectorial Tendencial"],
+            capitulo_nombre="Cap 3 — Análisis Sectorial Tendencial",
+            criterios=CRITERIOS_CAPITULO["Cap 3 — Análisis Sectorial Tendencial"],
             cap_obj=cap,
             run_key=ctx.run_key,
             store=store,
@@ -68,7 +107,7 @@ def build_fn_cap3_impl(ctx: _PipelineContext, g_code: str):
             sector_gics=g,
             sector_gics_code=g_code,
             empresa_id=ctx.empresa_id,
-            retrieval_query=f"{g} tendencias sectoriales tecnologicas {e}",
+            retrieval_query=query,
         )
 
     return _fn_cap3
@@ -81,22 +120,34 @@ def build_fn_cap4_impl(ctx: _PipelineContext, g_code: str):
     def _fn_cap4(store: Any, web: Any, _oal: Any):
         if ctx.api_llm is None:
             return None
-        cap = GenerateEcosistema(
+        gen = GenerateEcosistema(
             chain=build_chain_05(ctx.api_llm),
             store=store,
             web_connector=web,
-        ).execute(
+        )
+        query = f"{g} ecosistema inversiones fusiones adquisiciones alianzas {e}"
+        cap = gen.execute(
             nombre_empresa=e,
             descripcion_empresa=ctx.empresa.texto,
             sector_gics=g,
             sector_gics_code=g_code,
             empresa_id=ctx.empresa_id,
         )
+        if cap and not getattr(cap, "retrieval_suficiente", False):
+            if _maybe_auto_enrich(ctx, g_code, query):
+                cap = gen.execute(
+                    nombre_empresa=e,
+                    descripcion_empresa=ctx.empresa.texto,
+                    sector_gics=g,
+                    sector_gics_code=g_code,
+                    empresa_id=ctx.empresa_id,
+                )
+
         return review_web_cap(
             settings=s,
             llm=ctx.api_llm,
-            capitulo_nombre="Cap 4 ? Panorama Ecosistema",
-            criterios=CRITERIOS_CAPITULO["Cap 4 ? Panorama Ecosistema"],
+            capitulo_nombre="Cap 4 — Panorama Ecosistema",
+            criterios=CRITERIOS_CAPITULO["Cap 4 — Panorama Ecosistema"],
             cap_obj=cap,
             run_key=ctx.run_key,
             store=store,
@@ -104,7 +155,7 @@ def build_fn_cap4_impl(ctx: _PipelineContext, g_code: str):
             sector_gics=g,
             sector_gics_code=g_code,
             empresa_id=ctx.empresa_id,
-            retrieval_query=f"{g} ecosistema inversiones fusiones adquisiciones alianzas {e}",
+            retrieval_query=query,
         )
 
     return _fn_cap4
@@ -115,8 +166,8 @@ def apply_n1_intros(ctx: _PipelineContext, restored: dict[str, Any]) -> None:
     if ctx.intro_chain is None:
         return
     for cap_obj, titulo, name in [
-        (ctx.cap, "An?lisis Competitivo", "cap2"),
-        (ctx.cap_tend, "An?lisis Sectorial Tendencial", "cap3"),
+        (ctx.cap, "Análisis Competitivo", "cap2"),
+        (ctx.cap_tend, "Análisis Sectorial Tendencial", "cap3"),
         (ctx.cap_eco, "Ecosistema Empresarial", "cap4"),
     ]:
         if (
