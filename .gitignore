@@ -31,3 +31,9 @@ docs/ReportesHumanos/
 # Windows WSL metadata files
 *.Zone.Identifier
 *Zone.Identifier*
+
+# Datos de fuentes externas (corporativos, solo locales; el README sí se versiona)
+documentos_sectoriales/FuentesExternas/*
+!documentos_sectoriales/FuentesExternas/README.md
+# Configuración local de permisos del agente
+.agents/settings.local.json
