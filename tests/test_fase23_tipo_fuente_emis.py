@@ -3,15 +3,15 @@
 Dos frentes, ambos fast (sin BD ni Ollama reales):
   1. `PdfIngestor.ingest_batched` estampa `tipo_fuente='informe_emis'` para `tipo=INFORME_EMIS`
      (PDFs nuevos entran etiquetados), y NO estampa para tipos que no aplican.
-  2. `EmbeddingRepository.backfill_tipo_fuente_emis` etiqueta los chunks EMIS ya indexados con
-     una Session falsa que modela la idempotencia (segunda corrida → 0 filas).
+  2. `EmbeddingBackfillRepository.backfill_tipo_fuente_emis` etiqueta los chunks EMIS ya
+     indexados con una Session falsa que modela la idempotencia (segunda corrida → 0 filas).
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from ic.data.repositories.embedding_repo import EmbeddingRepository
+from ic.data.repositories.embedding_backfill_repo import EmbeddingBackfillRepository
 from ic.shared.constants import TipoDocumento, TipoFuente
 
 
@@ -117,7 +117,7 @@ class _StatefulSession:
 def test_backfill_tipo_fuente_emis_idempotente():
     # 3 chunks EMIS sin etiquetar + 1 ya etiquetado en corridas previas.
     sess = _StatefulSession([None, None, None, TipoFuente.INFORME_EMIS.value])
-    repo = EmbeddingRepository(sess)
+    repo = EmbeddingBackfillRepository(sess)
 
     n1 = repo.backfill_tipo_fuente_emis()
     n2 = repo.backfill_tipo_fuente_emis()  # segunda corrida: nada pendiente
@@ -129,7 +129,7 @@ def test_backfill_tipo_fuente_emis_idempotente():
 
 def test_backfill_sql_tiene_guarda_de_idempotencia_y_scope_emis():
     sess = _StatefulSession([None])
-    EmbeddingRepository(sess).backfill_tipo_fuente_emis()
+    EmbeddingBackfillRepository(sess).backfill_tipo_fuente_emis()
     sql = sess.sqls[-1]
     # Guarda de idempotencia: solo toca chunks aún sin etiquetar.
     assert "(metadatos->>'tipo_fuente') IS NULL" in sql

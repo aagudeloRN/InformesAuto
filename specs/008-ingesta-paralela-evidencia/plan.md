@@ -34,9 +34,9 @@ Dos mejoras de infraestructura independientes: (A) paralelizar la ingesta de PDF
 
 | Principio | Estado | Evidencia |
 |-----------|--------|-----------|
-| I — <300L por archivo | PASS | `parallel_ingestor.py` ~120L; `auto_enrich.py` ~175L |
+| I — <300L por archivo | PASS | `parallel_ingestor.py` 147L; `auto_enrich.py` 213L; `enrichment_connector.py` 94L (medido 2026-10-26) |
 | II — Agnosticismo de dependencias | PASS | `parallel_ingestor.py` bajo `infrastructure/`; `auto_enrich.py` bajo `domain/use_cases/` |
-| I — Mezcla negocio/BD (regla 1) | PASS con excepción conocida | `auto_enrich.py` abre `SessionLocal` y construye `EmbeddingVectorial`, igual que otros 11 archivos de `domain/`. Deuda estructural transversal, fuera del alcance de esta spec; el SQL ya vive en `EmbeddingRepository` (T025) |
+| I — Mezcla negocio/BD (regla 1) | EXCEPCIÓN DOCUMENTADA (ADR-018) | `auto_enrich.py` abre `SessionLocal` y construye `EmbeddingVectorial`, igual que otros 12 archivos de `domain/` (13 en total). Deuda estructural transversal, fuera del alcance de esta spec; el SQL ya vive en `EmbeddingRepository` (T025) |
 | III — Sin alucinación / regla datos ausentes / RN-001 | PASS (tras T021–T024; RN-001: T031–T032 hechas; promoción en T033–T035) | `AutoEnrich` preserva la regla: si no hay evidencia post-enriquecimiento, párrafo de ausencia. El historial del informe registra cada evento de enriquecimiento (T023) |
 | IV — Sin credenciales en código | PASS | `openalex_email` ya en Settings/.env; ningún secreto nuevo hardcodeado |
 | V — Tests en mismo PR | PASS | `test_parallel_ingestor.py` + `test_auto_enrich.py` incluidos |

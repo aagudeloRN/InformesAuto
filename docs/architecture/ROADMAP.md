@@ -220,6 +220,8 @@ web más específicas por empresa+sector en el paso de retrieval de benchmarking
 ### Deudas Pendientes / Pr?ximos Frentes
 | DT | Deuda | Nota |
 |----|-------|------|
+| **Validación E2E 008** | Medir SC-001 (lote de 50 PDFs con `--workers 4`, aceleración ≥ 2.5×) y SC-004 (−30% de párrafos de ausencia en sectores con < 10 docs) | Diferidos de la spec 008; falta definir corpus de prueba y baseline |
+| **ADR-018** | 13 archivos de `domain/` abren `SessionLocal` | Excepción tolerada; spec de refactor pendiente |
 | **DT-050b** | Reconciliaci?n EMIS?NER por NIT + HITL | Duplicados inertes hoy; paliados por dedup en el anclaje |
 | **DT-UI04a+** | Exclusi?n focal por aliases en casos extremos | "HOLADR." vs "HOLA DOCTOR S.A.S." |
 | **DT-UI04b+** | Anclaje global multi-sector y fichas | Extensi?n de `sectores_ancla_local` |

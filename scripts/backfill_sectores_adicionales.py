@@ -4,7 +4,8 @@ Activa la capacidad multi-sector dormida: la columna `sectores_adicionales` del 
 pero está vacía → ningún doc está multi-etiquetado, aunque el retrieval ya la soporta
 (`search_similar`: `jsonb_exists(metadatos->'sectores', :sector)`). Este script lee el CSV, y para
 cada fila con `sectores_adicionales` no vacío estampa el array `[primario] + adicionales` en:
-  1. los chunks del documento (identificado por título) vía `EmbeddingRepository.backfill_sectores`;
+  1. los chunks del documento (identificado por título) vía
+     `EmbeddingBackfillRepository.backfill_sectores`;
   2. su `documentos_locales` (telemetría a nivel doc).
 
 NO re-embebe ni reprocesa PDFs: solo UPDATE de metadatos. Idempotente (guarda `IS DISTINCT FROM`
@@ -33,7 +34,7 @@ if str(_SRC) not in sys.path:
 from sqlalchemy import text  # noqa: E402
 
 from ic.data.database import SessionLocal  # noqa: E402
-from ic.data.repositories.embedding_repo import EmbeddingRepository  # noqa: E402
+from ic.data.repositories.embedding_backfill_repo import EmbeddingBackfillRepository  # noqa: E402
 from ic.shared.config import get_settings  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -96,7 +97,7 @@ def main() -> int:
     chunks_actualizados = 0
 
     with open(csv_path, newline="", encoding="utf-8") as f, SessionLocal() as db:
-        repo = EmbeddingRepository(db)
+        repo = EmbeddingBackfillRepository(db)
         for fila in csv.DictReader(f):
             sectores = _parse_sectores(fila)
             titulo = _titulo(fila)

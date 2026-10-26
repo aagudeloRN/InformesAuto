@@ -99,16 +99,16 @@ El sistema detecta, durante la generación de un informe, que el retrieval de un
 
 **Bloque B — Enriquecimiento Automático:**
 
-- **FR-007**: El pipeline de generación DEBE detectar automáticamente cuando el retrieval de un sector no supera `rag_sector_reserve_threshold` (variable existente en `Settings`, configurable vía `.env`), medido sobre el score máximo de los 5 mejores resultados (`top_k=5`); ese mismo umbral activa el enriquecimiento automático — no se introduce una variable de configuración adicional.
+- **FR-007**: El pipeline de generación DEBE detectar automáticamente cuando el retrieval de un sector no supera `rag_sector_reserve_threshold` (variable existente en `Settings`, configurable vía `.env`), medido sobre el mejor score del retrieval (`top_k=5`); ese mismo umbral activa el enriquecimiento automático — no se introduce una variable de configuración adicional.
 - **FR-008**: Al detectar baja evidencia, el sistema DEBE activar el módulo de enriquecimiento automático (`infrastructure/sources/`) consultando OpenAlex vía polite pool (header `User-Agent` con `OPENALEX_EMAIL` de `.env`, sin API key) como primera opción, y búsqueda web como fallback.
 - **FR-009**: Los fragmentos obtenidos del enriquecimiento DEBEN persistirse en la misma tabla de embeddings que los PDFs manuales, con metadatos de procedencia (`fuente: "openalex"`, `fuente: "web_enrichment"`, etc.).
 - **FR-010**: El enriquecimiento DEBE ejecutarse como máximo una vez por sector por ejecución de informe (sin bucles de retry indefinidos).
 - **FR-011**: Si el enriquecimiento falla o no obtiene evidencia suficiente, el sistema DEBE aplicar la regla de datos ausentes sin invocar al modelo (comportamiento existente, preservado).
 - **FR-012**: Los fragmentos enriquecidos DEBEN ser citables con APA; cada fragmento persistido DEBE tener `titulo`, `autores`, `año` y `url` como metadatos mínimos.
+- **FR-013**: Cada fragmento enriquecido DEBE guardar `chunk_sha256` (SHA-256 de su texto) en `metadatos` y NO insertarse si ya existe un chunk con ese hash en el índice, ni repetirse dentro del mismo lote; repetir un enriquecimiento no crea duplicados.
 - **FR-014**: Los fragmentos enriquecidos DEBEN persistirse con `metadatos.estado_verificacion` (gate RN-001, Constitución III): `verificado` si `fuente = "openalex"`, `candidato` si `fuente = "web_enrichment"`.
 - **FR-015**: El retrieval DEBE excluir los fragmentos `candidato` de los resultados citables; un `candidato` pasa a `verificado` solo por (a) respaldo de un chunk `verificado` del mismo sector con similitud ≥ `rag_similarity_threshold`, o (b) aprobación humana.
 - **FR-016**: La UI DEBE listar los fragmentos `candidato` pendientes y permitir aprobarlos (`verificado`) o descartarlos (`descartado`); un `descartado` nunca se recupera ni se re-promueve.
-- **FR-013**: Cada fragmento enriquecido DEBE guardar `chunk_sha256` (SHA-256 de su texto) en `metadatos` y NO insertarse si ya existe un chunk con ese hash en el índice, ni repetirse dentro del mismo lote; repetir un enriquecimiento no crea duplicados.
 
 ### Key Entities
 

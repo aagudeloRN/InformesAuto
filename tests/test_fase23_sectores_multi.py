@@ -1,7 +1,7 @@
 """DT-057/T2 (DT-053) — backfill de sectores_adicionales + aflorado multi-sector.
 
 Fast (sin BD ni Ollama):
-  1. `EmbeddingRepository.backfill_sectores` estampa el array multi-sector idempotentemente
+  1. `EmbeddingBackfillRepository.backfill_sectores` estampa el array multi-sector idempotentemente
      (Session falsa con estado; segunda corrida → 0 filas) y con la guarda de scope correcta.
   2. Un doc con `metadatos.sectores=[primario, secundario]` aflora al buscar el sector secundario
      (mock del repo, patrón `test_fase13_sectorial`).
@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
+from ic.data.repositories.embedding_backfill_repo import EmbeddingBackfillRepository
 from ic.data.repositories.embedding_repo import EmbeddingRepository
 
 
@@ -46,7 +47,7 @@ class _StatefulSession:
 
 def test_backfill_sectores_idempotente():
     sess = _StatefulSession(None)
-    repo = EmbeddingRepository(sess)
+    repo = EmbeddingBackfillRepository(sess)
 
     n1 = repo.backfill_sectores("Informe Lácteos", ["3020", "2530"])
     n2 = repo.backfill_sectores("Informe Lácteos", ["3020", "2530"])  # mismo array → no-op
@@ -58,7 +59,7 @@ def test_backfill_sectores_idempotente():
 
 def test_backfill_sectores_sql_scope_y_guarda():
     sess = _StatefulSession(None)
-    EmbeddingRepository(sess).backfill_sectores("Doc X", ["3020", "2510"])
+    EmbeddingBackfillRepository(sess).backfill_sectores("Doc X", ["3020", "2510"])
     sql = sess.sqls[-1]
     assert "metadatos->>'titulo' = :titulo" in sql  # acotado al documento
     assert "IS DISTINCT FROM CAST(:sectores AS jsonb)" in sql  # idempotencia

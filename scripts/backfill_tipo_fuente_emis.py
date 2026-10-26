@@ -4,7 +4,7 @@ Los informes EMIS individuales se ingirieron con `tipo_fuente` NULL (solo PDF_SE
 llevaban `informe_compilado`) → quedaban sin telemetría ni palanca de reserva/boost. Este script
 estampa `metadatos->>'tipo_fuente' = 'informe_emis'` en:
   1. los chunks (`embeddings_vectoriales`) cuyo documento es de tipo INFORME_EMIS, vía
-     `EmbeddingRepository.backfill_tipo_fuente_emis` (lógica testeable en la capa de datos);
+     `EmbeddingBackfillRepository.backfill_tipo_fuente_emis` (lógica testeable en la capa de datos);
   2. los `documentos_locales` EMIS (telemetría a nivel documento).
 
 NO re-embebe ni reprocesa PDFs: solo UPDATE de metadatos sobre filas existentes. Idempotente
@@ -31,7 +31,7 @@ if str(_SRC) not in sys.path:
 from sqlalchemy import text  # noqa: E402
 
 from ic.data.database import SessionLocal  # noqa: E402
-from ic.data.repositories.embedding_repo import EmbeddingRepository  # noqa: E402
+from ic.data.repositories.embedding_backfill_repo import EmbeddingBackfillRepository  # noqa: E402
 from ic.shared.config import get_settings  # noqa: E402
 from ic.shared.constants import TipoDocumento, TipoFuente  # noqa: E402
 
@@ -78,7 +78,7 @@ def main() -> int:
             logger.info("--dry-run: no se escribe nada")
             return 0
 
-        n_chunks = EmbeddingRepository(db).backfill_tipo_fuente_emis()
+        n_chunks = EmbeddingBackfillRepository(db).backfill_tipo_fuente_emis()
         n_docs = _backfill_documentos(db, schema)
         despues = _emis_sin_tipo(db, schema)
 
