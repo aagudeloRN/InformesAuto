@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import httpx
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
@@ -18,6 +20,7 @@ from ic.infrastructure.llm.gateway import (
     build_resilient_api_llm,
     is_empty_generation_error,
 )
+from ic.infrastructure.llm.gateway_errors import is_model_unavailable_error
 from ic.shared.config import Settings
 
 
@@ -106,3 +109,25 @@ def test_build_resilient_anexa_el_fallback():
     assert "nemotron:free" in modelos
     assert "openrouter/free" in modelos  # fallback anexado al final
     assert modelos[-1] == "openrouter/free"
+
+
+# --------------------------------------------------------------------------- 404 → fallback
+
+
+def _http_error(status):
+    req = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+    return httpx.HTTPStatusError("err", request=req, response=httpx.Response(status, request=req))
+
+
+def test_404_cae_al_siguiente_tier():
+    t1, t2 = _tier_fail(_http_error(404)), _tier_ok("respaldo")
+    res = ResilientChatModel(tiers=[t1, t2])._generate([HumanMessage(content="hola")])
+    assert res.generations[0].message.content == "respaldo"
+    assert is_model_unavailable_error(_http_error(404)) is True
+    assert is_model_unavailable_error(_http_error(500)) is False
+
+
+def test_500_sigue_sin_activar_fallback():
+    model = ResilientChatModel(tiers=[_tier_fail(_http_error(500)), _tier_ok()])
+    with pytest.raises(httpx.HTTPStatusError):
+        model._generate([HumanMessage(content="hola")])

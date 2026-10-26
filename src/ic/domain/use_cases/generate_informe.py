@@ -35,7 +35,7 @@ __all__ = [
 
 
 class GenerateInforme:
-    """Orquesta el pipeline completo: Cap 1 ? GICS ? N1 paralelo ? N2 ? N3 ? .docx."""
+    """Orquesta el pipeline completo: Cap 1 → GICS → N1 paralelo → N2 → N3 → .docx."""
 
     TOTAL_PASOS = 10
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from ic.domain.chains.chain_03b_mercado import build_chain_03b
@@ -16,6 +17,8 @@ from ic.domain.use_cases.self_review_hooks import review_web_cap
 if TYPE_CHECKING:
     from ic.domain.use_cases.generate_informe import _PipelineContext
 
+logger = logging.getLogger(__name__)
+
 
 def _maybe_auto_enrich(ctx: _PipelineContext, g_code: str, query_text: str) -> bool:
     """Intenta auto-enriquecer evidencia si el sector no ha sido procesado."""
@@ -26,12 +29,15 @@ def _maybe_auto_enrich(ctx: _PipelineContext, g_code: str, query_text: str) -> b
         from ic.domain.use_cases.auto_enrich import AutoEnrich
 
         auto_enrich = AutoEnrich(settings=ctx.settings, embedder=ctx.embedder)
-        return auto_enrich.try_enrich(
+        evento = auto_enrich.try_enrich(
             sector_gics=g_code,
             query_text=query_text,
             threshold=getattr(ctx.settings, "rag_sector_reserve_threshold", 0.5),
         )
-    except Exception:
+        ctx.eventos_enriquecimiento.append(evento)
+        return evento.enriquecido
+    except Exception as exc:
+        logger.warning("Auto-enriquecimiento omitido para sector %s: %s", g_code, exc)
         return False
 
 

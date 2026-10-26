@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ic.data.models.documento_local import DocumentoLocal
 from ic.data.models.embedding_vectorial import EmbeddingVectorial
+from ic.data.repositories.embedding_estado_repo import SQL_SOLO_CITABLES
 from ic.infrastructure.retrieval.mmr import apply_mmr_reranking
 from ic.shared.constants import TipoDocumento, TipoFuente
 
@@ -17,6 +18,15 @@ class EmbeddingRepository:
     def insert_many(self, chunks: list[EmbeddingVectorial]) -> None:
         self._db.add_all(chunks)
         self._db.commit()
+
+    def exists_by_sha256(self, chunk_sha: str) -> bool:
+        """True si ya existe un chunk con este hash (``metadatos->>'chunk_sha256'``)."""
+        emb = EmbeddingVectorial.__table__.fullname
+        row = self._db.execute(
+            text(f"SELECT 1 FROM {emb} WHERE metadatos->>'chunk_sha256' = :sha LIMIT 1"),
+            {"sha": chunk_sha},
+        ).fetchone()
+        return row is not None
 
     def promote_cited_web(self, session_id: str, cited_ids: list[str]) -> tuple[int, int]:
         """Persistencia web "solo lo citado" (T14.5, DT-020).
@@ -195,6 +205,7 @@ class EmbeddingRepository:
         empresa_estricto: bool = False,
         mmr_lambda: float = 1.0,
         fuente_tipo_filter: str | None = None,
+        incluir_candidatos: bool = False,
     ) -> list[tuple[EmbeddingVectorial, float]]:
         # Margen amplio: el filtro sectorial + el cap por documento reducen candidatos
         fetch_k = top_k * 4
@@ -238,6 +249,9 @@ class EmbeddingRepository:
         if solo_activos:
             # Activo o sin documento asociado (chunks web no tienen documento_id)
             conditions.append("(d.activo IS NOT FALSE)")
+
+        if not incluir_candidatos:  # RN-001; sin clave = citable
+            conditions.append(SQL_SOLO_CITABLES)
 
         if fuente_tipo_filter is not None:
             conditions.append("e.fuente_tipo = :fuente_tipo")

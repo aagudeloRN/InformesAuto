@@ -12,11 +12,11 @@ Dos mejoras de infraestructura independientes: (A) paralelizar la ingesta de PDF
 
 ## Technical Context
 
-**Language/Version**: Python 3.11 (uv)
+**Language/Version**: Python 3.12 (uv)
 
 **Primary Dependencies**: `concurrent.futures.ThreadPoolExecutor`, `PdfIngestor` (existente), `OpenAlexConnector` (existente), SQLAlchemy sessions (una por thread), pgvector
 
-**Storage**: PostgreSQL + pgvector (esquema `informes_ic`); misma tabla `embedding_vectorial` para chunks de PDFs manuales y enriquecidos
+**Storage**: PostgreSQL + pgvector (esquema `informes_ic`); misma tabla `embeddings_vectoriales` para chunks de PDFs manuales y enriquecidos
 
 **Testing**: `uv run pytest`; mocks de `PdfIngestor` y `OpenAlexConnector`; tests unitarios sin BD real
 
@@ -34,9 +34,10 @@ Dos mejoras de infraestructura independientes: (A) paralelizar la ingesta de PDF
 
 | Principio | Estado | Evidencia |
 |-----------|--------|-----------|
-| I — <300L por archivo | PASS | `parallel_ingestor.py` ~120L; `auto_enrich.py` ~180L |
+| I — <300L por archivo | PASS | `parallel_ingestor.py` ~120L; `auto_enrich.py` ~175L |
 | II — Agnosticismo de dependencias | PASS | `parallel_ingestor.py` bajo `infrastructure/`; `auto_enrich.py` bajo `domain/use_cases/` |
-| III — Sin alucinación / regla datos ausentes | PASS | `AutoEnrich` preserva la regla: si no hay evidencia post-enriquecimiento, párrafo de ausencia |
+| I — Mezcla negocio/BD (regla 1) | PASS con excepción conocida | `auto_enrich.py` abre `SessionLocal` y construye `EmbeddingVectorial`, igual que otros 11 archivos de `domain/`. Deuda estructural transversal, fuera del alcance de esta spec; el SQL ya vive en `EmbeddingRepository` (T025) |
+| III — Sin alucinación / regla datos ausentes / RN-001 | PASS (tras T021–T024; RN-001: T031–T032 hechas; promoción en T033–T035) | `AutoEnrich` preserva la regla: si no hay evidencia post-enriquecimiento, párrafo de ausencia. El historial del informe registra cada evento de enriquecimiento (T023) |
 | IV — Sin credenciales en código | PASS | `openalex_email` ya en Settings/.env; ningún secreto nuevo hardcodeado |
 | V — Tests en mismo PR | PASS | `test_parallel_ingestor.py` + `test_auto_enrich.py` incluidos |
 | VI — Cambios atómicos | PASS | `--workers 1` mantiene comportamiento secuencial; sin regresión |
@@ -47,13 +48,17 @@ Dos mejoras de infraestructura independientes: (A) paralelizar la ingesta de PDF
 
 El spec (Q1) menciona constraint `(documento_id, chunk_index)`. El código existente en `pdf_ingestor.py` usa `chunk_sha256` (SHA-256 del texto del chunk) como clave de idempotencia — más robusto porque detecta duplicados cross-documento.
 
-**Decisión: mantener SHA-256**. No se migra el esquema. `chunk_index` existe como campo posicional pero el constraint de unicidad permanece en `chunk_sha256`. Esto evita una migración DDL sobre la BD compartida y es consistente con el comportamiento ya validado.
+**Decisión: mantener SHA-256**. No se migra el esquema. `chunk_index` existe como campo posicional pero la identidad del chunk permanece en `chunk_sha256`. Esto evita una migración DDL sobre la BD compartida y es consistente con el comportamiento ya validado. `spec.md` (Q1, FR-003, caso límite) ya refleja esta decisión.
+
+**Matices verificados en el código:**
+- `chunk_sha256` NO es un constraint de la BD: `PdfIngestor` consulta `metadatos->>'chunk_sha256'` antes de insertar (`pdf_ingestor.py:57`). La consulta y la inserción no son atómicas, por lo que una carrera exacta entre dos workers podría duplicar un chunk.
+- Los chunks de `AutoEnrich` guardan `chunk_sha256` y omiten los ya existentes o repetidos en el lote (FR-013, T025–T028).
 
 ---
 
 ## Decisión de Diseño — Umbral de Enriquecimiento
 
-El spec (Q3) indica reutilizar `RETRIEVAL_MIN_SCORE`. El nombre real en `Settings` es `rag_sector_reserve_threshold` (0.5, más permisivo) y `rag_similarity_threshold` (0.6). El enriquecimiento se activa cuando el score máximo de retrieval es < `rag_sector_reserve_threshold` — el umbral más relajado, para no enriquecer innecesariamente cuando hay algo de evidencia.
+El spec (Q3) indica reutilizar `RETRIEVAL_MIN_SCORE`. El nombre real en `Settings` es `rag_sector_reserve_threshold` (0.5, más permisivo) y `rag_similarity_threshold` (0.6). El enriquecimiento se activa cuando el score máximo de retrieval es < `rag_sector_reserve_threshold` — el umbral más relajado, para no enriquecer innecesariamente cuando hay algo de evidencia. `spec.md` (Q3, FR-007) ya usa este nombre real.
 
 ---
 
@@ -129,24 +134,34 @@ EnrichmentConnector(settings)
        con metadatos: titulo, autores, año, url, fuente="openalex"|"web_enrichment", idioma
 ```
 
-### D. `src/ic/domain/use_cases/auto_enrich.py` [NEW, ~180L]
+### D. `src/ic/domain/use_cases/auto_enrich.py` [NEW + MODIFY por T021, ~175L]
 
 ```
-AutoEnrich(pgvector_store, enrichment_connector, embedder, embedding_repo)
-  try_enrich(sector_gics, query_text, threshold) -> bool
-    1. scores = pgvector_store.search_scores(query_text, sector_gics, top_k=5)
-    2. if max(scores, default=0) >= threshold: return False
-    3. fragmentos = enrichment_connector.fetch_fragments(query_text, sector_gics)
-    4. if not fragmentos: return False
-    5. Para cada fragmento: embedder.embed(texto) → embedding_repo.save(chunk)
-    6. return True
+AutoEnrich(settings, embedder)            <- embedder OBLIGATORIO (T021); sin None ni vector de ceros
+  try_enrich(sector_gics, query_text, threshold) -> EventoEnriquecimiento
+    1. scores = search_scores(...)                       (PGVectorStore, sesión propia)
+    2. if max(scores, default=0) >= threshold: resultado="suficiente"
+    3. fragmentos = connector.fetch_fragments(query_text, sector_gics)
+    4. if not fragmentos: resultado="sin_evidencia"
+    4b. descartar fragmentos con chunk_sha256 ya existente (repo.exists_by_sha256) o repetidos; si no queda ninguno: resultado="ya_existentes" (sin reintentar retrieval)
+    5. Para cada fragmento: embedder.embed(texto) → EmbeddingRepository.insert_many(chunks)
+    6. resultado="enriquecido"; cualquier excepción → resultado="fallido" (+ error)
+  EventoEnriquecimiento.enriquecido -> bool    (True solo si resultado == "enriquecido")
 ```
 
-**Punto de integración**: en `_informe_context.py` (o helper de retrieval de capítulos), después de un retrieval < threshold y ANTES de llamar a `datos_ausentes()`:
+**Punto de integración**: `_maybe_auto_enrich` en `_n1_chapter_builders.py`, después de un retrieval < threshold y ANTES de `datos_ausentes()`:
 - Comprobar `sector_gics not in ctx._enriched_sectors`
-- Llamar `auto_enrich.try_enrich(...)`
-- Añadir sector a `ctx._enriched_sectors` (set en `InformeContext`)
-- Si retorna `True`: reintentar retrieval una vez
+- Llamar `AutoEnrich(...).try_enrich(...)`
+- Añadir sector a `ctx._enriched_sectors`
+- Anexar el evento a `ctx.eventos_enriquecimiento` (T022); registrar excepciones con `logger.warning` (sin `except` silencioso)
+- Si `evento.enriquecido`: reintentar retrieval una vez
+
+### E. Trazabilidad del enriquecimiento (T021–T024)
+
+- `EventoEnriquecimiento` (dataclass en `auto_enrich.py`) registra cada activación (spec US2/AC4, constitución III).
+- `ctx.eventos_enriquecimiento: list` (nuevo campo en `_informe_context.py`).
+- Persistencia: `_informe_nodes_n3.py` los guarda en `historial_informes.metricas_fiabilidad` (JSONB existente), clave `enriquecimiento`. Sin migración de esquema.
+- `embedder` obligatorio (opción B acordada): en producción `ctx.embedder` siempre se construye con `Embedder(s)` (`_informe_context.py:144`), así que el `None` y el vector `[0.0] * 768` eran código muerto con riesgo de contaminar el índice compartido.
 
 ---
 

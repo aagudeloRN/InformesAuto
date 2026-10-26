@@ -56,7 +56,7 @@ BOILERPLATE: frozenset[str] = frozenset(
         "profile is a",
         "industry profiles marketline this",
         "by organizations in the",
-        # Acr?nimos gen?ricos / metadatos de informe que NO son empresas (no se?al).
+        # Acrónimos genéricos / metadatos de informe que NO son empresas (no señal).
         "utc",
         "cagr",
         "lng",

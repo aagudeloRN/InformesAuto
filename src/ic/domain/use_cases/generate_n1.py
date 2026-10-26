@@ -161,8 +161,8 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
         cap = review_web_cap(
             settings=s,
             llm=ctx.api_llm or ctx.llm,
-            capitulo_nombre="Cap 2 ? An?lisis Competitivo",
-            criterios=CRITERIOS_CAPITULO["Cap 2 ? An?lisis Competitivo"],
+            capitulo_nombre="Cap 2 — Análisis Competitivo",
+            criterios=CRITERIOS_CAPITULO["Cap 2 — Análisis Competitivo"],
             cap_obj=cap,
             run_key=ctx.run_key,
             store=store,
@@ -200,7 +200,7 @@ def run_n1_parallel(ctx: _PipelineContext) -> None:
     ctx.cap, ctx.cap_mercado = _results.get("cap2"), _results.get("mercado")
     ctx.cap_tend, ctx.cap_eco = _results.get("cap3"), _results.get("cap4")
 
-    ctx.step_fn(4, "P?rrafos introductorios N1")
+    ctx.step_fn(4, "Párrafos introductorios N1")
     apply_n1_intros(ctx, _restored)
 
     _slots = {

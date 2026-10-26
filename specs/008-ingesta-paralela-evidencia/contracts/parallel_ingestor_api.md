@@ -59,16 +59,14 @@ resultados = ingestor.run_batch(tareas=[
 ```python
 from ic.domain.use_cases.auto_enrich import AutoEnrich
 
-enricher = AutoEnrich(
-    pgvector_store=pgvector_store,
-    enrichment_connector=enrichment_connector,
-    embedder=embedder,
-    embedding_repo=embedding_repo,
-)
-enriquecido = enricher.try_enrich(
+enricher = AutoEnrich(settings=settings, embedder=embedder)  # embedder obligatorio
+evento = enricher.try_enrich(
     sector_gics="5510",
     query_text="energías renovables Colombia",
     threshold=0.5,  # rag_sector_reserve_threshold
 )
-# enriquecido: bool — True si se persistieron fragmentos nuevos
+# evento: EventoEnriquecimiento; evento.enriquecido -> True si se persistieron fragmentos nuevos
+# evento.resultado in {"suficiente", "enriquecido", "ya_existentes", "sin_evidencia", "fallido"}
 ```
+
+Los eventos del informe se guardan en `historial_informes.metricas_fiabilidad["enriquecimiento"]` (lista de objetos con los campos de `EventoEnriquecimiento`).

@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-17
 
-**Status**: Draft
+**Status**: Implemented (US1 y US2; validación E2E de SC-001/SC-004 diferida)
 
 **Priority**: P1 (Infraestructura y Capacidad de Carga)
 
@@ -26,10 +26,14 @@ El sistema genera informes de Inteligencia Competitiva a partir de un corpus doc
 
 ### Session 2026-09-17
 
-- Q: ¿Qué campo(s) definen la unicidad de un chunk para evitar duplicados en re-ingesta? → A: Constraint único `(documento_id, chunk_index)` — FK del documento + posición ordinal dentro del PDF.
+- Q: ¿Qué campo(s) definen la unicidad de un chunk para evitar duplicados en re-ingesta? → A: `chunk_sha256` (SHA-256 del texto del chunk, guardado en `metadatos`), ya usado por `PdfIngestor`, que consulta antes de insertar. Se descartó el constraint `(documento_id, chunk_index)` para no migrar la BD compartida y porque `chunk_sha256` también detecta duplicados entre documentos distintos.
 - Q: ¿El paralelismo entre PDFs debe usar hilos (`ThreadPoolExecutor`) o procesos (`ProcessPoolExecutor`)? → A: `ThreadPoolExecutor` — las llamadas a Ollama son I/O HTTP; el GIL se libera durante la espera, los threads son suficientes y más livianos.
-- Q: ¿El umbral que activa el enriquecimiento automático es el mismo del retrieval normal o uno independiente? → A: Mismo umbral del sistema existente (`RETRIEVAL_MIN_SCORE` en `.env`); sin nueva variable de configuración.
+- Q: ¿El umbral que activa el enriquecimiento automático es el mismo del retrieval normal o uno independiente? → A: Mismo umbral del sistema existente (`rag_sector_reserve_threshold` en `Settings`, 0.5 por defecto, configurable vía `.env`); sin nueva variable de configuración.
 - Q: ¿El acceso a OpenAlex requiere API key o opera de forma anónima con polite pool? → A: Anónimo con polite pool — incluir `OPENALEX_EMAIL` en `.env` para el header `User-Agent`; sin API key adicional.
+- Q: ¿Se aplica el gate RN-001 (candidato/verificado/descartado) a los fragmentos enriquecidos? → A: Sí, según el origen: OpenAlex entra como `verificado` (fuente académica con metadatos APA completos); web (`web_enrichment`) entra como `candidato` y el retrieval lo excluye hasta que se corrobore o se apruebe (FR-014, FR-015).
+- Q: ¿Cómo se promueve un fragmento `candidato` a `verificado`? → A: Dos vías (A+C): automática, si existe un chunk `verificado` del mismo sector con similitud ≥ `rag_similarity_threshold` (0.6) que lo respalde; y manual, por aprobación o descarte de un analista en la UI. Sin respaldo automático, el `candidato` espera revisión humana (FR-015, FR-016).
+- Q: ¿Dónde se miden SC-001 (aceleración) y SC-004 (reducción de párrafos de ausencia)? → A: En una spec posterior de validación E2E; no forman parte del alcance de esta spec.
+- Q: ¿Se crea `pool_size` configurable? → A: No; se usa el pool por defecto de SQLAlchemy y se documenta el máximo recomendado de workers (ver Assumptions).
 - Q: ¿El log de errores de ingesta debe persistirse en BD o basta con stdout estructurado? → A: Stdout estructurado (JSON lines) — cada resultado impreso como JSON por línea; redirigible a archivo con `> ingesta.log`; sin tabla adicional en BD.
 
 ---
@@ -55,7 +59,7 @@ El operador del sistema desea ingestar un lote grande de PDFs (ej. 250 archivos 
 
 ### User Story 2 — Enriquecimiento Automático de Sectores con Baja Evidencia (Priority: P2)
 
-El sistema detecta, durante la generación de un informe, que el retrieval de un sector específico no supera el umbral de relevancia mínima. En lugar de insertar inmediatamente el párrafo de ausencia, activa un proceso de enriquecimiento: consulta fuentes secundarias (OpenAlex, arXiv, búsqueda web), descarga y persiste los fragmentos relevantes en el índice vectorial compartido, y luego reintenta el retrieval. Si tras el enriquecimiento hay evidencia suficiente, el informe la utiliza con citación APA; si no, aplica la regla de datos ausentes.
+El sistema detecta, durante la generación de un informe, que el retrieval de un sector específico no supera el umbral de relevancia mínima. En lugar de insertar inmediatamente el párrafo de ausencia, activa un proceso de enriquecimiento: consulta fuentes secundarias (OpenAlex y búsqueda web), descarga y persiste los fragmentos relevantes en el índice vectorial compartido, y luego reintenta el retrieval. Si tras el enriquecimiento hay evidencia suficiente, el informe la utiliza con citación APA; si no, aplica la regla de datos ausentes.
 
 **Why this priority**: Reduce la tasa de párrafos de ausencia en sectores secundarios sin requerir intervención manual del analista. Mejora directamente la completitud percibida del informe.
 
@@ -72,10 +76,10 @@ El sistema detecta, durante la generación de un informe, que el retrieval de un
 
 ### Edge Cases
 
-- ¿Qué ocurre si dos workers intentan ingestar el mismo PDF simultáneamente? → El constraint único `(documento_id, chunk_index)` garantiza que el segundo worker recibe `ON CONFLICT DO NOTHING` sin error; los datos quedan consistentes.
+- ¿Qué ocurre si dos workers intentan ingestar el mismo PDF simultáneamente? → `PdfIngestor` consulta `chunk_sha256` antes de insertar, así que el segundo worker omite los chunks ya guardados. Como la consulta y la inserción no son atómicas, una carrera exacta entre dos workers podría duplicar un chunk; el riesgo se reduce porque el lote no repite archivos (ver Assumptions).
 - ¿Qué ocurre si el pool de conexiones SQLAlchemy se agota durante ingesta paralela masiva? → Cada worker crea su propia `SessionLocal()` independiente; no se comparten sesiones entre hilos.
 - ¿Qué ocurre si el enriquecimiento web devuelve contenido en inglés para un informe en español? → Los fragmentos se persisten con metadato `idioma: "en"`; el pipeline RAG los incluye si superan el umbral de relevancia semántica.
-- ¿Qué ocurre si el directorio de PDFs está vacío? → El script finaliza inmediatamente con mensaje informativo y código de salida 0.
+- ¿Qué ocurre si el directorio de PDFs está vacío? → El script finaliza inmediatamente con código de salida 0 y emite el resumen `{"tipo": "resumen", "total": 0, ...}` más un log informativo (verificado 2026-10-26 con `--workers 1` y `--workers 3`).
 - ¿El enriquecimiento automático puede entrar en bucle infinito? → No: se ejecuta como máximo una vez por sector por generación de informe (flag en contexto de generación).
 
 ---
@@ -88,26 +92,30 @@ El sistema detecta, durante la generación de un informe, que el retrieval de un
 
 - **FR-001**: El script `ingest_batch.py` DEBE aceptar un parámetro `--workers N` (entero ≥ 1, default 1) que controla el número de hilos concurrentes implementados con `ThreadPoolExecutor`; cada hilo maneja un PDF completo de forma independiente.
 - **FR-002**: Cada worker DEBE usar su propia sesión de base de datos independiente; está prohibido compartir sesiones SQLAlchemy entre hilos.
-- **FR-003**: La ingesta paralela DEBE ser idempotente: la tabla de embeddings tiene un constraint único `(documento_id, chunk_index)`; re-ejecutar sobre un directorio ya procesado activa `ON CONFLICT DO NOTHING` y no crea duplicados.
+- **FR-003**: La ingesta paralela DEBE ser idempotente: cada chunk se identifica por `chunk_sha256` y se omite si ya existe en la tabla de embeddings; re-ejecutar sobre un directorio ya procesado no crea duplicados.
 - **FR-004**: Los fallos de un PDF individual DEBEN emitirse por stdout como JSON lines (`{"archivo": ..., "estado": "error", "error": ...}`) sin interrumpir el procesamiento de los demás archivos; el operador puede redirigir stdout a archivo (`> ingesta.log`).
 - **FR-005**: El script DEBE emitir líneas de progreso por stdout (JSON lines con `{"procesados": N, "total": M, "archivo": ..., "estado": ...}`) a medida que cada worker completa un PDF.
 - **FR-006**: El módulo de ingesta paralela DEBE estar encapsulado en un wrapper bajo `infrastructure/` siguiendo el principio de agnosticismo de dependencias (Constitución II).
 
 **Bloque B — Enriquecimiento Automático:**
 
-- **FR-007**: El pipeline de generación DEBE detectar automáticamente cuando el retrieval de un sector no supera `RETRIEVAL_MIN_SCORE` (variable existente en `.env`); ese mismo umbral activa el enriquecimiento automático — no se introduce una variable de configuración adicional.
+- **FR-007**: El pipeline de generación DEBE detectar automáticamente cuando el retrieval de un sector no supera `rag_sector_reserve_threshold` (variable existente en `Settings`, configurable vía `.env`), medido sobre el score máximo de los 5 mejores resultados (`top_k=5`); ese mismo umbral activa el enriquecimiento automático — no se introduce una variable de configuración adicional.
 - **FR-008**: Al detectar baja evidencia, el sistema DEBE activar el módulo de enriquecimiento automático (`infrastructure/sources/`) consultando OpenAlex vía polite pool (header `User-Agent` con `OPENALEX_EMAIL` de `.env`, sin API key) como primera opción, y búsqueda web como fallback.
 - **FR-009**: Los fragmentos obtenidos del enriquecimiento DEBEN persistirse en la misma tabla de embeddings que los PDFs manuales, con metadatos de procedencia (`fuente: "openalex"`, `fuente: "web_enrichment"`, etc.).
 - **FR-010**: El enriquecimiento DEBE ejecutarse como máximo una vez por sector por ejecución de informe (sin bucles de retry indefinidos).
 - **FR-011**: Si el enriquecimiento falla o no obtiene evidencia suficiente, el sistema DEBE aplicar la regla de datos ausentes sin invocar al modelo (comportamiento existente, preservado).
 - **FR-012**: Los fragmentos enriquecidos DEBEN ser citables con APA; cada fragmento persistido DEBE tener `titulo`, `autores`, `año` y `url` como metadatos mínimos.
+- **FR-014**: Los fragmentos enriquecidos DEBEN persistirse con `metadatos.estado_verificacion` (gate RN-001, Constitución III): `verificado` si `fuente = "openalex"`, `candidato` si `fuente = "web_enrichment"`.
+- **FR-015**: El retrieval DEBE excluir los fragmentos `candidato` de los resultados citables; un `candidato` pasa a `verificado` solo por (a) respaldo de un chunk `verificado` del mismo sector con similitud ≥ `rag_similarity_threshold`, o (b) aprobación humana.
+- **FR-016**: La UI DEBE listar los fragmentos `candidato` pendientes y permitir aprobarlos (`verificado`) o descartarlos (`descartado`); un `descartado` nunca se recupera ni se re-promueve.
+- **FR-013**: Cada fragmento enriquecido DEBE guardar `chunk_sha256` (SHA-256 de su texto) en `metadatos` y NO insertarse si ya existe un chunk con ese hash en el índice, ni repetirse dentro del mismo lote; repetir un enriquecimiento no crea duplicados.
 
 ### Key Entities
 
 - **LotePDF**: Conjunto de archivos PDF a procesar; atributos clave: ruta de directorio, lista de archivos, número de workers, estado de progreso.
-- **ResultadoIngesta**: Resultado por archivo: `documento_id`, `n_chunks_creados`, `estado` (exitoso / fallido), `error_msg`.
+- **ResultadoIngesta**: Resultado por archivo: `documento_id` (siempre `null` hoy, ver T017), `n_chunks`, `estado` (`ok` / `error`), `error_msg`.
 - **FragmentoEnriquecido**: Chunk de texto obtenido de fuente secundaria; mismo esquema que chunks de PDFs manuales, con metadato `fuente` y `procedencia_url`.
-- **EventoEnriquecimiento**: Registro de cada activación del enriquecimiento: sector, umbral detectado, fuentes consultadas, fragmentos obtenidos, resultado (enriquecido / sin evidencia / fallido).
+- **EventoEnriquecimiento**: Registro de cada activación del enriquecimiento: sector, umbral detectado, fuentes consultadas, fragmentos obtenidos, resultado (suficiente / enriquecido / ya_existentes / sin evidencia / fallido).
 
 ---
 
@@ -115,10 +123,10 @@ El sistema detecta, durante la generación de un informe, que el retrieval de un
 
 ### Measurable Outcomes
 
-- **SC-001**: Un lote de 50 PDFs con `--workers 4` completa en tiempo ≤ 40% del tiempo que tardaría de forma secuencial (factor de aceleración ≥ 2.5×).
+- **SC-001** *(diferido a spec de validación E2E)*: Un lote de 50 PDFs con `--workers 4` completa en tiempo ≤ 40% del tiempo que tardaría de forma secuencial (factor de aceleración ≥ 2.5×).
 - **SC-002**: La re-ingesta del mismo lote produce exactamente 0 chunks duplicados en la tabla de embeddings.
 - **SC-003**: Un fallo en un PDF individual no interrumpe el lote; el resto de archivos se procesan y quedan indexados correctamente.
-- **SC-004**: El enriquecimiento automático reduce la tasa de párrafos de ausencia en sectores secundarios (< 10 docs en corpus) en al menos un 30% respecto al baseline actual.
+- **SC-004** *(diferido a spec de validación E2E)*: El enriquecimiento automático reduce la tasa de párrafos de ausencia en sectores secundarios (< 10 docs en corpus) en al menos un 30% respecto al baseline actual.
 - **SC-005**: Los fragmentos enriquecidos son recuperados por el pipeline RAG en las mismas condiciones que los chunks de PDFs manuales (mismo threshold, mismo re-ranker).
 - **SC-006**: Ningún archivo nuevo creado en `src/` supera las 300 líneas (Constitución I).
 - **SC-007**: Cobertura de tests ≥ 80% en los módulos de `domain/` nuevos o modificados; 0 errores de `ruff`.
@@ -128,7 +136,7 @@ El sistema detecta, durante la generación de un informe, que el retrieval de un
 ## Assumptions
 
 - El embedding local (`nomic-embed-text` vía Ollama en el host) tiene capacidad para manejar requests concurrentes desde múltiples workers; se asume que Ollama gestiona la cola internamente.
-- La BD PostgreSQL compartida soporta el número de conexiones simultáneas requerido (N workers × 1 sesión cada uno); el `pool_size` del engine se configurará en `.env`.
+- La BD PostgreSQL compartida soporta el número de conexiones simultáneas requerido (N workers × 1 sesión cada uno); el engine usa el pool por defecto de SQLAlchemy (5 conexiones + 10 de desborde = 15 máx.; `database.py` no define `pool_size`). Se recomienda `--workers` ≤ 8; con valores mayores los hilos esperan conexión pero no fallan. No se añade configuración nueva.
 - OpenAlex se accede vía polite pool anónimo con `OPENALEX_EMAIL` en el header `User-Agent`; sin API key. El volumen esperado (~10 queries/sector/informe) está dentro del límite del polite pool (~10 req/s).
 - El enriquecimiento automático no reemplaza la ingesta manual de PDFs EMIS; es un complemento para sectores con corpus insuficiente.
 - Los PDFs del lote están en el sistema de archivos local (no en S3 ni almacenamiento remoto).

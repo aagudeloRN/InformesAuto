@@ -268,8 +268,8 @@ def build_fn_cap2_impl(
         cap = review_web_cap(
             settings=s,
             llm=ctx.api_llm or ctx.llm,
-            capitulo_nombre="Cap 2 ? An?lisis Competitivo",
-            criterios=CRITERIOS_CAPITULO["Cap 2 ? An?lisis Competitivo"],
+            capitulo_nombre="Cap 2 — Análisis Competitivo",
+            criterios=CRITERIOS_CAPITULO["Cap 2 — Análisis Competitivo"],
             cap_obj=cap,
             run_key=ctx.run_key,
             store=store,

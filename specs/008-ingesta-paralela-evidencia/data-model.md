@@ -52,7 +52,7 @@ Chunk de texto obtenido de fuente secundaria para enriquecimiento del índice.
 
 ---
 
-### EventoEnriquecimiento (no persistido, registrado en log de contexto)
+### EventoEnriquecimiento (dataclass; se persiste en `historial_informes.metricas_fiabilidad`, clave `enriquecimiento`)
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
@@ -61,13 +61,14 @@ Chunk de texto obtenido de fuente secundaria para enriquecimiento del índice.
 | `score_max_previo` | `float` | Score máximo del retrieval previo al enriquecimiento |
 | `fuentes_consultadas` | `list[str]` | `["openalex", "web"]` según lo activado |
 | `n_fragmentos` | `int` | Fragmentos persistidos en pgvector |
-| `resultado` | `str` | `"enriquecido"`, `"sin_evidencia"`, `"fallido"` |
+| `resultado` | `str` | `"enriquecido"`, `"sin_evidencia"`, `"fallido"` (más `"suficiente"` si no hizo falta enriquecer y `"ya_existentes"` si todos los fragmentos ya estaban en el índice) |
+| `error` | `str \| None` | Mensaje si `resultado="fallido"` |
 
 ---
 
 ## Tabla Existente — Sin Cambios de Esquema
 
-**`embedding_vectorial`** (esquema `informes_ic`): Los `FragmentoEnriquecido` se persisten usando el mismo `EmbeddingRepo` y la misma tabla que los chunks de PDFs. La procedencia queda en `metadatos JSONB`:
+**`embeddings_vectoriales`** (esquema `informes_ic`): Los `FragmentoEnriquecido` se persisten usando el mismo `EmbeddingRepo` y la misma tabla que los chunks de PDFs. La procedencia queda en `metadatos JSONB`:
 
 ```json
 {
@@ -86,4 +87,4 @@ Chunk de texto obtenido de fuente secundaria para enriquecimiento del índice.
 
 ## Invariante de Idempotencia
 
-La tabla `embedding_vectorial` usa `chunk_sha256` (SHA-256 del texto del chunk) como clave de deduplicación. Re-ingestar el mismo fragmento — ya sea de PDF o de fuente secundaria — activa `ON CONFLICT DO NOTHING` y no crea duplicados.
+La tabla `embeddings_vectoriales` usa `chunk_sha256` (SHA-256 del texto del chunk) como clave de deduplicación. Re-ingestar el mismo fragmento — ya sea de PDF o de fuente secundaria — se omite si ya existe (consulta previa de `PdfIngestor`, no un constraint de BD). Los chunks de `AutoEnrich` guardan `chunk_sha256` y omiten los ya existentes o repetidos en el lote (FR-013, T025–T028).

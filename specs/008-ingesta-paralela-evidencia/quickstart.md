@@ -45,7 +45,7 @@ uv run python scripts/ingest_batch.py \
   --dir documentos_sectoriales \
   --csv documentos_sectoriales/indice.csv \
   --workers 3 2>/dev/null | grep '"n_chunks"'
-# Resultado esperado: "n_chunks": 0 en todos (ON CONFLICT DO NOTHING)
+# Resultado esperado: "n_chunks": 0 en todos (chunks ya existentes por `chunk_sha256`)
 ```
 
 ### 4. Verificar aceleración
@@ -69,7 +69,7 @@ Identificar un sector con 0 chunks en el índice:
 
 ```bash
 # En psql
-SELECT sector_gics, count(*) FROM informes_ic.embedding_vectorial
+SELECT sector_gics, count(*) FROM informes_ic.embeddings_vectoriales
 GROUP BY sector_gics ORDER BY count ASC LIMIT 5;
 ```
 
@@ -85,7 +85,7 @@ from ic.shared.config import get_settings
 
 **Resultado esperado**:
 - El log muestra `AutoEnrich.try_enrich` activado para ese sector
-- Al menos 1 fragmento nuevo en `embedding_vectorial` con `metadatos->>'fuente' IN ('openalex','web_enrichment')`
+- Al menos 1 fragmento nuevo en `embeddings_vectoriales` con `metadatos->>'fuente' IN ('openalex','web_enrichment')`
 - El informe generado cita la fuente enriquecida con APA
 
 ### 3. Verificar degradación elegante

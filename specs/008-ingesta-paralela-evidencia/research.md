@@ -26,7 +26,9 @@
 
 **Decision**: Mantener `chunk_sha256` como clave de idempotencia (ya implementado). No añadir constraint `(documento_id, chunk_index)`.
 
-**Rationale**: SHA-256 del texto detecta duplicados cross-documento (más robusto). Añadir un segundo constraint requeriría una migración DDL sobre la BD compartida (`ALTER TABLE embedding_vectorial ADD CONSTRAINT ...`), con riesgo de lock en prod. El comportamiento existente ya satisface SC-002.
+**Nota (verificada en código)**: no es un constraint de BD sino una consulta previa en `pdf_ingestor.py:57`, no atómica; `AutoEnrich` guarda `chunk_sha256` y omite repetidos (FR-013, T025–T028).
+
+**Rationale**: SHA-256 del texto detecta duplicados cross-documento (más robusto). Añadir un segundo constraint requeriría una migración DDL sobre la BD compartida (`ALTER TABLE embeddings_vectoriales ADD CONSTRAINT ...`), con riesgo de lock en prod. El comportamiento existente ya satisface SC-002.
 
 ---
 
@@ -53,3 +55,13 @@
 **Decision**: Usar `settings.openalex_email` (ya en `Settings` y usado por `OpenAlexConnector` existente). Sin cambios en la configuración.
 
 **Rationale**: `OpenAlexConnector.__init__` ya lee `settings.openalex_email` y lo pone en el header `User-Agent`. La infraestructura ya existe; `EnrichmentConnector` simplemente instancia `OpenAlexConnector(settings)`.
+
+---
+
+## Decisión 7 — Trazabilidad del enriquecimiento y embedder obligatorio
+
+**Decision**: `try_enrich` devuelve un `EventoEnriquecimiento`; los eventos se guardan en `historial_informes.metricas_fiabilidad` (JSONB existente, clave `enriquecimiento`). `AutoEnrich` exige `embedder` (sin `None`).
+
+**Rationale**: El spec (US2/AC4) y la constitución III piden historial completo. La columna JSONB ya existe, así que no hay migración. `ctx.embedder` siempre se construye con `Embedder(s)` (`_informe_context.py:144`) y el único llamador lo pasa; el vector de ceros `[0.0] * 768` era código muerto que, de activarse, contaminaría el índice compartido.
+
+**Alternatives considered**: guarda en `try_enrich` que devuelve evento "fallido" si falta el embedder (innecesaria con embedder obligatorio); tabla nueva de eventos (requiere migración en BD compartida, desproporcionado).

@@ -47,6 +47,15 @@ def is_transient_network_error(exc: Exception) -> bool:
     return any(p in text for p in _TRANSIENT_NETWORK_PATTERNS)
 
 
+def is_model_unavailable_error(exc: Exception) -> bool:
+    """Detecta HTTP 404 de OpenRouter: el modelo/endpoint ya no existe para esta cuenta.
+
+    Pasa con los modelos ``:free`` cuando el proveedor retira el despliegue (2026-10-26). Justifica
+    fallback de tier: reintentar el mismo modelo no sirve.
+    """
+    return isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 404
+
+
 class RateLimitError(RuntimeError):
     """Excepción explícita de rate-limit para que ResilientChatModel la capture."""
 
@@ -98,6 +107,7 @@ class ResilientChatModel(BaseChatModel):
                     is_rate_limit_error(exc)
                     or is_transient_network_error(exc)
                     or is_empty_generation_error(exc)
+                    or is_model_unavailable_error(exc)
                 ):
                     logger.warning(
                         "Fallo recuperable en tier %d (model=%s): %s. Intentando fallback.",
@@ -134,6 +144,16 @@ class ResilientChatModel(BaseChatModel):
                 if is_rate_limit_error(exc):
                     logger.warning(
                         "Rate-limit en tier %d (model=%s, stream): %s. Intentando fallback.",
+                        i,
+                        tier_llm.model,
+                        exc,
+                    )
+                    last_exc = exc
+                    continue
+                if is_model_unavailable_error(exc):
+                    logger.warning(
+                        "Modelo no disponible (404) en tier %d (model=%s, stream): %s. "
+                        "Intentando fallback.",
                         i,
                         tier_llm.model,
                         exc,

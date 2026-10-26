@@ -84,6 +84,7 @@ class _PipelineContext:
     run_key: str = ""
     checkpoint: dict = field(default_factory=dict)
     _enriched_sectors: set[str] = field(default_factory=set)
+    eventos_enriquecimiento: list[Any] = field(default_factory=list)
 
 
 def setup_pipeline_infra(

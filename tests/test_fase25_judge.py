@@ -123,3 +123,22 @@ def test_criterios_cubren_los_caps_looped():
     }
     assert esperados <= set(CRITERIOS_CAPITULO)
     assert DIMENSIONES == ("E", "P", "V", "F", "T")
+
+
+def test_claves_criterios_capitulo_usadas_en_src_existen():
+    """Regresión 2026-10-26: claves con '?' (codificación dañada) daban KeyError en el Cap 2."""
+    import ast
+    from pathlib import Path
+
+    usadas = set()
+    for py in Path("src").rglob("*.py"):
+        for nodo in ast.walk(ast.parse(py.read_text(encoding="utf-8"))):
+            if (
+                isinstance(nodo, ast.Subscript)
+                and isinstance(nodo.value, ast.Name)
+                and nodo.value.id == "CRITERIOS_CAPITULO"
+                and isinstance(nodo.slice, ast.Constant)
+            ):
+                usadas.add(nodo.slice.value)
+    assert usadas, "no se encontró ningún uso de CRITERIOS_CAPITULO"
+    assert usadas <= set(CRITERIOS_CAPITULO), usadas - set(CRITERIOS_CAPITULO)

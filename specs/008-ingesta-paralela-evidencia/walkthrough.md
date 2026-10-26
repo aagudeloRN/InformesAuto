@@ -27,7 +27,7 @@ Se ha completado al 100% la implementación y verificación del **Spec 008** (`0
 
 ### 4. Caso de Uso de Auto-Enriquecimiento
 - **`src/ic/domain/use_cases/auto_enrich.py`**:
-  - Clase `AutoEnrich`: consulta de scores vectoriales y persistencia en `embedding_vectorial` vía `EmbeddingRepository.insert_many`.
+  - Clase `AutoEnrich`: consulta de scores vectoriales y persistencia en `embeddings_vectoriales` vía `EmbeddingRepository.insert_many`.
 
 ### 5. Integración en el Pipeline de Generación
 - **`src/ic/domain/use_cases/_informe_context.py`**:

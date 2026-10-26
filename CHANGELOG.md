@@ -5,6 +5,23 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 
 ---
 
+## [Sin versión] — 2026-10-26 (Spec 008: convergencia T021–T028 y fixes del E2E)
+
+### Added
+- `AutoEnrich.try_enrich` devuelve `EventoEnriquecimiento` (suficiente / enriquecido / ya_existentes / sin_evidencia / fallido); se guarda en `metricas_fiabilidad["enriquecimiento"]`.
+- Deduplicación de fragmentos enriquecidos por `chunk_sha256` (`EmbeddingRepository.exists_by_sha256`).
+- Fallback de tier del gateway ante HTTP 404 (`is_model_unavailable_error`).
+- Gate RN-001 en fragmentos enriquecidos: `metadatos.estado_verificacion` = `verificado` (OpenAlex) o `candidato` (web); `EmbeddingRepository.search_similar` excluye los `candidato` (parámetro `incluir_candidatos`). Promoción automática (chunk `verificado` del mismo sector con similitud ≥ `rag_similarity_threshold`) y aprobación manual en la pestaña Repositorio; `descartado` queda fuera del retrieval para siempre.
+
+### Fixed
+- `KeyError: 'Cap 2 ? An?lisis Competitivo'` en el Cap 2: el código tenía `?` literal en lugar de `—`/`á` (codificación dañada desde commits previos), por lo que la clave nunca coincidía con `CRITERIOS_CAPITULO`. Corregido en `generate_n1.py`, `_n1_cap2_builder.py`, `generate_benchmarking.py` y textos/comentarios afines; test de regresión en `tests/test_fase25_judge.py`.
+- `LLM_API_FREE_MODEL`: `nvidia/nemotron-3-super-120b-a12b:free` devolvía 404 (despliegue retirado); ahora `nvidia/nemotron-3.5-lightning:free` (`.env` y `.env.example`).
+
+### Notas
+- `black --check` marca archivos sin cambios: usa 88 columnas y el proyecto 100. Pendiente de alinear.
+
+---
+
 ## [0.9.8] — 2026-09-17 (Spec 008: Ingesta Masiva Paralela e Infraestructura de Evidencia)
 
 ### Added
@@ -15,7 +32,7 @@ Versiones siguiendo [SemVer](https://semver.org/lang/es/).
 - **Auto-Enriquecimiento de Evidencia para Sectores Pobres (US2)**:
   - Caso de uso AutoEnrich en src/ic/domain/use_cases/auto_enrich.py y conector EnrichmentConnector con OpenAlex y WebSearch fallback.
   - Integración en _PipelineContext (_enriched_sectors) y en sub-orquestadores de capítulos _n1_chapter_builders.py.
-  - Cobertura de pruebas unitarias en 	ests/test_auto_enrich.py (3/3 passed).
+  - Cobertura de pruebas unitarias en 	ests/test_auto_enrich.py (12/12 passed tras T021–T028).
 
 ---
 

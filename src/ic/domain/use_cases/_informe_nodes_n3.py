@@ -128,6 +128,7 @@ def run_n3(ctx: _PipelineContext) -> InformeResult:
         "n_citas_huerfanas": len(orphans),
         "n_huerfanas_suprimidas": n_huerfanas_suprimidas,
         "tiempo_ollama_total_s": round(ctx.tracker.total_ollama_time_s(), 2),
+        "enriquecimiento": [e.to_dict() for e in ctx.eventos_enriquecimiento],
     }
 
     informe = InformePiloto(

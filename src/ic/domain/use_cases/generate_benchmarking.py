@@ -191,7 +191,7 @@ class GenerateBenchmarking:
 
         if not check_retrieval_sufficient(chunks, min_chunks=_MIN_CHUNKS):
             return CapBenchmarking(
-                texto=build_absent_paragraph("Cap 2 ? Analisis Competitivo"),
+                texto=build_absent_paragraph("Cap 2 — Análisis Competitivo"),
                 n_chunks_usados=0,
                 retrieval_suficiente=False,
                 chunks_usados=[],
@@ -262,7 +262,7 @@ class GenerateBenchmarking:
         if has_cjk_characters(texto_raw):
             return CapBenchmarking(
                 texto=build_absent_paragraph(
-                    "Cap 2 ? Analisis Competitivo",
+                    "Cap 2 — Análisis Competitivo",
                     "El modelo genero texto en un idioma incorrecto (no espanol)",
                 ),
                 n_chunks_usados=len(chunks),
@@ -273,7 +273,7 @@ class GenerateBenchmarking:
         if is_llm_refusal(texto_raw):
             return CapBenchmarking(
                 texto=build_absent_paragraph(
-                    "Cap 2 ? Analisis Competitivo",
+                    "Cap 2 — Análisis Competitivo",
                     "El modelo no pudo redactar las fichas de competidores con las fuentes dadas",
                 ),
                 n_chunks_usados=len(chunks),

@@ -1,4 +1,4 @@
-"""Nodos N0 (Cap 1, GICS, KB) y N1 (an?lisis paralelo) del pipeline de informes (DT-039)."""
+"""Nodos N0 (Cap 1, GICS, KB) y N1 (análisis paralelo) del pipeline de informes (DT-039)."""
 
 from __future__ import annotations
 
